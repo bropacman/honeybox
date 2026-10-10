@@ -10,7 +10,7 @@ const RANKS = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 
 
 export const SEC = 1000;
 export const TIMES = {
-  intro: 22, turnStart: 5, pick: 30, guess: 20, reveal: 8, safe: 6, dragged: 7,
+  intro: 22, turnStart: 9, pick: 30, guess: 20, reveal: 8, safe: 6, dragged: 7,
   mgIntro: 8, triviaQ: 20, triviaA: 8, pollQ: 20, pollA: 9,
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 9,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
@@ -38,6 +38,19 @@ export const SUSPENSE_MS = 1600;
 
 // What's on the line each card. Watcher: win/same pay per pile depth, a miss risks `risk` in the woods.
 export const SIDE = { right: 100, same: 400 };
+export const BANISH = 300; // bonus for a correct call on the animatronic's spot
+
+// Night events: one is drawn at the start of each night shift and lasts for that shift
+export const EVENTS = {
+  calm: { name: 'A Quiet Night', emoji: '🌌', text: 'Nothing strange tonight… too quiet.' },
+  outage: { name: 'Power Outage', emoji: '🔦', text: 'The board goes dark. You only see a card after you pick its spot.' },
+  moon: { name: 'Full Moon', emoji: '🌕', text: 'SAME pays double tonight.' },
+  cold: { name: 'Cold Snap', emoji: '🧊', text: 'Ties count as a win for the night shift.' },
+  dogs: { name: 'Archie & Honey on Patrol', emoji: '🐕', text: 'The dogs will save the night shift from one miss.' },
+  wind: { name: 'Mount Washington Wind', emoji: '🌪️', text: 'The card piles blew around the map!' },
+  fever: { name: 'Funspot Fever', emoji: '🎪', text: 'Everyone else\'s side bets pay double tonight.' },
+  jackpot: { name: 'Jackpot Night', emoji: '🎰', text: 'The night shift earns double for correct calls.' }
+};
 export function stakesFor(depth) {
   const d = Math.max(1, depth);
   return { win: 100 * d, same: 200 * d, risk: Math.max(200, 100 * d) };
@@ -96,6 +109,7 @@ export class Game {
       seq: 0
     };
     if (saved && saved.deadline) this.S.deadline = Date.now() + (saved.phaseMs || 10 * SEC);
+    if (saved && !this.S.monster && this.S.piles?.length) this.spawnMonster();
   }
 
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -236,6 +250,9 @@ export class Game {
     S.bag = [];
     S.players.forEach(p => { p.score = 0; });
     S.board = {};
+    S.event = null;
+    S.lastEvent = null;
+    this.spawnMonster();
     this.emit('say', 'Welcome to the cabin on Lake Winnipesaukee. Story Land, Funspot and Santa\'s Village closed hours ago. But the animatronics are still moving. Survive until 6 A M.');
     this.go('intro', TIMES.intro);
   }
@@ -295,8 +312,51 @@ export class Game {
     if (S.turnIdx >= S.turnOrder.length) return this.startFinale();
     const w = this.player(S.turnOrder[S.turnIdx]);
     S.watch = { watcherId: w.id, streak: 0, pile: null, guesses: {}, drawn: null, results: null, depth: 0 };
-    this.emit('say', `${w.name}, you're on the night shift. Three in a row gets you to 6 A M.`);
+    const keys = Object.keys(EVENTS).filter(k => k !== S.lastEvent);
+    S.event = pick(keys);
+    S.lastEvent = S.event;
+    if (S.event === 'wind') {
+      const stacks = shuffle(S.piles.map(p => p.cards));
+      S.piles.forEach((p, i) => { p.cards = stacks[i]; });
+    }
+    const ev = EVENTS[S.event];
+    this.emit('say', `${w.name}, you're on the night shift. Tonight: ${ev.name}. ${ev.text}`);
     this.go('turnStart', TIMES.turnStart);
+  }
+
+  // ---------- the roaming animatronic & event modifiers ----------
+  spawnMonster(avoid = -1) {
+    const S = this.S;
+    const spots = S.piles.map((_, i) => i).filter(i => i !== avoid);
+    const kind = pick(DANGERS.filter(d => d.name !== S.monster?.name));
+    S.monster = { pile: pick(spots), name: kind.name, emoji: kind.emoji };
+  }
+
+  moveMonster() {
+    const S = this.S;
+    const spots = S.piles.map((_, i) => i).filter(i => i !== S.monster.pile);
+    S.monster.pile = pick(spots);
+  }
+
+  // what a pile is worth right now, including tonight's event and the animatronic
+  stakesNow(i) {
+    const S = this.S;
+    const base = stakesFor(S.piles[i].cards.length);
+    const haunted = Boolean(S.monster && S.monster.pile === i);
+    const jackpot = S.event === 'jackpot' ? 2 : 1;
+    return {
+      win: base.win * jackpot,
+      same: base.same * jackpot * (S.event === 'moon' ? 2 : 1),
+      risk: base.risk * (haunted ? 2 : 1),
+      haunted,
+      banish: haunted ? BANISH : 0
+    };
+  }
+
+  side() {
+    const S = this.S;
+    const fever = S.event === 'fever' ? 2 : 1;
+    return { right: SIDE.right * fever, same: SIDE.same * fever * (S.event === 'moon' ? 2 : 1) };
   }
 
   // ---------- night watch ----------
@@ -317,6 +377,11 @@ export class Game {
     S.watch.pile = i;
     S.watch.guesses = {};
     S.watch.depth = S.piles[i].cards.length;
+    S.watch.st = this.stakesNow(i);
+    S.watch.saved = false;
+    S.watch.banished = false;
+    S.watch.coldTie = false;
+    if (S.watch.st.haunted) this.emit('say', `Careful. ${S.monster.name} is lurking there.`);
     this.emit('sfx', 'lock');
     this.go('guess', TIMES.guess);
   }
@@ -353,18 +418,27 @@ export class Game {
     pile.cards.push(drawn);
     S.gains = {};
     const results = {};
+    const side = this.side();
+    const st = w.st || this.stakesNow(w.pile);
     for (const [pid, choice] of Object.entries(w.guesses)) {
-      const ok = choice === actual;
+      let ok = choice === actual;
+      // Cold Snap: a tie on HIGH/LOW counts as a win for the watcher
+      if (pid === w.watcherId && !ok && S.event === 'cold' && actual === 'SAME') { ok = true; w.coldTie = true; }
       results[pid] = ok;
-      if (pid !== w.watcherId && ok) this.addScore(pid, choice === 'SAME' ? SIDE.same : SIDE.right);
+      if (pid !== w.watcherId && ok) this.addScore(pid, choice === 'SAME' ? side.same : side.right);
     }
-    const depth = Math.max(1, w.depth);
     const mine = w.guesses[w.watcherId];
     const ok = results[w.watcherId];
     if (ok) {
-      if (mine === 'SAME') { w.streak = 3; this.addScore(w.watcherId, stakesFor(depth).same); }
-      else { w.streak++; this.addScore(w.watcherId, stakesFor(depth).win); }
+      if (mine === 'SAME') { w.streak = 3; this.addScore(w.watcherId, st.same); }
+      else { w.streak++; this.addScore(w.watcherId, st.win); }
+      if (st.haunted) { w.banished = true; this.addScore(w.watcherId, BANISH); }
+    } else if (S.event === 'dogs' && !w.dogsUsed) {
+      // Archie & Honey: one free miss per shift
+      w.saved = true;
+      w.dogsUsed = true;
     }
+    w.risk = st.risk;
     // character sounds: everyone hears their own on their phone; the TV voices the watcher
     for (const [pid, r] of Object.entries(results)) this.emit('mood', { pid, mood: r ? 'happy' : 'sad', tv: pid === w.watcherId, delay: 2100 });
     w.drawn = drawn;
@@ -372,7 +446,7 @@ export class Game {
     w.actual = actual;
     w.results = results;
     w.tie = actual === 'SAME' && mine !== 'SAME';
-    this.suspense(ok ? (mine === 'SAME' ? 'great' : 'good') : 'bad');
+    this.suspense(ok ? (mine === 'SAME' || w.banished ? 'great' : 'good') : w.saved ? 'good' : 'bad');
     this.go('reveal', TIMES.reveal);
   }
 
@@ -380,6 +454,19 @@ export class Game {
     const S = this.S;
     const w = S.watch;
     const name = this.player(w.watcherId)?.name || 'Someone';
+    const lurker = { ...S.monster };
+    if (w.banished) {
+      this.emit('say', `${name} banished ${S.monster.name}! Plus ${BANISH} honey.`);
+      this.spawnMonster(w.pile);
+    } else {
+      this.moveMonster();
+    }
+    if (w.saved) {
+      w.pile = null;
+      S.gains = {};
+      this.emit('say', 'Archie and Honey chased it off! The night shift continues.');
+      return this.go('pick', TIMES.pick);
+    }
     if (w.results[w.watcherId]) {
       if (w.streak >= 3) {
         S.gains = {};
@@ -393,8 +480,8 @@ export class Game {
       S.gains = {};
       return this.go('pick', TIMES.pick);
     }
-    S.lost = { pid: w.watcherId, stake: stakesFor(w.depth).risk };
-    S.danger = pick(DANGERS);
+    S.lost = { pid: w.watcherId, stake: w.risk || stakesFor(w.depth).risk };
+    S.danger = w.st?.haunted ? { name: lurker.name, emoji: lurker.emoji } : pick(DANGERS);
     S.gains = {};
     this.emit('sfx', 'scare');
     this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}.`);
@@ -869,14 +956,17 @@ export class Game {
     switch (S.phase) {
       case 'lobby': return { ...base, screen: 'lobby', length: S.length, count: S.players.length, taken: S.players.filter(p => p.id !== pid).map(p => p.avatar) };
       case 'intro': return wait('Look at the TV', 'The night is starting…', '🌲');
-      case 'turnStart':
-        return w.watcherId === pid ? wait("You're on the night shift!", 'Get 3 in a row to make it to 6 AM.', '🔦')
-          : wait(`${watcher?.name} is on the night shift`, 'You can still bet on every card.', '🔦');
+      case 'turnStart': {
+        const ev = EVENTS[S.event] || EVENTS.calm;
+        return w.watcherId === pid ? wait(`You're on the night shift! ${ev.emoji} ${ev.name}`, ev.text, '🔦')
+          : wait(`${watcher?.name} is on the night shift`, `${ev.emoji} ${ev.name}: ${ev.text}`, '🔦');
+      }
       case 'pick':
         if (w.watcherId === pid) {
           return {
             ...base, screen: 'pick', streak: w.streak,
-            piles: S.piles.map(p => ({ name: p.name, top: p.cards[p.cards.length - 1], depth: p.cards.length, ...stakesFor(p.cards.length) }))
+            event: EVENTS[S.event], monster: S.monster,
+            piles: S.piles.map((p, i) => ({ name: p.name, top: S.event === 'outage' ? null : p.cards[p.cards.length - 1], depth: p.cards.length, ...this.stakesNow(i) }))
           };
         }
         return wait(`${watcher?.name} is choosing where to look…`, `It's ${CLOCK[w.streak]}`, '👀');
@@ -885,12 +975,14 @@ export class Game {
         return {
           ...base, screen: 'guess', watcher: w.watcherId === pid, watcherName: watcher?.name,
           top: pile.cards[pile.cards.length - 1], pileName: pile.name, depth: w.depth, streak: w.streak,
-          locked: w.guesses[pid] || null, ...stakesFor(w.depth), side: SIDE
+          locked: w.guesses[pid] || null, ...(w.st || this.stakesNow(w.pile)), side: this.side(), event: EVENTS[S.event], monster: S.monster
         };
       }
       case 'reveal': {
         const mine = w.guesses[pid];
         if (!mine) return { ...wait(`It was ${w.drawn.r}${w.drawn.s}`, 'You didn\'t guess this one.', '🃏'), suspense: true };
+        if (pid === w.watcherId && w.saved) return { ...wait('Saved by the dogs!', `It was ${w.drawn.r}${w.drawn.s}. Archie & Honey chased it off.`, '🐕'), suspense: true };
+        if (pid === w.watcherId && w.banished) return { ...wait('You banished it!', `+${BANISH} bonus. It was ${w.drawn.r}${w.drawn.s}.`, '⚡'), suspense: true };
         return { ...wait(w.results[pid] ? 'Correct!' : 'Wrong!', `You said ${mine}. It was ${w.drawn.r}${w.drawn.s}.`, w.results[pid] ? '✅' : '❌'), suspense: true };
       }
       case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, 'Safe inside the cabin.', '🏠');

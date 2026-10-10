@@ -433,3 +433,21 @@ body.is-phone .moon { display: none; }
 .finale-opt small { color: var(--muted); }
 .finale-choice { align-items: center; }
 .f-emoji { font-size: 2em; }
+
+/* night events & the roaming animatronic */
+.event-card { display: flex; gap: 0.8em; align-items: center; margin-top: 1em; padding: 0.8em 1.4em; border-radius: 18px; background: var(--panel); border: 3px solid var(--honey); max-width: 40em; text-align: left; animation: verdict 0.8s cubic-bezier(.2,1.6,.4,1) 0.6s both; }
+.event-card .ev-emoji { font-size: 3.4em; }
+.event-card p { margin: 0.2em 0 0; color: var(--muted); }
+.event-chip { display: inline-block; padding: 0.15em 0.7em; border-radius: 999px; background: var(--bg2); border: 2px solid var(--honey); color: var(--honey); font-size: 0.85em; margin-left: 0.4em; }
+.lurk-note { font-size: 0.9em; }
+.spot.haunted .stack .card { box-shadow: 0 0 0 4px var(--bad), 0 0 30px rgba(255, 60, 60, 0.7); }
+.lurker { position: absolute; top: -1.6em; right: -1.4em; font-size: 2.6em; z-index: 3; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); animation: lurk 2.4s ease-in-out infinite; }
+@keyframes lurk { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-6px) rotate(6deg); } }
+.map.outage { filter: brightness(0.55) saturate(0.6); }
+.map.outage .spot.haunted, .map.outage .lurker { filter: none; }
+.banish-m { border-color: #8ad1ff; } .banish-m .m-big { color: #8ad1ff; }
+
+.pick { position: relative; }
+.pick.haunted { border-color: var(--bad); box-shadow: 0 0 14px rgba(255, 60, 60, 0.5); }
+.lurk-ph { position: absolute; top: -10px; right: -6px; font-size: 1.6em; animation: lurk 2.4s ease-in-out infinite; }
+.phone .event-chip { margin: 4px 0; }

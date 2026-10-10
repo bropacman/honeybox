@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES, NARRATED, SIDE, stakesFor, FINALES } from './game.js';
+import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES, NARRATED, SIDE, stakesFor, FINALES, EVENTS, BANISH } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -239,15 +239,18 @@ export function startTV(root, { resume = null } = {}) {
   function board(highlight = null) {
     const S = game.S;
     const piles = S.piles.map((p, i) => {
-      const top = p.cards[p.cards.length - 1];
+      const dark = S.event === 'outage';
+      const top = dark ? null : p.cards[p.cards.length - 1];
+      const st = game.stakesNow(i);
       const [x, y] = SPOTS[p.name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
-      return `<div class="spot ${i === highlight ? 'hl' : ''}" style="left:${x}%;top:${y}%">
+      return `<div class="spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
+        ${st.haunted ? `<div class="lurker" title="${esc(S.monster.name)}">${S.monster.emoji}</div>` : ''}
         <div class="stack" style="--depth:${Math.min(p.cards.length, 8)}">${card(top)}</div>
         <div class="pile-name">${PILE_ICONS[p.name] || ''} ${esc(p.name)}</div>
-        <div class="depth">${p.cards.length} deep · <span class="win">+${stakesFor(p.cards.length).win}</span> · <span class="risk">risk ${stakesFor(p.cards.length).risk}</span></div>
+        <div class="depth">${p.cards.length} deep · <span class="win">+${st.win}</span> · <span class="risk">risk ${st.risk}</span></div>
       </div>`;
     }).join('');
-    return `<div class="map">
+    return `<div class="map ${S.event === 'outage' ? 'outage' : ''}">
       <svg class="map-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <defs><radialGradient id="lake" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2c6a8f"/><stop offset="100%" stop-color="#173f57"/></radialGradient></defs>
         <path d="M30 34 L40 12 L46 22 L54 4 L62 18 L68 8 L78 30 Z" fill="#1d3328"/>
@@ -274,6 +277,14 @@ export function startTV(root, { resume = null } = {}) {
   // face-down card shakes, then flips (timed with the drumroll)
   function revealSlot(c) {
     return `<div class="reveal-slot">${card(null, 'huge suspense')}${card(c, 'huge front')}</div>`;
+  }
+
+  function eventCard(big) {
+    const ev = EVENTS[game.S.event];
+    if (!ev) return '';
+    return big
+      ? `<div class="event-card"><span class="ev-emoji">${ev.emoji}</span><div><b>${esc(ev.name)}</b><p>${esc(ev.text)}</p></div></div>`
+      : `<span class="event-chip">${ev.emoji} ${esc(ev.name)}</span>`;
   }
 
   function streakDots(n) {
@@ -331,6 +342,7 @@ export function startTV(root, { resume = null } = {}) {
           <p class="muted big">NIGHT ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
           <h1>${avatar(watcher)} is on the night shift</h1>
           <p class="big">12 AM. Get 3 in a row to make it to 6 AM.</p>
+          ${eventCard(true)}
         </div>`;
       case 'pick':
         return `<div class="watch pick-layout">
@@ -338,6 +350,8 @@ export function startTV(root, { resume = null } = {}) {
           <div class="pick-info">
             <h2>${avatar(watcher)} is choosing where to look…</h2>
             ${streakDots(w.streak)}
+            ${eventCard(false)}
+            <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> is lurking at ${esc(S.piles[S.monster.pile].name)}. Miss there = double stake. Call it right = <b class="win">+${BANISH} banish!</b></p>
             <p class="muted">Make it to 6 AM: 3 right in a row.</p>
             <p class="muted">Deeper piles pay more honey, but cost more if you get dragged off.</p>
           </div>
@@ -347,11 +361,12 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="watch">
           <div class="watch-head"><h2>${avatar(watcher)} at the <b>${esc(pile.name)}</b></h2>${streakDots(w.streak)}</div>
           <div class="medals">
-            <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${stakesFor(w.depth).win}</span><span class="m-sub">🍯 if right</span></div>
-            <div class="medal same-m"><span class="m-icon">🍯</span><span class="m-big">+${stakesFor(w.depth).same}</span><span class="m-sub">SAME = straight to 6 AM</span></div>
-            <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${stakesFor(w.depth).risk}</span><span class="m-sub">miss = dragged off</span></div>
+            <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${w.st.win}</span><span class="m-sub">🍯 if right</span></div>
+            <div class="medal same-m"><span class="m-icon">🍯</span><span class="m-big">+${w.st.same}</span><span class="m-sub">SAME = straight to 6 AM</span></div>
+            <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.st.risk}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: double stake` : 'miss = dragged off'}</span></div>
+            ${w.st.haunted ? `<div class="medal banish-m"><span class="m-icon">⚡</span><span class="m-big">+${BANISH}</span><span class="m-sub">banish ${S.monster.emoji}</span></div>` : ''}
           </div>
-          <div class="side-note">Everyone else bets risk-free: right <b class="win">+${SIDE.right}</b> · SAME <b class="win">+${SIDE.same}</b></div>
+          <div class="side-note">Everyone else bets risk-free: right <b class="win">+${game.side().right}</b> · SAME <b class="win">+${game.side().same}</b> ${eventCard(false)}</div>
           <div class="duel">
             ${card(pile.cards[pile.cards.length - 1], 'huge')}
             <div class="vs">next card is…<div class="hl-opts"><span>HIGH</span><span>LOW</span><span>SAME</span></div><p class="muted">Lock in on your phone!</p></div>
@@ -372,7 +387,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="watch-head"><h2>${avatar(watcher)} said <b>${mine}</b> at the ${esc(pile.name)}</h2><div class="late">${streakDots(w.streak)}</div></div>
           <div class="duel">
             ${card(w.top, 'huge')}
-            <div class="vs result late ${ok ? 'ok' : 'bad'}">${ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The animatronics win ties.' : '💀 WRONG!'}</div>
+            <div class="vs result late ${ok || w.saved ? 'ok' : 'bad'}">${w.saved ? '🐕 SAVED BY THE DOGS!' : w.banished ? `⚡ BANISHED ${game.S.monster.emoji}!` : w.coldTie ? '🧊 TIE = WIN!' : ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The animatronics win ties.' : '💀 WRONG!'}</div>
             ${revealSlot(w.drawn)}
           </div>
           <div class="guess-cols later">${groups}</div>

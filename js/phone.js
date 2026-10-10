@@ -167,6 +167,7 @@ export function startPhone(root) {
 
   // ---------- screens ----------
   function cardHtml(c, cls = '') {
+    if (!c) return `<div class="card back ${cls}"></div>`;
     const red = c.s === '♥' || c.s === '♦';
     return `<div class="card ${red ? 'red' : ''} ${cls}"><span class="r">${c.r}</span><span class="s">${c.s}</span></div>`;
   }
@@ -200,11 +201,14 @@ export function startPhone(root) {
         break;
       case 'pick':
         body = `<h2>Where do you look?</h2><p class="muted">Streak ${v.streak}/3 · deeper = more honey, bigger stakes</p>
-          <div class="pick-grid">${v.piles.map((p, i) => `<button class="pick" data-pick="${i}">${cardHtml(p.top, 'sm')}<b>${esc(p.name)}</b><small>${p.depth} deep</small><small><span class="win">+${p.win}</span> · <span class="risk">risk ${p.risk}</span></small></button>`).join('')}</div>`;
+          ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
+          <p class="small">${v.monster.emoji} lurks at <b>${esc(v.piles[v.monster.pile].name)}</b>: double risk, <b class="win">+300</b> if you call it right</p>
+          <div class="pick-grid">${v.piles.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}${cardHtml(p.top, 'sm')}<b>${esc(p.name)}</b><small>${p.depth} deep</small><small><span class="win">+${p.win}</span> · <span class="risk">risk ${p.risk}</span></small></button>`).join('')}</div>`;
         break;
       case 'guess':
         body = `<p class="role">${v.watcher ? `🔦 You're on watch · streak ${v.streak}/3` : `Betting on ${esc(v.watcherName)}'s card`}</p>
-          ${v.watcher ? `<div class="risk-box">Miss = dragged off · <b>${v.risk} 🍯 at stake</b></div>` : `<div class="safe-box">No risk for you · right <b>+${v.side.right}</b> · SAME <b>+${v.side.same}</b></div>`}
+          ${v.event ? `<p class="center-sm"><span class="event-chip">${v.event.emoji} ${esc(v.event.name)}</span></p>` : ''}
+          ${v.watcher ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Miss = dragged off · <b>${v.risk} 🍯 at stake</b>${v.haunted ? ' · call it right for <b>+300</b>' : ''}</div>` : `<div class="safe-box">No risk for you · right <b>+${v.side.right}</b> · SAME <b>+${v.side.same}</b></div>`}
           <div class="center-sm">${cardHtml(v.top)}<p>${esc(v.pileName)} · ${v.depth} deep · the next card is…</p></div>
           <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c} <small class="pay">+${v.watcher ? (c === 'SAME' ? v.same : v.win) : (c === 'SAME' ? v.side.same : v.side.right)}</small></button>`).join('')}</div>
           ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
