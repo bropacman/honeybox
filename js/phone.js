@@ -3,6 +3,7 @@
 import { startClient } from './net.js';
 import { AVATARS } from './content.js';
 import { drawingPad, INK } from './draw.js';
+import { unlockAudio, characterSound } from './audio.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const params = new URLSearchParams(location.search);
@@ -54,10 +55,13 @@ export function startPhone(root) {
         <p class="muted small">Hosting on the TV? <a href="?host=1${params.get('peer') ? `&peer=${esc(params.get('peer'))}` : ''}">Open the host screen</a></p>
       </div>`;
     root.querySelectorAll('[data-av]').forEach(b => b.addEventListener('click', () => {
+      unlockAudio();
       chosen = b.dataset.av;
+      characterSound(chosen, 'happy');
       root.querySelectorAll('[data-av]').forEach(x => x.classList.toggle('sel', x === b));
     }));
     root.querySelector('#go').addEventListener('click', () => {
+      unlockAudio();
       const c = root.querySelector('#code').value.trim().toUpperCase();
       const n = root.querySelector('#name').value.trim();
       if (c.length !== 4) return showJoin('Enter the 4-letter room code from the TV.');
@@ -102,9 +106,15 @@ export function startPhone(root) {
       setTime(msg.ms, false);
       const key = JSON.stringify(msg.v);
       view = msg.v;
+      if (session && view.me && session.avatar !== view.me.avatar) {
+        session.avatar = view.me.avatar;
+        store.setItem(SESSION_KEY, JSON.stringify({ ...session, at: Date.now() }));
+      }
       if (key !== viewKey) { viewKey = key; render(); }
     } else if (msg.t === 'time') {
       setTime(msg.ms, msg.paused);
+    } else if (msg.t === 'mood') {
+      if (view?.me) characterSound(view.me.avatar, msg.mood, msg.delay || 0);
     } else if (msg.t === 'toast') {
       toast(msg.text);
       if (view?.screen === 'fib') { const b = root.querySelector('#send'); if (b) b.disabled = false; }
@@ -175,7 +185,7 @@ export function startPhone(root) {
       case 'lobby':
         body = `<div class="center-sm lobby-ph"><div class="emoji-xl">${v.me.avatar}</div><h2>You're in!</h2><p>Waiting for everyone. Start the game on the TV.</p>
           <p class="muted">Change your character:</p>
-          <div class="avatars">${AVATARS.map(a => `<button class="av ${a === v.me.avatar ? 'sel' : ''}" data-switch="${a}">${a}</button>`).join('')}</div>
+          <div class="avatars">${AVATARS.map(a => `<button class="av ${a === v.me.avatar ? 'sel' : ''}" data-switch="${a}" ${(v.taken || []).includes(a) ? 'disabled' : ''}>${a}</button>`).join('')}</div>
           <button class="link" id="leave">Leave room</button></div>`;
         break;
       case 'wait':
@@ -243,6 +253,8 @@ export function startPhone(root) {
     root.querySelector('#leave')?.addEventListener('click', leave);
     root.querySelectorAll('[data-switch]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-switch]').forEach(x => x.classList.toggle('sel', x === b));
+      unlockAudio();
+      characterSound(b.dataset.switch, 'happy');
       session.avatar = b.dataset.switch;
       store.setItem(SESSION_KEY, JSON.stringify({ ...session, at: Date.now() }));
       send({ t: 'avatar', avatar: b.dataset.switch });
@@ -314,6 +326,9 @@ export function startPhone(root) {
       if (btns.length) choose(btns).click();
     }, delay);
   }
+
+  // phones only allow sound after a tap
+  document.addEventListener('pointerdown', unlockAudio, { once: true });
 
   // ---------- boot ----------
   const prev = savedSession();

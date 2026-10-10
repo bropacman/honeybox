@@ -2,7 +2,7 @@
 
 import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES } from './game.js';
 import { startHost, newRoomCode } from './net.js';
-import { sfx, say, unlockAudio, setMuted, isMuted, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
+import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
 import { PILE_ICONS } from './content.js';
 
@@ -57,6 +57,7 @@ export function startTV(root, { resume = null } = {}) {
       if (old && old !== connId) { connToPlayer.delete(old); net.drop(old); }
       const res = game.join(pid, name, avatar);
       if (res.error) { net.send(connId, { t: 'error', text: res.error }); return; }
+      if (res.swapped) net.send(connId, { t: 'toast', text: `${avatar} was taken, so you're ${res.avatar} now. Change it in the lobby!` });
       connToPlayer.set(connId, pid);
       playerToConn.set(pid, connId);
       lastSent.delete(pid);
@@ -103,6 +104,13 @@ export function startTV(root, { resume = null } = {}) {
       sendViews();
     } else if (type === 'sfx') sfx[data]?.();
     else if (type === 'say') say(data);
+    else if (type === 'mood') {
+      const p = game.player(data.pid);
+      if (!p) return;
+      if (data.tv) characterSound(p.avatar, data.mood, (data.delay || 0) * Math.min(1, SPEED * 4));
+      const connId = playerToConn.get(p.id);
+      if (connId) net.send(connId, { t: 'mood', mood: data.mood, delay: data.delay || 0 });
+    }
   });
 
   // timers

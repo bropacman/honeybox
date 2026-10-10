@@ -81,21 +81,27 @@ export class Game {
   player(id) { return this.S.players.find(p => p.id === id); }
   connected() { return this.S.players.filter(p => p.connected); }
 
+  // one character per player
+  avatarFree(avatar, id) {
+    return AVATARS.includes(avatar) && !this.S.players.some(p => p.id !== id && p.avatar === avatar);
+  }
+
   join(id, name, avatar) {
     let p = this.player(id);
     if (p) {
       p.connected = true;
       if (name) p.name = name;
-      if (avatar) p.avatar = avatar;
+      if (avatar && this.avatarFree(avatar, id)) p.avatar = avatar;
     } else {
       if (this.S.players.length >= 8) return { error: 'Sorry, the cabin is full (8 players max).' };
-      p = { id, name: name || 'Camper', avatar: avatar || '🐶', score: 0, connected: true };
+      const pickAvatar = this.avatarFree(avatar, id) ? avatar : AVATARS.find(a => this.avatarFree(a, id));
+      p = { id, name: name || 'Camper', avatar: pickAvatar, score: 0, connected: true };
       this.S.players.push(p);
-      this.emit('sfx', 'join');
+      this.emit('mood', { pid: id, mood: 'happy', tv: true });
     }
     this.changed();
     this.checkAllDone();
-    return { ok: true };
+    return { ok: true, avatar: p.avatar, swapped: Boolean(avatar) && avatar !== p.avatar };
   }
 
   setConnected(id, on) {
@@ -108,9 +114,11 @@ export class Game {
 
   setAvatar(id, avatar) {
     const p = this.player(id);
-    if (!p || !AVATARS.includes(avatar)) return;
+    if (!p || !this.avatarFree(avatar, id)) return false;
     p.avatar = avatar;
+    this.emit('mood', { pid: id, mood: 'happy', tv: true });
     this.changed();
+    return true;
   }
 
   kick(id) {
@@ -313,6 +321,8 @@ export class Game {
       if (mine === 'SAME') { w.streak = 3; this.addScore(w.watcherId, 200 * depth); }
       else { w.streak++; this.addScore(w.watcherId, 100 * depth); }
     }
+    // character sounds: everyone hears their own on their phone; the TV voices the watcher
+    for (const [pid, r] of Object.entries(results)) this.emit('mood', { pid, mood: r ? 'happy' : 'sad', tv: pid === w.watcherId, delay: 900 });
     w.drawn = drawn;
     w.top = top;
     w.actual = actual;
@@ -333,6 +343,7 @@ export class Game {
         this.addScore(w.watcherId, 500);
         this.emit('sfx', 'great');
         this.emit('say', `6 A M! ${name} survived the night shift. The dogs are thrilled.`);
+        this.emit('mood', { pid: w.watcherId, mood: 'happy', tv: true, delay: 600 });
         return this.go('safe', TIMES.safe);
       }
       w.pile = null;
@@ -344,6 +355,7 @@ export class Game {
     S.gains = {};
     this.emit('sfx', 'scare');
     this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}.`);
+    this.emit('mood', { pid: w.watcherId, mood: 'sad', tv: true, delay: 1300 });
     return this.go('dragged', TIMES.dragged);
   }
 
@@ -425,6 +437,10 @@ export class Game {
       this.addScore(pid, pts);
       if (mg.correct) mg.correct[pid] = (mg.correct[pid] || 0) + 1;
     }
+    for (const p of this.connected()) {
+      const a = mg.answers[p.id];
+      this.emit('mood', { pid: p.id, mood: a && a.i === q.a ? 'happy' : 'sad', tv: false });
+    }
     this.emit('sfx', 'good');
     this.emit('say', `The answer is: ${q.c[q.a]}.`);
     this.go(finale ? 'finaleA' : 'triviaA', finale ? TIMES.finaleA : TIMES.triviaA);
@@ -487,6 +503,7 @@ export class Game {
         }
       }
     }
+    for (const [pid, a] of Object.entries(mg.answers)) this.emit('mood', { pid, mood: top > 0 && counts[a.i] === top ? 'happy' : 'sad', tv: false });
     this.emit('sfx', 'good');
     this.go('pollA', TIMES.pollA);
   }
@@ -607,6 +624,8 @@ export class Game {
       else for (const owner of o.owners) this.addScore(owner, 300);
     }
     if (artist === S.lost.pid) mg.lostOk = found > 0;
+    for (const [pid, i] of Object.entries(mg.votes)) this.emit('mood', { pid, mood: mg.options[i].real ? 'happy' : 'sad', tv: false });
+    this.emit('mood', { pid: artist, mood: found ? 'happy' : 'sad', tv: true, delay: 500 });
     this.emit('sfx', found ? 'good' : 'bad');
     this.emit('say', `The real title was: ${mg.prompts[artist]}.`);
     this.go('drawReveal', TIMES.drawReveal);
@@ -622,6 +641,7 @@ export class Game {
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
     this.emit('say', ok ? `${name} escaped and found the trail home!` : `${name} lost some honey to the animatronics.`);
+    this.emit('mood', { pid: lost.pid, mood: ok ? 'happy' : 'sad', tv: true, delay: 400 });
     this.go('mgResult', TIMES.mgResult);
   }
 
@@ -703,6 +723,7 @@ export class Game {
         this.addScore(pid, -b.amount);
       }
     }
+    for (const [pid, b] of Object.entries(mg.bets)) this.emit('mood', { pid, mood: b.won ? 'happy' : 'sad', tv: b.pct === 100, delay: 900 });
     this.emit('sfx', 'flip');
     setTimeout(() => this.emit('sfx', anyWin ? 'good' : 'bad'), 600 * Math.min(1, this.speed * 4));
     this.go('stakesReveal', TIMES.stakesReveal);
@@ -713,6 +734,8 @@ export class Game {
     S.gains = {};
     const ranked = this.ranked();
     if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most honey. Archie and Honey approve.`);
+    if (ranked[0]) this.emit('mood', { pid: ranked[0].id, mood: 'happy', tv: true, delay: 1200 });
+    if (ranked.length > 1) this.emit('mood', { pid: ranked[ranked.length - 1].id, mood: 'sad', tv: true, delay: 2200 });
     this.emit('sfx', 'great');
     this.go('end', null);
   }
@@ -761,7 +784,7 @@ export class Game {
     const isLost = S.lost && S.lost.pid === pid;
 
     switch (S.phase) {
-      case 'lobby': return { ...base, screen: 'lobby' };
+      case 'lobby': return { ...base, screen: 'lobby', taken: S.players.filter(p => p.id !== pid).map(p => p.avatar) };
       case 'intro': return wait('Look at the TV', 'The night is starting…', '🌲');
       case 'turnStart':
         return w.watcherId === pid ? wait("You're on the night shift!", 'Get 3 in a row to make it to 6 AM.', '🔦')

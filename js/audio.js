@@ -63,6 +63,105 @@ export const sfx = {
   }
 };
 
+// ---------- character voices ----------
+// Every avatar has a little synthesized call. Happy = two rising calls, sad = one slow droopy call.
+const CALLS = {
+  bark: { type: 'sawtooth', base: 380, len: 0.12, slide: -0.4, filter: 1300, noise: 0.25 },
+  meow: { type: 'triangle', base: 650, len: 0.32, slide: 0.45, vib: [6, 12] },
+  squeak: { type: 'sine', base: 1900, len: 0.07, slide: 0.35 },
+  growl: { type: 'sawtooth', base: 105, len: 0.42, slide: 0.15, vib: [28, 14], filter: 700 },
+  yip: { type: 'sawtooth', base: 850, len: 0.1, slide: 0.6, filter: 2500 },
+  chitter: { type: 'triangle', base: 1500, len: 0.04, slide: 0.2, repeat: 5 },
+  oink: { type: 'square', base: 210, len: 0.18, slide: -0.3, filter: 900, noise: 0.08 },
+  ribbit: { type: 'square', base: 170, len: 0.07, slide: 0.1, filter: 800, repeat: 2 },
+  ooh: { type: 'sine', base: 380, len: 0.22, slide: 0.9 },
+  hoot: { type: 'sine', base: 420, len: 0.3, slide: -0.08, vib: [5, 6] },
+  quack: { type: 'sawtooth', base: 470, len: 0.15, slide: -0.25, filter: 1100, q: 6 },
+  blip: { type: 'triangle', base: 280, len: 0.22, slide: 0.2 },
+  neigh: { type: 'sawtooth', base: 720, len: 0.5, slide: -0.45, vib: [13, 60], filter: 2200 },
+  buzz: { type: 'sawtooth', base: 210, len: 0.5, slide: 0.05, vib: [32, 18], filter: 900 },
+  bleat: { type: 'sine', base: 520, len: 0.42, slide: -0.1, vib: [9, 45] },
+  bellow: { type: 'sawtooth', base: 120, len: 0.7, slide: -0.25, filter: 600, vib: [4, 5] }
+};
+
+// avatar -> [call, pitch multiplier]
+const CHARACTER = {
+  '🐶': ['bark', 1.15], '🐕': ['bark', 0.85], '🦮': ['bark', 1.0], '🐩': ['bark', 1.45],
+  '🐱': ['meow', 1.0], '🐰': ['squeak', 1.0], '🐻': ['growl', 1.0], '🐼': ['growl', 1.35],
+  '🐨': ['growl', 1.7], '🦊': ['yip', 1.0], '🦝': ['chitter', 0.9], '🐷': ['oink', 1.0],
+  '🐸': ['ribbit', 1.0], '🐵': ['ooh', 1.0], '🦉': ['hoot', 1.0], '🐧': ['quack', 1.3],
+  '🦆': ['quack', 1.0], '🐢': ['blip', 0.9], '🦄': ['neigh', 1.15], '🐝': ['buzz', 1.0],
+  '🦌': ['bleat', 1.0], '🫎': ['bellow', 1.0], '🐿️': ['chitter', 1.3], '🦔': ['squeak', 1.35]
+};
+
+function voiceTone(freq, dur, delay, spec) {
+  if (!ctx || muted) return;
+  const t = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = spec.type;
+  osc.frequency.setValueAtTime(freq, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq * (1 + spec.slideNow)), t + dur);
+  let out = osc;
+  if (spec.vib) {
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.frequency.value = spec.vib[0];
+    depth.gain.value = spec.vib[1];
+    lfo.connect(depth).connect(osc.frequency);
+    lfo.start(t);
+    lfo.stop(t + dur + 0.05);
+  }
+  if (spec.filter) {
+    const f = ctx.createBiquadFilter();
+    f.type = spec.q ? 'bandpass' : 'lowpass';
+    f.frequency.value = spec.filter;
+    if (spec.q) f.Q.value = spec.q;
+    out.connect(f);
+    out = f;
+  }
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.16, t + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  out.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+  if (spec.noise) {
+    const len = Math.floor(ctx.sampleRate * Math.min(dur, 0.1));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource();
+    const g = ctx.createGain();
+    g.gain.value = spec.noise;
+    src.buffer = buf;
+    src.connect(g).connect(ctx.destination);
+    src.start(t);
+  }
+}
+
+function call(spec, freq, delay, lenMul, slideSign) {
+  const n = spec.repeat || 1;
+  const len = spec.len * lenMul;
+  const s = { ...spec, slideNow: Math.abs(spec.slide) * slideSign };
+  for (let i = 0; i < n; i++) voiceTone(freq, len, delay + i * (len + 0.03), s);
+  return n * (len + 0.03);
+}
+
+export function characterSound(avatar, mood = 'happy', delayMs = 0) {
+  if (!ctx || muted) return;
+  const [kind, mul] = CHARACTER[avatar] || ['blip', 1];
+  const spec = CALLS[kind];
+  const f = spec.base * mul;
+  const d = delayMs / 1000;
+  if (mood === 'happy') {
+    const first = call(spec, f, d, 1, 1);
+    call(spec, f * 1.26, d + first + 0.04, 1, 1);
+  } else {
+    call(spec, f * 0.72, d, 2.2, -1);
+  }
+}
+
 // ---------- narrator ----------
 // Browser voices only (free, offline). Quality depends on the laptop:
 // Edge has very natural "Online (Natural)" voices; Chrome has "Google" voices; Macs have Siri-like ones.
