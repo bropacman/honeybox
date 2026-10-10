@@ -13,7 +13,8 @@ export const TIMES = {
   intro: 16, turnStart: 5, pick: 30, guess: 20, reveal: 5, safe: 6, dragged: 7,
   mgIntro: 8, triviaQ: 20, triviaA: 6, pollQ: 20, pollA: 7,
   drawDraw: 80, drawFib: 45, drawVote: 25, drawReveal: 12, mgResult: 6, scores: 7,
-  finaleIntro: 8, finaleQ: 18, finaleA: 6
+  finaleIntro: 9, finaleQ: 18, finaleA: 6,
+  stakesIntro: 14, stakesBet: 20, stakesShow: 5, stakesReveal: 6
 };
 
 export const MINIGAMES = {
@@ -23,6 +24,9 @@ export const MINIGAMES = {
 };
 
 export const LENGTHS = { short: 5, normal: 7, long: 10 };
+
+// Wager percentages, minimum bankroll for broke players, payouts
+export const STAKES = { rounds: 5, pcts: [10, 25, 50, 100], floor: 300, sameMult: 4, boost: 1.5 };
 
 const shuffle = (arr) => {
   const a = arr.slice();
@@ -221,6 +225,10 @@ export class Game {
       case 'mgResult': this.S.gains = {}; return this.go('scores', TIMES.scores);
       case 'scores': this.snapshotScores(); return this.nextTurn();
       case 'finaleIntro': return this.askTrivia();
+      case 'stakesIntro': return this.stakesRound();
+      case 'stakesBet': return this.showStakes();
+      case 'stakesShow': return this.revealStakes();
+      case 'stakesReveal': return this.stakesRound();
       default: return undefined;
     }
   }
@@ -425,7 +433,7 @@ export class Game {
   nextTrivia() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askTrivia();
-    if (mg.type === 'finale') return this.finish();
+    if (mg.type === 'finale') return this.startStakes();
     const lost = this.S.lost;
     return this.finishMinigame((mg.correct[lost.pid] || 0) >= 2);
   }
@@ -623,9 +631,81 @@ export class Game {
     S.watch = null;
     S.lost = null;
     S.gains = {};
-    S.mg = { type: 'finale', questions: this.takeTrivia(5), qi: -1 };
-    this.emit('say', 'Five A M. The sun is almost up. Five final questions, double honey. Make it count.');
+    S.mg = { type: 'finale', questions: this.takeTrivia(1), qi: -1 };
+    this.emit('say', 'Five A M. Last light. One double honey warm up question, then the Sunrise Stakes.');
     this.go('finaleIntro', TIMES.finaleIntro);
+  }
+
+  // ---------- Sunrise Stakes: bet your honey on the last cards ----------
+  startStakes() {
+    const S = this.S;
+    const ranked = this.ranked();
+    const boosted = ranked.slice(Math.ceil(ranked.length / 2)).map(p => p.id);
+    S.gains = {};
+    S.mg = { type: 'stakes', round: 0, rounds: STAKES.rounds, boosted, bets: {} };
+    const names = boosted.map(id => this.player(id)?.name).filter(Boolean);
+    this.emit('say', `The Sunrise Stakes. Five cards. Bet your honey. Same pays four times.${names.length ? ` ${names.join(' and ')}, you get a comeback boost.` : ''}`);
+    this.go('stakesIntro', TIMES.stakesIntro);
+  }
+
+  stakesRound() {
+    const S = this.S;
+    const mg = S.mg;
+    if (mg.round >= mg.rounds) return this.finish();
+    mg.round++;
+    mg.bets = {};
+    mg.drawn = null;
+    mg.pile = Math.floor(Math.random() * S.piles.length);
+    S.gains = {};
+    if (mg.round === mg.rounds) this.emit('say', 'Final card. The sun is coming up.');
+    this.go('stakesBet', TIMES.stakesBet);
+  }
+
+  stakeBase(pid) { return Math.max(this.player(pid)?.score || 0, STAKES.floor); }
+
+  stake(pid, choice, pct) {
+    const S = this.S;
+    if (S.phase !== 'stakesBet' || !this.player(pid) || S.mg.bets[pid]) return;
+    if (!['HIGH', 'LOW', 'SAME'].includes(choice) || !STAKES.pcts.includes(pct)) return;
+    S.mg.bets[pid] = { choice, pct, amount: Math.max(10, Math.round(this.stakeBase(pid) * pct / 1000) * 10) };
+    this.emit('sfx', 'lock');
+    this.changed();
+    this.checkAllDone();
+  }
+
+  showStakes() {
+    const bets = this.S.mg.bets;
+    const allIn = Object.entries(bets).filter(([, b]) => b.pct === 100).map(([id, b]) => `${this.player(id)?.name} went all in on ${b.choice}`);
+    this.emit('say', allIn.length ? `${allIn.join('. ')}.` : 'Bets are locked.');
+    this.go('stakesShow', TIMES.stakesShow);
+  }
+
+  revealStakes() {
+    const S = this.S;
+    const mg = S.mg;
+    const pile = S.piles[mg.pile];
+    const top = pile.cards[pile.cards.length - 1];
+    const drawn = this.drawCard();
+    const actual = drawn.v > top.v ? 'HIGH' : drawn.v < top.v ? 'LOW' : 'SAME';
+    pile.cards.push(drawn);
+    mg.top = top;
+    mg.drawn = drawn;
+    mg.actual = actual;
+    S.gains = {};
+    let anyWin = false;
+    for (const [pid, b] of Object.entries(mg.bets)) {
+      b.won = b.choice === actual;
+      if (b.won) {
+        anyWin = true;
+        const mult = (b.choice === 'SAME' ? STAKES.sameMult : 1) * (mg.boosted.includes(pid) ? STAKES.boost : 1);
+        this.addScore(pid, Math.round(b.amount * mult / 10) * 10);
+      } else {
+        this.addScore(pid, -b.amount);
+      }
+    }
+    this.emit('sfx', 'flip');
+    setTimeout(() => this.emit('sfx', anyWin ? 'good' : 'bad'), 600 * Math.min(1, this.speed * 4));
+    this.go('stakesReveal', TIMES.stakesReveal);
   }
 
   finish() {
@@ -650,6 +730,7 @@ export class Game {
       case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'guess': return ids.filter(id => !S.watch.guesses[id]);
       case 'triviaQ': case 'finaleQ': case 'pollQ': return ids.filter(id => !mg.answers[id]);
+      case 'stakesBet': return ids.filter(id => !mg.bets[id]);
       case 'drawDraw': return ids.filter(id => mg.prompts[id] && !mg.drawings[id]);
       case 'drawFib': return ids.filter(id => id !== this.artistId() && !mg.lies[id]);
       case 'drawVote': return ids.filter(id => id !== this.artistId() && mg.votes[id] == null);
@@ -658,7 +739,7 @@ export class Game {
   }
 
   checkAllDone() {
-    const phases = ['guess', 'triviaQ', 'finaleQ', 'pollQ', 'drawDraw', 'drawFib', 'drawVote'];
+    const phases = ['guess', 'triviaQ', 'finaleQ', 'pollQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
     if (!phases.includes(this.S.phase)) return;
     if (this.waitingOn().length === 0 && this.S.pausedLeft == null) {
       // a short beat so the last lock-in is visible
@@ -754,7 +835,25 @@ export class Game {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return wait(`You're #${rank}`, `${me.score} 🍯`, '📊');
       }
-      case 'finaleIntro': return wait('5 AM: Last Light', 'Five questions. Double honey.', '🌅');
+      case 'finaleIntro': return wait('5 AM: Last Light', 'One double-honey question, then the Sunrise Stakes.', '🌅');
+      case 'stakesIntro':
+        return wait('Sunrise Stakes', mg.boosted.includes(pid) ? 'You get a 1.5× comeback boost on wins!' : 'Bet your honey on the last 5 cards.', '🌅');
+      case 'stakesBet': {
+        const pile = S.piles[mg.pile];
+        return {
+          ...base, screen: 'stakes', round: `${mg.round}/${mg.rounds}`, top: pile.cards[pile.cards.length - 1], pileName: pile.name,
+          bank: me.score, base: this.stakeBase(pid), boosted: mg.boosted.includes(pid), pcts: STAKES.pcts, locked: mg.bets[pid] || null
+        };
+      }
+      case 'stakesShow': {
+        const b = mg.bets[pid];
+        return wait(b ? `${b.choice} · ${b.pct === 100 ? 'ALL IN 🔥' : b.pct + '%'}` : 'No bet', 'Here comes the card…', '🃏');
+      }
+      case 'stakesReveal': {
+        const b = mg.bets[pid];
+        if (!b) return wait(`It was ${mg.drawn.r}${mg.drawn.s}`, 'You sat this one out.', '🃏');
+        return wait(b.won ? 'You won the bet!' : 'Lost the bet!', `It was ${mg.drawn.r}${mg.drawn.s}`, b.won ? '🤑' : '💸');
+      }
       case 'end': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return { ...base, screen: 'end', rank, total: S.players.length };

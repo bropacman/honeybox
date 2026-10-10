@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, CLOCK } from './game.js';
+import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -73,6 +73,7 @@ export function startTV(root, { resume = null } = {}) {
         else game.answer(pid, Number(msg.i));
         break;
       case 'drawing': game.submitDrawing(pid, msg.strokes); break;
+      case 'stake': game.stake(pid, msg.choice, Number(msg.pct)); break;
       case 'avatar': game.setAvatar(pid, String(msg.avatar || '')); break;
       case 'fib': {
         const err = game.fib(pid, msg.text);
@@ -436,9 +437,39 @@ export function startTV(root, { resume = null } = {}) {
       case 'finaleIntro':
         return `<div class="center">
           <div class="emoji-xl">🌅</div>
-          <h1>Last Light</h1>
-          <p class="big">The sun is almost up. Five final questions. Double honey.</p>
+          <h1>5 AM · Last Light</h1>
+          <p class="big">The sun is almost up. One double-honey warm-up question… then the <b>Sunrise Stakes</b>.</p>
         </div>`;
+      case 'stakesIntro': {
+        const boosted = mg.boosted.map(id => game.player(id)).filter(Boolean);
+        return `<div class="center story">
+          <div class="emoji-xl">🌅🎰🌅</div>
+          <h1>Sunrise Stakes</h1>
+          <p>Five last cards before dawn. Before each flip, call <b>HIGH</b>, <b>LOW</b> or <b>SAME</b> and bet your honey: <b>10%</b> · <b>25%</b> · <b>50%</b> · <b>ALL IN 🔥</b></p>
+          <p>Right = win your bet. Wrong = lose it. <b>SAME pays 4×.</b></p>
+          ${boosted.length ? `<p>Comeback boost (1.5× on wins): ${boosted.map(p => avatar(p)).join(' ')}</p>` : ''}
+          <p class="muted">Scores stay secret until sunrise.</p>
+        </div>`;
+      }
+      case 'stakesBet': case 'stakesShow': case 'stakesReveal': {
+        const pile = S.piles[mg.pile];
+        const reveal = S.phase === 'stakesReveal';
+        const top = reveal ? mg.top : pile.cards[pile.cards.length - 1];
+        const label = (b) => `${b.choice} · ${b.pct === 100 ? 'ALL IN 🔥' : b.pct + '%'}`;
+        const bets = S.phase === 'stakesBet' ? waitingStrip() : `<div class="bets">${S.players.filter(p => mg.bets[p.id]).map(p => {
+          const b = mg.bets[p.id];
+          return `<div class="bet ${reveal ? (b.won ? 'won' : 'lost') : ''} ${b.pct === 100 ? 'allin' : ''}">${p.avatar} <b>${esc(p.name)}</b><span>${label(b)}</span>${reveal ? gainTag(p.id) : ''}</div>`;
+        }).join('') || '<p class="muted">Nobody bet!</p>'}</div>`;
+        return `<div class="watch">
+          <div class="watch-head"><h2>🌅 Sunrise Stakes · card ${mg.round} of ${mg.rounds} · ${PILE_ICONS[pile.name] || ''} ${esc(pile.name)}</h2></div>
+          <div class="duel">
+            ${card(top, 'huge')}
+            <div class="vs ${reveal ? 'result ok' : ''}">${reveal ? `It's ${mg.actual}!` : S.phase === 'stakesShow' ? 'Bets are locked…' : 'Place your bets!<p class="muted">SAME pays 4×</p>'}</div>
+            ${card(reveal ? mg.drawn : null, reveal ? 'huge flip-in' : 'huge')}
+          </div>
+          ${bets}
+        </div>`;
+      }
       case 'end': {
         const r = game.ranked();
         return `<div class="center">

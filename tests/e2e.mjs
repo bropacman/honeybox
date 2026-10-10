@@ -90,7 +90,9 @@ for (let g = 0; g < GAMES; g++) {
       if (st.mg && st.mg !== 'finale') minigames.add(st.mg);
       if (!seenAll.has(tag)) {
         seenAll.add(tag);
-        if (st.phase !== 'pick') await tv.waitForTimeout(150);
+        const settle = ['stakesReveal', 'reveal', 'drawReveal'].includes(st.phase);
+        if (settle) { await tv.evaluate(() => window.__honeybox.togglePause()); await tv.waitForTimeout(1200); await tv.evaluate(() => document.querySelector('.paused')?.remove()); }
+        else if (st.phase !== 'pick') await tv.waitForTimeout(150);
         const n = String(shot++).padStart(2, '0');
         await tv.screenshot({ path: join(OUT, `${n}-tv-${tag.replace(':', '-')}.png`) });
         // screenshot the phone that has something to do, else phone 0
@@ -99,6 +101,7 @@ for (let g = 0; g < GAMES; g++) {
           if (await p.$('canvas#pad, #lie, [data-pick]:not([disabled]), [data-guess]:not([disabled]), [data-answer]:not([disabled])')) { target = p; break; }
         }
         await target.screenshot({ path: join(OUT, `${n}-phone-${tag.replace(':', '-')}.png`) });
+        if (settle) await tv.evaluate(() => window.__honeybox.togglePause());
       }
       // one screenshot per distinct phone screen, before the bot acts on it
       for (const p of phones) {

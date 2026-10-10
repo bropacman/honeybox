@@ -191,6 +191,17 @@ export function startPhone(root) {
           <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c}</button>`).join('')}</div>
           ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : v.watcher ? '' : '<p class="center-sm muted small">Right = +100 · SAME = +400</p>'}`;
         break;
+      case 'stakes': {
+        const amt = (pct) => Math.max(10, Math.round(v.base * pct / 1000) * 10);
+        body = `<p class="role">🌅 Sunrise Stakes · card ${v.round}${v.boosted ? ' · <span class="boost">1.5× boost</span>' : ''}</p>
+          <div class="center-sm">${cardHtml(v.top, 'sm')}<p>${esc(v.pileName)} · you have <b>${v.bank} 🍯</b></p></div>
+          ${v.locked ? `<div class="center-sm"><h2>${v.locked.choice} · ${v.locked.pct === 100 ? 'ALL IN 🔥' : v.locked.pct + '%'}</h2><p>${v.locked.amount} 🍯 on the line. Watch the TV!</p></div>` : `
+          <p class="muted small">1. How much?</p>
+          <div class="pcts">${v.pcts.map(p => `<button class="pct ${p === 25 ? 'sel' : ''}" data-pct="${p}">${p === 100 ? 'ALL IN 🔥' : p + '%'}<small>${amt(p)} 🍯</small></button>`).join('')}</div>
+          <p class="muted small">2. The next card is…</p>
+          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()}" data-stake="${c}">${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c}${c === 'SAME' ? ' <small>(4×)</small>' : ''}</button>`).join('')}</div>`}`;
+        break;
+      }
       case 'choices':
         body = `<p class="role">${esc(v.title)} ${v.num ? `· ${v.num}` : ''}</p><h2 class="q">${esc(v.q)}</h2>${v.sub ? `<p class="muted">${esc(v.sub)}</p>` : ''}
           <div class="choices">${v.choices.map((c, i) => `<button class="choice ${v.locked === i ? 'sel' : ''}" data-answer="${i}" ${v.locked != null || c.disabled ? 'disabled' : ''}><span class="letter">${'ABCDEFGH'[i]}</span>${esc(c.text)}${c.disabled ? ' <small>(yours)</small>' : ''}</button>`).join('')}</div>
@@ -245,6 +256,16 @@ export function startPhone(root) {
       b.classList.add('sel');
       send({ t: 'guess', choice: b.dataset.guess });
     }));
+    let pct = 25;
+    root.querySelectorAll('[data-pct]').forEach(b => b.addEventListener('click', () => {
+      pct = Number(b.dataset.pct);
+      root.querySelectorAll('[data-pct]').forEach(x => x.classList.toggle('sel', x === b));
+    }));
+    root.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => {
+      root.querySelectorAll('[data-stake], [data-pct]').forEach(x => { x.disabled = true; });
+      b.classList.add('sel');
+      send({ t: 'stake', choice: b.dataset.stake, pct });
+    }));
     root.querySelectorAll('[data-answer]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-answer]').forEach(x => { x.disabled = true; });
       b.classList.add('sel');
@@ -287,7 +308,9 @@ export function startPhone(root) {
       if (view.screen === 'draw' && pad) { pad.scribble(); root.querySelector('#submit')?.click(); return; }
       const lie = root.querySelector('#lie');
       if (lie) { lie.value = choose(['A moose doing karate', 'Grandpa at the beach', 'A haunted toaster', 'Dog vs vacuum']) + ' ' + Math.floor(Math.random() * 99); root.querySelector('#send').click(); return; }
-      const btns = enabled('[data-pick], [data-guess], [data-answer]');
+      const pcts = enabled('[data-pct]');
+      if (pcts.length) choose(pcts).click();
+      const btns = enabled('[data-pick], [data-guess], [data-answer], [data-stake]');
       if (btns.length) choose(btns).click();
     }, delay);
   }

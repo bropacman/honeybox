@@ -329,3 +329,20 @@ body.is-phone .moon { display: none; }
 /* phone lobby avatar switch */
 .lobby-ph .avatars { width: 100%; margin: 6px 0 16px; }
 .lobby-ph { padding-top: 4vh; }
+
+/* Sunrise Stakes */
+.bets { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6em; }
+.bet { flex: 0 0 auto; min-width: max-content; white-space: nowrap; background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 0.4em 0.8em; display: flex; gap: 0.5em; align-items: center; font-size: 1.1em; animation: rise 0.35s ease-out both; }
+@keyframes rise { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: none; } }
+.bet span { margin-left: 0.6em; color: var(--honey); }
+.bet.allin { border-color: var(--bad); box-shadow: 0 0 18px rgba(255, 93, 79, 0.4); }
+.bet.won { border-color: var(--good); background: rgba(95, 209, 138, 0.15); }
+.bet.lost { opacity: 0.6; }
+.pcts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pct { display: flex; flex-direction: column; align-items: center; font-size: 1.1em; padding: 10px; }
+.pct small { color: var(--muted); font-size: 0.75em; }
+.pct.sel { border-color: var(--honey); background: rgba(242, 177, 52, 0.2); }
+.pct:last-child { border-color: var(--bad); }
+.pct:last-child.sel { background: rgba(255, 93, 79, 0.25); }
+.boost { color: var(--good); }
+.screen-stakes .hl { padding: 12px; font-size: 1.35em; }
