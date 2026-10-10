@@ -346,3 +346,22 @@ body.is-phone .moon { display: none; }
 .pct:last-child.sel { background: rgba(255, 93, 79, 0.25); }
 .boost { color: var(--good); }
 .screen-stakes .hl { padding: 12px; font-size: 1.35em; }
+
+/* VIP controls on the phone */
+.vip-badge { color: var(--honey); margin: 4px 0; }
+.vip-start { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 8px 0 14px; }
+.lengths-ph { display: flex; gap: 6px; }
+.lengths-ph button { text-transform: capitalize; padding: 6px 12px; }
+.lengths-ph button.sel { border-color: var(--honey); color: var(--honey); }
+.vip-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 6px; align-items: center; justify-content: center;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: rgba(11, 23, 18, 0.95); border-top: 2px solid var(--honey); z-index: 30;
+}
+.vip-bar span { color: var(--honey); font-size: 0.85em; margin-right: 4px; }
+.vip-bar button { padding: 6px 10px; font-size: 0.9em; }
+.phone.has-vip { padding-bottom: 80px; }
+
+.gallery { display: flex; flex-wrap: wrap; gap: 1.2em; justify-content: center; margin-top: 1em; }
+.frame { display: flex; flex-direction: column; align-items: center; gap: 0.3em; max-width: 15em; }
+.frame canvas { width: 13em; height: 13em; border-radius: 10px; border: 5px solid #6b4a24; }
+.frame small { color: var(--muted); }

@@ -10,9 +10,9 @@ const RANKS = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 
 
 export const SEC = 1000;
 export const TIMES = {
-  intro: 16, turnStart: 5, pick: 30, guess: 20, reveal: 5, safe: 6, dragged: 7,
+  intro: 22, turnStart: 5, pick: 30, guess: 20, reveal: 5, safe: 6, dragged: 7,
   mgIntro: 8, triviaQ: 20, triviaA: 6, pollQ: 20, pollA: 7,
-  drawDraw: 80, drawFib: 45, drawVote: 25, drawReveal: 12, mgResult: 6, scores: 7,
+  drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 10, drawGallery: 9, mgResult: 6, scores: 7,
   finaleIntro: 9, finaleQ: 18, finaleA: 6,
   stakesIntro: 14, stakesBet: 20, stakesShow: 5, stakesReveal: 6
 };
@@ -24,6 +24,12 @@ export const MINIGAMES = {
 };
 
 export const LENGTHS = { short: 5, normal: 7, long: 10 };
+
+// Sketchy Woods: how many drawings get the full fib-and-vote treatment
+export const DRAW_JUDGED = 4;
+
+// story screens that wait for the narrator before moving on
+export const NARRATED = ['intro', 'turnStart', 'safe', 'dragged', 'mgIntro', 'mgResult', 'finaleIntro', 'stakesIntro'];
 
 // Wager percentages, minimum bankroll for broke players, payouts
 export const STAKES = { rounds: 5, pcts: [10, 25, 50, 100], floor: 300, sameMult: 4, boost: 1.5 };
@@ -160,8 +166,12 @@ export class Game {
   }
   isPaused() { return this.S.pausedLeft != null; }
 
+  // Story screens wait for the narrator to finish (the TV sets speaking), up to a safety cap.
+  isNarrated() { return NARRATED.includes(this.S.phase); }
+
   tick() {
     if (this.S.pausedLeft != null || !this.S.deadline) return;
+    if (this.speaking && this.isNarrated() && Date.now() < this.S.deadline + 15000) return;
     if (Date.now() >= this.S.deadline) {
       this.S.deadline = null;
       this.timeout();
@@ -185,9 +195,13 @@ export class Game {
     if (S.players.length < 1) return;
     const n = S.players.length;
     const rounds = Math.max(1, Math.min(4, Math.round(LENGTHS[S.length] / n)));
-    const order = shuffle(S.players.map(p => p.id));
+    // fresh random order every round; everyone gets the same number of turns, no back-to-back across rounds
     S.turnOrder = [];
-    for (let r = 0; r < rounds; r++) S.turnOrder.push(...order);
+    for (let r = 0; r < rounds; r++) {
+      let order = shuffle(S.players.map(p => p.id));
+      if (order.length > 1 && order[0] === S.turnOrder[S.turnOrder.length - 1]) order.push(order.shift());
+      S.turnOrder.push(...order);
+    }
     S.turnIdx = -1;
     S.deck = makeDeck();
     S.piles = PILE_NAMES.map(name => ({ name, cards: [S.deck.pop()] }));
@@ -230,6 +244,7 @@ export class Game {
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
       case 'drawReveal': return this.nextDrawing();
+      case 'drawGallery': return this.finishMinigame(this.S.mg.lostOk);
       case 'mgResult': this.S.gains = {}; return this.go('scores', TIMES.scores);
       case 'scores': this.snapshotScores(); return this.nextTurn();
       case 'finaleIntro': return this.askTrivia();
@@ -362,7 +377,10 @@ export class Game {
   // ---------- minigames ----------
   startMinigame() {
     const S = this.S;
-    if (!S.bag.length) S.bag = shuffle(Object.keys(MINIGAMES));
+    // Cabin Census needs a crowd: skip it with fewer than 3 players
+    const allowed = Object.keys(MINIGAMES).filter(t => t !== 'poll' || this.connected().length >= 3);
+    S.bag = S.bag.filter(t => allowed.includes(t));
+    if (!S.bag.length) S.bag = shuffle(allowed);
     const type = S.bag.pop();
     S.mg = { type, lostOk: false };
     S.gains = {};
@@ -548,8 +566,9 @@ export class Game {
     const mg = S.mg;
     const lostId = S.lost.pid;
     const others = shuffle(Object.keys(mg.drawings).filter(id => id !== lostId && mg.drawings[id].length));
-    mg.judged = [lostId];
-    if (others.length && S.players.length >= 3) mg.judged.push(others[0]);
+    // judge everyone's drawing (captured player first); with a big group the extras go to a gallery
+    mg.judged = [lostId, ...others.slice(0, DRAW_JUDGED - 1)];
+    mg.gallery = others.slice(DRAW_JUDGED - 1);
     mg.di = -1;
     return this.nextDrawing();
   }
@@ -558,7 +577,10 @@ export class Game {
     const S = this.S;
     const mg = S.mg;
     mg.di++;
-    if (mg.di >= mg.judged.length) return this.finishMinigame(mg.lostOk);
+    if (mg.di >= mg.judged.length) {
+      if (mg.gallery?.length && S.phase !== 'drawGallery') { S.gains = {}; return this.go('drawGallery', TIMES.drawGallery); }
+      return this.finishMinigame(mg.lostOk);
+    }
     mg.lies = {};
     mg.options = null;
     mg.votes = {};
@@ -742,6 +764,9 @@ export class Game {
 
   snapshotScores() { this.S.board = Object.fromEntries(this.S.players.map(p => [p.id, p.score])); }
 
+  // The first connected player is the VIP and gets host controls on their phone
+  vipId() { return this.S.players.find(p => p.connected)?.id || null; }
+
   ranked() { return this.S.players.slice().sort((a, b) => b.score - a.score); }
 
   // ---------- everyone done? ----------
@@ -775,7 +800,7 @@ export class Game {
     const S = this.S;
     const me = this.player(pid);
     if (!me) return { screen: 'gone' };
-    const base = { me: { name: me.name, avatar: me.avatar, score: me.score }, gain: S.gains[pid] || 0 };
+    const base = { me: { name: me.name, avatar: me.avatar, score: me.score }, gain: S.gains[pid] || 0, vip: this.vipId() === pid, story: this.isNarrated() };
     const wait = (title, sub = '', emoji = '🏕️') => ({ ...base, screen: 'wait', title, sub, emoji });
     const w = S.watch;
     const watcher = w && this.player(w.watcherId);
@@ -784,7 +809,7 @@ export class Game {
     const isLost = S.lost && S.lost.pid === pid;
 
     switch (S.phase) {
-      case 'lobby': return { ...base, screen: 'lobby', taken: S.players.filter(p => p.id !== pid).map(p => p.avatar) };
+      case 'lobby': return { ...base, screen: 'lobby', length: S.length, count: S.players.length, taken: S.players.filter(p => p.id !== pid).map(p => p.avatar) };
       case 'intro': return wait('Look at the TV', 'The night is starting…', '🌲');
       case 'turnStart':
         return w.watcherId === pid ? wait("You're on the night shift!", 'Get 3 in a row to make it to 6 AM.', '🔦')
@@ -853,6 +878,7 @@ export class Game {
           locked: mg.votes[pid] ?? null
         };
       case 'drawReveal': return wait('Look at the TV', 'Who got fooled?', '😈');
+      case 'drawGallery': return wait('The gallery', 'Bonus masterpieces on the TV', '🖼️');
       case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost honey to the animatronics`, '', mg.result ? '🏠' : '💀');
       case 'scores': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;

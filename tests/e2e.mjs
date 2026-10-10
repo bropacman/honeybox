@@ -77,7 +77,15 @@ let shot = 2;
 
 for (let g = 0; g < GAMES; g++) {
   await tv.click('[data-act="length"][data-len="long"]');
-  await tv.click('[data-act="start"]');
+  if (g === 0) {
+    // first phone to join is the VIP and starts the night from their phone
+    await phones[0].waitForSelector('[data-vip="start"]:not([disabled])');
+    await phones[0].click('[data-vip="start"]');
+    await tv.waitForFunction(() => window.__honeybox.S.phase !== 'lobby');
+    summary0.vipStart = true;
+  } else {
+    await tv.click('[data-act="start"]');
+  }
   const seen = [];
   let last = '';
   const started = Date.now();

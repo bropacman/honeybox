@@ -135,7 +135,9 @@ export function startPhone(root) {
     if (!el) return;
     if (deadline == null) { el.textContent = ''; return; }
     const s = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-    el.textContent = paused ? '⏸' : s;
+    el.textContent = paused ? '⏸' : view?.story ? '' : s;
+    const pb = root.querySelector('#vip-pause');
+    if (pb) pb.textContent = paused ? '▶️ Resume' : '⏸ Pause';
     el.classList.toggle('urgent', s <= 5);
   }, 250);
 
@@ -183,7 +185,10 @@ export function startPhone(root) {
         body = '<div class="center"><p>You were removed from this room.</p><button id="leave">Back</button></div>';
         break;
       case 'lobby':
-        body = `<div class="center-sm lobby-ph"><div class="emoji-xl">${v.me.avatar}</div><h2>You're in!</h2><p>Waiting for everyone. Start the game on the TV.</p>
+        body = `<div class="center-sm lobby-ph"><div class="emoji-xl">${v.me.avatar}</div><h2>You're in!</h2>${v.vip ? `<div class="vip-start"><p class="vip-badge">⭐ You're the VIP</p>
+            <div class="lengths-ph">${['short', 'normal', 'long'].map(l => `<button data-vip="length" data-len="${l}" class="${v.length === l ? 'sel' : ''}">${l}</button>`).join('')}</div>
+            <button class="big-btn" data-vip="start" ${v.count >= 2 ? '' : 'disabled'}>Start the night 🔥</button>
+            ${v.count >= 2 ? '' : '<p class="muted small">Need at least 2 players.</p>'}</div>` : '<p>Waiting for everyone. The ⭐ VIP starts the game.</p>'}
           <p class="muted">Change your character:</p>
           <div class="avatars">${AVATARS.map(a => `<button class="av ${a === v.me.avatar ? 'sel' : ''}" data-switch="${a}" ${(v.taken || []).includes(a) ? 'disabled' : ''}>${a}</button>`).join('')}</div>
           <button class="link" id="leave">Leave room</button></div>`;
@@ -239,18 +244,27 @@ export function startPhone(root) {
         }
         break;
       case 'end':
-        body = `<div class="center"><div class="emoji-xl">${v.rank === 1 ? '🏆' : v.rank === v.total ? '💀' : '🌄'}</div><h2>You finished #${v.rank} of ${v.total}</h2><p>${v.me.score} 🍯</p><p class="muted">Play again from the TV.</p></div>`;
+        body = `<div class="center"><div class="emoji-xl">${v.rank === 1 ? '🏆' : v.rank === v.total ? '💀' : '🌄'}</div><h2>You finished #${v.rank} of ${v.total}</h2><p>${v.me.score} 🍯</p>${v.vip ? '<button class="big-btn" data-vip="again">Play again 🔁</button>' : '<p class="muted">The VIP can start another round.</p>'}</div>`;
         break;
       default:
         body = '<div class="center"><p>Look at the TV</p></div>';
     }
-    root.innerHTML = `<div class="phone screen-${v.screen}">${header()}<main>${body}</main></div>`;
+    const vipBar = v.vip && !['lobby', 'end'].includes(v.screen)
+      ? `<div class="vip-bar"><span>⭐ VIP</span><button data-vip="pause" id="vip-pause">${paused ? '▶️ Resume' : '⏸ Pause'}</button><button data-vip="skip">⏭ Skip</button><button data-vip="lobby">🏠 End</button></div>`
+      : '';
+    root.innerHTML = `<div class="phone screen-${v.screen} ${vipBar ? 'has-vip' : ''}">${header()}<main>${body}</main>${vipBar}</div>`;
     wire();
     if (BOT) botAct();
   }
 
   function wire() {
     root.querySelector('#leave')?.addEventListener('click', leave);
+    root.querySelectorAll('[data-vip]').forEach(b => b.addEventListener('click', () => {
+      const a = b.dataset.vip;
+      if (a === 'lobby' && !confirm('End this game and go back to the lobby?')) return;
+      if (a === 'length') root.querySelectorAll('[data-vip="length"]').forEach(x => x.classList.toggle('sel', x === b));
+      send({ t: 'vip', a, len: b.dataset.len });
+    }));
     root.querySelectorAll('[data-switch]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-switch]').forEach(x => x.classList.toggle('sel', x === b));
       unlockAudio();

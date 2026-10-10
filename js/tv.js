@@ -1,8 +1,8 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES } from './game.js';
+import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES, NARRATED } from './game.js';
 import { startHost, newRoomCode } from './net.js';
-import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
+import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
 import { PILE_ICONS } from './content.js';
 
@@ -10,6 +10,7 @@ const SAVE_KEY = 'honeybox_host_save';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const params = new URLSearchParams(location.search);
 const SPEED = Number(params.get('speed')) || 1;
+const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 
 export function savedGame() {
   try {
@@ -75,6 +76,17 @@ export function startTV(root, { resume = null } = {}) {
         break;
       case 'drawing': game.submitDrawing(pid, msg.strokes); break;
       case 'stake': game.stake(pid, msg.choice, Number(msg.pct)); break;
+      case 'vip': {
+        if (game.vipId() !== pid) break;
+        const S = game.S;
+        if (msg.a === 'start' && S.phase === 'lobby' && S.players.length >= MIN_PLAYERS) { unlockAudio(); game.start(); }
+        if (msg.a === 'length') game.setLength(msg.len);
+        if (msg.a === 'pause') game.togglePause();
+        if (msg.a === 'skip') { stopSpeaking(); game.skip(); }
+        if (msg.a === 'again' && S.phase === 'end') game.restart();
+        if (msg.a === 'lobby' && S.phase !== 'lobby') { stopSpeaking(); game.restart(); }
+        break;
+      }
       case 'avatar': game.setAvatar(pid, String(msg.avatar || '')); break;
       case 'fib': {
         const err = game.fib(pid, msg.text);
@@ -116,14 +128,15 @@ export function startTV(root, { resume = null } = {}) {
   // timers
   let lastSec = null;
   setInterval(() => {
+    game.speaking = SPEED >= 1 && isSpeaking();
     game.tick();
     const left = game.timeLeft();
     const el = root.querySelector('#timer');
     if (el) {
       const s = left == null ? '' : Math.ceil(left / 1000);
-      el.textContent = game.isPaused() ? '⏸' : s;
+      el.textContent = game.isPaused() ? '⏸' : game.isNarrated() ? '' : s;
       el.classList.toggle('urgent', left != null && left < 5000);
-      if (left != null && left < 5000 && s !== lastSec && !game.isPaused() && s > 0) sfx.tick();
+      if (left != null && left < 5000 && s !== lastSec && !game.isPaused() && !game.isNarrated() && s > 0) sfx.tick();
       lastSec = s;
     }
   }, 200);
@@ -155,7 +168,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'length') game.setLength(b.dataset.len);
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'pause') game.togglePause();
-    if (act === 'skip') game.skip();
+    if (act === 'skip') { stopSpeaking(); game.skip(); }
     if (act === 'mute') { setMuted(!isMuted()); render(); }
     if (act === 'again') game.restart();
     if (act === 'style') { setStyle(b.dataset.style); say(STYLES[b.dataset.style].sample); render(); }
@@ -284,7 +297,8 @@ export function startTV(root, { resume = null } = {}) {
               ${Object.keys(STYLES).map(k => `<button data-act="style" data-style="${k}" class="${voiceSettings().style === k ? 'sel' : ''}">${STYLES[k].label}</button>`).join('')}
               <button data-act="testvoice">▶ Test</button>
             </div>
-            <button class="big-btn" data-act="start" ${S.players.length >= (params.has('dev') ? 1 : 2) ? '' : 'disabled'}>Start the night 🔥</button>
+            <button class="big-btn" data-act="start" ${S.players.length >= MIN_PLAYERS ? '' : 'disabled'}>Start the night 🔥</button>
+            <p class="muted small">Best with 3–8 players. ${S.players[0] ? `⭐ VIP ${esc(game.player(game.vipId())?.name || '')} can also start, pause and skip from their phone.` : 'The first player to join becomes the ⭐ VIP.'}</p>
             <p class="muted small">Space = pause · N = skip · click a camper to remove them</p>
           </div>
         </div>`;
@@ -434,6 +448,12 @@ export function startTV(root, { resume = null } = {}) {
           <div class="side">${side}</div>
         </div>`;
       }
+      case 'drawGallery':
+        return `<div class="center"><h1>🖼️ The Gallery</h1><p class="muted">No time to judge these masterpieces, but they deserve to be seen.</p>
+          <div class="gallery">${mg.gallery.map(id => {
+            const p = game.player(id);
+            return `<div class="frame"><canvas data-artist="${esc(id)}" width="320" height="320"></canvas><b>${esc(mg.prompts[id])}</b><small>${p ? `${p.avatar} ${esc(p.name)}` : ''}</small></div>`;
+          }).join('')}</div></div>`;
       case 'mgResult':
         return `<div class="center ${mg.result ? '' : 'dark'}">
           <div class="emoji-xl ${mg.result ? 'bounce' : 'shake'}">${mg.result ? '🏠🔥' : '💀🌲'}</div>
@@ -516,6 +536,7 @@ export function startTV(root, { resume = null } = {}) {
       }
     }
 
+    root.querySelectorAll('canvas[data-artist]').forEach(c => drawStrokes(c, S.mg?.drawings?.[c.dataset.artist] || []));
     const canvas = root.querySelector('#art');
     if (canvas) {
       const id = `${S.turnIdx}-${S.mg.di}`;

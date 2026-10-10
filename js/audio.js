@@ -34,7 +34,12 @@ function tone(freq, dur, { type = 'sine', vol = 0.15, delay = 0, slide = 0 } = {
 
 export const sfx = {
   join() { tone(660, 0.12); tone(880, 0.15, { delay: 0.1 }); },
-  tick() { tone(1200, 0.05, { type: 'square', vol: 0.04 }); },
+  // spooky countdown: a low heartbeat "lub-dub"
+  tick() {
+    tone(62, 0.16, { type: 'sine', vol: 0.5, slide: -20 });
+    tone(55, 0.14, { type: 'sine', vol: 0.38, delay: 0.2, slide: -18 });
+    tone(180, 0.05, { type: 'triangle', vol: 0.05 });
+  },
   flip() { tone(300, 0.08, { type: 'triangle', slide: 400 }); },
   good() { [523, 659, 784].forEach((f, i) => tone(f, 0.18, { delay: i * 0.09, type: 'triangle' })); },
   great() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, { delay: i * 0.08, type: 'triangle', vol: 0.18 })); },
@@ -211,6 +216,11 @@ function persist() { try { localStorage.setItem(VOICE_KEY, JSON.stringify(settin
 export function setVoice(name) { settings.voice = name; persist(); }
 export function setStyle(style) { if (STYLES[style]) { settings.style = style; persist(); } }
 
+let speaking = false;
+let current = null;
+export const isSpeaking = () => speaking && !muted;
+export function stopSpeaking() { speaking = false; window.speechSynthesis?.cancel(); }
+
 export function say(text) {
   if (muted || !window.speechSynthesis || !text) return;
   window.speechSynthesis.cancel();
@@ -221,5 +231,12 @@ export function say(text) {
   const st = STYLES[settings.style];
   u.rate = st.rate;
   u.pitch = st.pitch;
+  speaking = true;
+  const done = () => { if (current === u) speaking = false; };
+  current = u;
+  u.onend = done;
+  u.onerror = done;
+  // some browsers never fire onend; fall back to an estimate of the speaking time
+  setTimeout(done, ((text.length / 14) / st.rate + 1.5) * 1000);
   window.speechSynthesis.speak(u);
 }
