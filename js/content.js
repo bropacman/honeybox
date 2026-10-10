@@ -185,7 +185,9 @@ export const POLLS = [
 import TRIVIA_1 from './packs/trivia-1.js';
 import TRIVIA_2 from './packs/trivia-2.js';
 import TRIVIA_3 from './packs/trivia-3.js';
+import TRIVIA_4 from './packs/trivia-4.js';
 import PROMPTS_X from './packs/prompts.js';
+import PROMPTS_2 from './packs/prompts-2.js';
 import POLLS_X from './packs/polls.js';
 
 const key = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -196,6 +198,6 @@ function addUnique(list, extra, keyOf) {
     if (!seen.has(k)) { seen.add(k); list.push(item); }
   }
 }
-addUnique(TRIVIA, [...TRIVIA_1, ...TRIVIA_2, ...TRIVIA_3], t => key(t.q));
-addUnique(DRAW_PROMPTS, PROMPTS_X, key);
+addUnique(TRIVIA, [...TRIVIA_1, ...TRIVIA_2, ...TRIVIA_3, ...TRIVIA_4], t => key(t.q));
+addUnique(DRAW_PROMPTS, [...PROMPTS_X, ...PROMPTS_2], key);
 addUnique(POLLS, POLLS_X, p => key(p.q));

@@ -94,6 +94,22 @@ export default [
   O('Which is scarier?', 'Clowns', 'Dolls', 'Animatronics', 'Spiders'),
   O('Which is the best planet?', 'Earth', 'Saturn', 'Mars', 'Pluto (still counts)'),
 
+  // the family's favorite topics
+  O('Disney or Universal?', 'Disney', 'Universal', 'Both, obviously', 'Neither, too many lines'),
+  O('Best theme park snack?', 'Mickey ice cream bar', 'Butterbeer', 'Turkey leg', 'Churro'),
+  O('Best fast food fries?', 'McDonald\'s', 'Five Guys', 'Wendy\'s', 'Burger King'),
+  O('Best retro console?', 'Atari 2600', 'NES', 'Sega Genesis', 'Game Boy'),
+  O('Best action star?', 'Arnold Schwarzenegger', 'Sylvester Stallone', 'The Rock', 'Tom Cruise'),
+  O('Best old-school cartoon?', 'Looney Tunes', 'Scooby-Doo', 'The Flintstones', 'Tom and Jerry'),
+  O('Best Cape Cod activity?', 'Beach day', 'Whale watching', 'Mini golf', 'Sitting in Sagamore traffic'),
+  O('Best Florida activity?', 'Theme parks', 'The beach', 'Spotting alligators', 'Early bird dinner'),
+  O('Best mall food?', 'Cinnabon', 'Auntie Anne\'s', 'Sbarro', 'Chick-fil-A'),
+  O('Most dangerous New England driving move?', 'Merging onto the Pike', 'Rotaries', 'Left turn on a busy road', 'Driving in the first snow'),
+  O('Best road trip music?', 'Classic rock', '80s hits', 'Today\'s hits', 'A podcast'),
+  O('Best Netflix move?', 'Binge it all in one night', 'One episode a week', 'Rewatch The Office forever', 'Fall asleep in 10 minutes'),
+  O('Which would you rather visit?', 'Ripley\'s Believe It or Not!', 'A haunted house tour', 'A wax museum', 'The world\'s largest ball of twine'),
+  O('Funniest kind of comedy?', 'Slapstick', 'Dad jokes', 'Sarcasm', 'Pranks'),
+
   // everyday opinions
   O('Best time of day?', 'Morning', 'Afternoon', 'Evening', 'Middle of the night'),
   O('Best season?', 'Spring', 'Summer', 'Fall', 'Winter'),
