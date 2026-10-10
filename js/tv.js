@@ -1,8 +1,8 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES, NARRATED } from './game.js';
+import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES, NARRATED, SIDE, stakesFor } from './game.js';
 import { startHost, newRoomCode } from './net.js';
-import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
+import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
 import { PILE_ICONS } from './content.js';
 
@@ -11,6 +11,13 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const params = new URLSearchParams(location.search);
 const SPEED = Number(params.get('speed')) || 1;
 const MIN_PLAYERS = params.has('dev') ? 1 : 2;
+// background music mood for each phase (anything missing is silence)
+const MUSIC = {
+  intro: 'dread', turnStart: 'tense', pick: 'tense', guess: 'tense', reveal: 'tense',
+  dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
+  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
+  finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesShow: 'tense', stakesReveal: 'sunrise'
+};
 
 export function savedGame() {
   try {
@@ -204,7 +211,7 @@ export function startTV(root, { resume = null } = {}) {
       return d ? `<span class="gain ${d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</span>` : '';
     };
     return `<div class="scoreboard ${big ? 'big' : ''}">${ranked.map((p, i) => `
-      <div class="score-row ${p.connected ? '' : 'off'}">
+      <div class="score-row ${p.connected ? '' : 'off'}" style="animation-delay:${big ? (ranked.length - 1 - i) * 0.7 : 0}s">
         <span class="rank">${i + 1}</span><span class="av">${p.avatar}</span>
         <span class="nm">${esc(p.name)}</span><span class="pts">${p.score} 🍯${big ? delta(p) : gainTag(p.id)}</span>
       </div>`).join('')}</div>`;
@@ -236,7 +243,7 @@ export function startTV(root, { resume = null } = {}) {
       return `<div class="spot ${i === highlight ? 'hl' : ''}" style="left:${x}%;top:${y}%">
         <div class="stack" style="--depth:${Math.min(p.cards.length, 8)}">${card(top)}</div>
         <div class="pile-name">${PILE_ICONS[p.name] || ''} ${esc(p.name)}</div>
-        <div class="depth">${p.cards.length} deep · ${100 * p.cards.length}🍯</div>
+        <div class="depth">${p.cards.length} deep · <span class="win">+${stakesFor(p.cards.length).win}</span> · <span class="risk">risk ${stakesFor(p.cards.length).risk}</span></div>
       </div>`;
     }).join('');
     return `<div class="map">
@@ -261,6 +268,11 @@ export function startTV(root, { resume = null } = {}) {
       <div class="map-label" style="left:56%;top:42%">Kancamagus Hwy →</div>
       ${piles}
     </div>`;
+  }
+
+  // face-down card shakes, then flips (timed with the drumroll)
+  function revealSlot(c) {
+    return `<div class="reveal-slot">${card(null, 'huge suspense')}${card(c, 'huge front')}</div>`;
   }
 
   function streakDots(n) {
@@ -333,6 +345,12 @@ export function startTV(root, { resume = null } = {}) {
         const pile = S.piles[w.pile];
         return `<div class="watch">
           <div class="watch-head"><h2>${avatar(watcher)} at the <b>${esc(pile.name)}</b></h2>${streakDots(w.streak)}</div>
+          <div class="medals">
+            <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${stakesFor(w.depth).win}</span><span class="m-sub">🍯 if right</span></div>
+            <div class="medal same-m"><span class="m-icon">🍯</span><span class="m-big">+${stakesFor(w.depth).same}</span><span class="m-sub">SAME = straight to 6 AM</span></div>
+            <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${stakesFor(w.depth).risk}</span><span class="m-sub">miss = dragged off</span></div>
+          </div>
+          <div class="side-note">Everyone else bets risk-free: right <b class="win">+${SIDE.right}</b> · SAME <b class="win">+${SIDE.same}</b></div>
           <div class="duel">
             ${card(pile.cards[pile.cards.length - 1], 'huge')}
             <div class="vs">next card is…<div class="hl-opts"><span>HIGH</span><span>LOW</span><span>SAME</span></div><p class="muted">Lock in on your phone!</p></div>
@@ -350,13 +368,13 @@ export function startTV(root, { resume = null } = {}) {
           return `<div class="guess-col ${w.actual === ch ? 'right' : ''}"><h3>${ch}</h3>${who.map(p => `<div>${p.avatar} ${esc(p.name)} ${gainTag(p.id)}</div>`).join('')}</div>`;
         }).join('');
         return `<div class="watch">
-          <div class="watch-head"><h2>${avatar(watcher)} said <b>${mine}</b> at the ${esc(pile.name)}</h2>${streakDots(w.streak)}</div>
+          <div class="watch-head"><h2>${avatar(watcher)} said <b>${mine}</b> at the ${esc(pile.name)}</h2><div class="late">${streakDots(w.streak)}</div></div>
           <div class="duel">
             ${card(w.top, 'huge')}
-            <div class="vs result ${ok ? 'ok' : 'bad'}">${ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The animatronics win ties.' : 'WRONG!'}</div>
-            ${card(w.drawn, 'huge flip-in')}
+            <div class="vs result late ${ok ? 'ok' : 'bad'}">${ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The animatronics win ties.' : '💀 WRONG!'}</div>
+            ${revealSlot(w.drawn)}
           </div>
-          <div class="guess-cols">${groups}</div>
+          <div class="guess-cols later">${groups}</div>
         </div>`;
       }
       case 'safe':
@@ -399,7 +417,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz">
           <div class="quiz-head">${S.phase === 'finaleA' ? '🌅 Last Light' : '🐻 Bear Trivia'} <span class="muted">${mg.qi + 1}/${mg.questions.length}</span></div>
           <h1 class="q">${esc(q.q)}</h1>
-          <div class="answers">${q.c.map((c, i) => {
+          <div class="answers reveal-q">${q.c.map((c, i) => {
             const who = Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean);
             return `<div class="ans ${i === q.a ? 'right' : 'dim'}"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span></div>`;
           }).join('')}</div>
@@ -412,10 +430,10 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz">
           <div class="quiz-head">📋 Cabin Census <span class="muted">${mg.qi + 1}/${mg.questions.length}</span></div>
           <h1 class="q">${esc(q.q)}</h1>
-          <div class="bars">${choices.map((c, i) => {
+          <div class="bars reveal-poll">${choices.map((c, i) => {
             const who = Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean);
             const top = q.top > 0 && q.counts[i] === q.top;
-            return `<div class="bar ${top ? 'right' : ''}"><div class="fill" style="width:${(q.counts[i] / total) * 100}%"></div>
+            return `<div class="bar ${top ? 'right' : ''}" style="--i:${i}"><div class="fill" style="width:${(q.counts[i] / total) * 100}%"></div>
               <span class="bl">${esc(c)}</span><span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span><span class="cnt">${q.counts[i]}</span></div>`;
           }).join('')}</div>
         </div>`;
@@ -436,11 +454,12 @@ export function startTV(root, { resume = null } = {}) {
         } else if (S.phase === 'drawVote') {
           side = `<h2>Which is the real title?</h2><div class="opts">${mg.options.map(o => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>${waitingStrip()}`;
         } else {
-          side = `<h2>The reveal</h2><div class="opts">${mg.options.map((o, i) => {
+          const order = mg.options.map((o, i) => [o, i]).sort((a, b) => (a[0].real ? 1 : 0) - (b[0].real ? 1 : 0));
+          side = `<h2>The reveal</h2><div class="opts">${order.map(([o, i], k) => {
             const voters = Object.entries(mg.votes).filter(([, v]) => v === i).map(([id]) => game.player(id)).filter(Boolean);
             const owners = o.owners.map(id => game.player(id)).filter(Boolean);
             const by = o.real ? `the truth, drawn by ${artist?.avatar} ${esc(artist?.name)}` : o.house ? 'a house lie' : `lie by ${owners.map(p => `${p.avatar} ${esc(p.name)}`).join(', ')}`;
-            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${i * 0.6}s"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.map(p => p.avatar).join(' ') || '—'}</span></div>`;
+            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${k * 1.3}s"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.map(p => p.avatar).join(' ') || '—'}</span></div>`;
           }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
         }
         return `<div class="drawful">
@@ -484,7 +503,7 @@ export function startTV(root, { resume = null } = {}) {
         const reveal = S.phase === 'stakesReveal';
         const top = reveal ? mg.top : pile.cards[pile.cards.length - 1];
         const label = (b) => `${b.choice} · ${b.pct === 100 ? 'ALL IN 🔥' : b.pct + '%'}`;
-        const bets = S.phase === 'stakesBet' ? waitingStrip() : `<div class="bets">${S.players.filter(p => mg.bets[p.id]).map(p => {
+        const bets = S.phase === 'stakesBet' ? waitingStrip() : `<div class="bets ${reveal ? 'later' : ''}">${S.players.filter(p => mg.bets[p.id]).map(p => {
           const b = mg.bets[p.id];
           return `<div class="bet ${reveal ? (b.won ? 'won' : 'lost') : ''} ${b.pct === 100 ? 'allin' : ''}">${p.avatar} <b>${esc(p.name)}</b><span>${label(b)}</span>${reveal ? gainTag(p.id) : ''}</div>`;
         }).join('') || '<p class="muted">Nobody bet!</p>'}</div>`;
@@ -492,8 +511,8 @@ export function startTV(root, { resume = null } = {}) {
           <div class="watch-head"><h2>🌅 Sunrise Stakes · card ${mg.round} of ${mg.rounds} · ${PILE_ICONS[pile.name] || ''} ${esc(pile.name)}</h2></div>
           <div class="duel">
             ${card(top, 'huge')}
-            <div class="vs ${reveal ? 'result ok' : ''}">${reveal ? `It's ${mg.actual}!` : S.phase === 'stakesShow' ? 'Bets are locked…' : 'Place your bets!<p class="muted">SAME pays 4×</p>'}</div>
-            ${card(reveal ? mg.drawn : null, reveal ? 'huge flip-in' : 'huge')}
+            <div class="vs ${reveal ? 'result ok late' : ''}">${reveal ? `It's ${mg.actual}!` : S.phase === 'stakesShow' ? 'Bets are locked…' : 'Place your bets!<p class="muted">SAME pays 4×</p>'}</div>
+            ${reveal ? revealSlot(mg.drawn) : card(null, 'huge')}
           </div>
           ${bets}
         </div>`;
@@ -513,6 +532,7 @@ export function startTV(root, { resume = null } = {}) {
 
   function render() {
     const S = game.S;
+    setMusic(MUSIC[S.phase] || 'none');
     const showSide = !['lobby', 'end', 'scores', 'intro'].includes(S.phase);
     root.innerHTML = `
       <div class="tv phase-${S.phase}">

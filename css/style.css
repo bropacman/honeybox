@@ -365,3 +365,60 @@ body.is-phone .moon { display: none; }
 .frame { display: flex; flex-direction: column; align-items: center; gap: 0.3em; max-width: 15em; }
 .frame canvas { width: 13em; height: 13em; border-radius: 10px; border: 5px solid #6b4a24; }
 .frame small { color: var(--muted); }
+
+/* stakes visibility */
+.win { color: var(--good); }
+.risk { color: var(--bad); }
+.stakes-banner { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 0.5em 1em; text-align: center; }
+.stakes-banner .mine { font-size: 1.15em; }
+.stakes-banner .others { color: var(--muted); font-size: 0.9em; margin-top: 0.2em; }
+.risk-box, .safe-box { text-align: center; border-radius: 12px; padding: 8px; margin: 4px 0 8px; font-size: 0.95em; }
+.risk-box { background: rgba(255, 93, 79, 0.15); border: 2px solid var(--bad); color: #ffd0cb; }
+.safe-box { background: rgba(95, 209, 138, 0.1); border: 2px solid rgba(95, 209, 138, 0.5); }
+.hl .pay { font-size: 0.6em; opacity: 0.85; margin-left: 6px; }
+
+/* ---- slow reveals ---- */
+.reveal-slot { position: relative; }
+.reveal-slot .card.suspense { animation: suspense 1.6s ease-in both; }
+.reveal-slot .card.front { position: absolute; inset: 0; animation: flip 0.6s ease-out 1.6s both; }
+@keyframes suspense {
+  0% { transform: none; } 20% { transform: rotate(-2deg); } 40% { transform: rotate(3deg) scale(1.02); }
+  60% { transform: rotate(-4deg) scale(1.04); } 80% { transform: rotate(6deg) scale(1.07); }
+  99% { transform: rotate(-6deg) scale(1.1); opacity: 1; } 100% { opacity: 0; }
+}
+.late { animation: lateIn 0.5s ease-out 2.0s both; }
+.later { animation: lateIn 0.5s ease-out 2.7s both; }
+@keyframes lateIn { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
+.vs.result.late { animation: verdict 0.7s cubic-bezier(.2,1.6,.4,1) 2.0s both; }
+@keyframes verdict { from { opacity: 0; transform: scale(2.4); } to { opacity: 1; transform: scale(1); } }
+/* trivia: wrong answers fade, then the right one lights up, then who picked what */
+.reveal-q .ans { animation: none; }
+.reveal-q .ans.dim { animation: dimOut 0.6s ease 1.0s both; }
+.reveal-q .ans.right { animation: rightOn 0.7s cubic-bezier(.2,1.6,.4,1) 1.9s both; }
+.reveal-q .voters { animation: lateIn 0.4s ease 2.6s both; }
+@keyframes dimOut { from { opacity: 1; } to { opacity: 0.35; } }
+@keyframes rightOn { from { border-color: var(--line); background: var(--panel); transform: scale(1); } 60% { transform: scale(1.06); } to { border-color: var(--good); background: rgba(95, 209, 138, 0.18); transform: scale(1); } }
+/* poll: bars grow one by one, then the winner glows */
+.reveal-poll .bar .fill { animation: grow 1s ease-out both; animation-delay: calc(var(--i) * 0.45s); }
+.reveal-poll .bar .cnt, .reveal-poll .bar .voters { animation: lateIn 0.4s ease both; animation-delay: calc(var(--i) * 0.45s + 0.7s); }
+.reveal-poll .bar.right { animation: rightOn 0.7s ease 2.6s both; }
+@keyframes grow { from { width: 0; } }
+/* honey count: last place first, leader last */
+.scoreboard.big .score-row { animation: lateIn 0.6s ease-out both; }
+.opt.reveal { animation-duration: 0.7s; }
+/* ---- stakes medallions ---- */
+.medals { display: flex; justify-content: center; gap: 1.2vw; }
+.medal { display: flex; flex-direction: column; align-items: center; min-width: 9em; padding: 0.4em 1em; border-radius: 18px; border: 3px solid; background: var(--panel); }
+.m-icon { font-size: 1.6em; line-height: 1; }
+.m-big { font-size: 2.1em; font-weight: 900; line-height: 1.1; }
+.m-sub { font-size: 0.75em; color: var(--muted); }
+.win-m { border-color: var(--good); } .win-m .m-big { color: var(--good); }
+.same-m { border-color: var(--honey); } .same-m .m-big { color: var(--honey); }
+.risk-m { border-color: var(--bad); animation: danger 1.4s ease-in-out infinite; } .risk-m .m-big { color: var(--bad); }
+@keyframes danger { 50% { box-shadow: 0 0 28px rgba(255, 93, 79, 0.6); transform: scale(1.04); } }
+.side-note { text-align: center; color: var(--muted); font-size: 0.85em; }
+.risk-box { animation: danger 1.4s ease-in-out infinite; }
+/* phone: suspense before your result */
+.suspense-ph { font-size: 4em; text-align: center; animation: suspenseOut 1.9s ease both; }
+@keyframes suspenseOut { 0% { opacity: 1; transform: scale(1); } 85% { opacity: 1; transform: scale(1.3) rotate(8deg); } 100% { opacity: 0; transform: scale(0); height: 0; } }
+.phone .late { animation: lateIn 0.5s ease-out 1.9s both; }

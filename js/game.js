@@ -10,11 +10,11 @@ const RANKS = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 
 
 export const SEC = 1000;
 export const TIMES = {
-  intro: 22, turnStart: 5, pick: 30, guess: 20, reveal: 5, safe: 6, dragged: 7,
-  mgIntro: 8, triviaQ: 20, triviaA: 6, pollQ: 20, pollA: 7,
-  drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 10, drawGallery: 9, mgResult: 6, scores: 7,
-  finaleIntro: 9, finaleQ: 18, finaleA: 6,
-  stakesIntro: 14, stakesBet: 20, stakesShow: 5, stakesReveal: 6
+  intro: 22, turnStart: 5, pick: 30, guess: 20, reveal: 8, safe: 6, dragged: 7,
+  mgIntro: 8, triviaQ: 20, triviaA: 8, pollQ: 20, pollA: 9,
+  drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 9,
+  finaleIntro: 9, finaleQ: 18, finaleA: 8,
+  stakesIntro: 14, stakesBet: 20, stakesShow: 5, stakesReveal: 8
 };
 
 export const MINIGAMES = {
@@ -24,6 +24,16 @@ export const MINIGAMES = {
 };
 
 export const LENGTHS = { short: 5, normal: 7, long: 10 };
+
+// how long the card shakes face-down before it flips
+export const SUSPENSE_MS = 1600;
+
+// What's on the line each card. Watcher: win/same pay per pile depth, a miss risks `risk` in the woods.
+export const SIDE = { right: 100, same: 400 };
+export function stakesFor(depth) {
+  const d = Math.max(1, depth);
+  return { win: 100 * d, same: 200 * d, risk: Math.max(200, 100 * d) };
+}
 
 // Sketchy Woods: how many drawings get the full fib-and-vote treatment
 export const DRAW_JUDGED = 4;
@@ -131,6 +141,14 @@ export class Game {
     if (this.S.phase !== 'lobby') return;
     this.S.players = this.S.players.filter(p => p.id !== id);
     this.changed();
+  }
+
+  // drumroll -> flip -> verdict, matching the TV's slow card reveal
+  suspense(verdict) {
+    const k = Math.min(1, this.speed * 4);
+    this.emit('sfx', 'drumroll');
+    setTimeout(() => this.emit('sfx', 'flip'), SUSPENSE_MS * k);
+    setTimeout(() => this.emit('sfx', verdict), (SUSPENSE_MS + 500) * k);
   }
 
   addScore(id, n) {
@@ -327,24 +345,23 @@ export class Game {
     for (const [pid, choice] of Object.entries(w.guesses)) {
       const ok = choice === actual;
       results[pid] = ok;
-      if (pid !== w.watcherId && ok) this.addScore(pid, choice === 'SAME' ? 400 : 100);
+      if (pid !== w.watcherId && ok) this.addScore(pid, choice === 'SAME' ? SIDE.same : SIDE.right);
     }
     const depth = Math.max(1, w.depth);
     const mine = w.guesses[w.watcherId];
     const ok = results[w.watcherId];
     if (ok) {
-      if (mine === 'SAME') { w.streak = 3; this.addScore(w.watcherId, 200 * depth); }
-      else { w.streak++; this.addScore(w.watcherId, 100 * depth); }
+      if (mine === 'SAME') { w.streak = 3; this.addScore(w.watcherId, stakesFor(depth).same); }
+      else { w.streak++; this.addScore(w.watcherId, stakesFor(depth).win); }
     }
     // character sounds: everyone hears their own on their phone; the TV voices the watcher
-    for (const [pid, r] of Object.entries(results)) this.emit('mood', { pid, mood: r ? 'happy' : 'sad', tv: pid === w.watcherId, delay: 900 });
+    for (const [pid, r] of Object.entries(results)) this.emit('mood', { pid, mood: r ? 'happy' : 'sad', tv: pid === w.watcherId, delay: 2100 });
     w.drawn = drawn;
     w.top = top;
     w.actual = actual;
     w.results = results;
     w.tie = actual === 'SAME' && mine !== 'SAME';
-    this.emit('sfx', 'flip');
-    setTimeout(() => this.emit('sfx', ok ? (mine === 'SAME' ? 'great' : 'good') : 'bad'), 700 * Math.min(1, this.speed * 4));
+    this.suspense(ok ? (mine === 'SAME' ? 'great' : 'good') : 'bad');
     this.go('reveal', TIMES.reveal);
   }
 
@@ -365,7 +382,7 @@ export class Game {
       S.gains = {};
       return this.go('pick', TIMES.pick);
     }
-    S.lost = { pid: w.watcherId, stake: Math.max(200, 100 * Math.max(1, w.depth)) };
+    S.lost = { pid: w.watcherId, stake: stakesFor(w.depth).risk };
     S.danger = pick(DANGERS);
     S.gains = {};
     this.emit('sfx', 'scare');
@@ -457,10 +474,11 @@ export class Game {
     }
     for (const p of this.connected()) {
       const a = mg.answers[p.id];
-      this.emit('mood', { pid: p.id, mood: a && a.i === q.a ? 'happy' : 'sad', tv: false });
+      this.emit('mood', { pid: p.id, mood: a && a.i === q.a ? 'happy' : 'sad', tv: false, delay: 2000 });
     }
     this.emit('sfx', 'good');
-    this.emit('say', `The answer is: ${q.c[q.a]}.`);
+    this.emit('say', 'The answer is…');
+    setTimeout(() => this.emit('say', `${q.c[q.a]}.`), 1500 * Math.min(1, this.speed * 4));
     this.go(finale ? 'finaleA' : 'triviaA', finale ? TIMES.finaleA : TIMES.triviaA);
   }
 
@@ -521,7 +539,7 @@ export class Game {
         }
       }
     }
-    for (const [pid, a] of Object.entries(mg.answers)) this.emit('mood', { pid, mood: top > 0 && counts[a.i] === top ? 'happy' : 'sad', tv: false });
+    for (const [pid, a] of Object.entries(mg.answers)) this.emit('mood', { pid, mood: top > 0 && counts[a.i] === top ? 'happy' : 'sad', tv: false, delay: 2600 });
     this.emit('sfx', 'good');
     this.go('pollA', TIMES.pollA);
   }
@@ -745,9 +763,8 @@ export class Game {
         this.addScore(pid, -b.amount);
       }
     }
-    for (const [pid, b] of Object.entries(mg.bets)) this.emit('mood', { pid, mood: b.won ? 'happy' : 'sad', tv: b.pct === 100, delay: 900 });
-    this.emit('sfx', 'flip');
-    setTimeout(() => this.emit('sfx', anyWin ? 'good' : 'bad'), 600 * Math.min(1, this.speed * 4));
+    for (const [pid, b] of Object.entries(mg.bets)) this.emit('mood', { pid, mood: b.won ? 'happy' : 'sad', tv: b.pct === 100, delay: 2100 });
+    this.suspense(anyWin ? 'good' : 'bad');
     this.go('stakesReveal', TIMES.stakesReveal);
   }
 
@@ -818,7 +835,7 @@ export class Game {
         if (w.watcherId === pid) {
           return {
             ...base, screen: 'pick', streak: w.streak,
-            piles: S.piles.map(p => ({ name: p.name, top: p.cards[p.cards.length - 1], depth: p.cards.length }))
+            piles: S.piles.map(p => ({ name: p.name, top: p.cards[p.cards.length - 1], depth: p.cards.length, ...stakesFor(p.cards.length) }))
           };
         }
         return wait(`${watcher?.name} is choosing where to look…`, `It's ${CLOCK[w.streak]}`, '👀');
@@ -827,13 +844,13 @@ export class Game {
         return {
           ...base, screen: 'guess', watcher: w.watcherId === pid, watcherName: watcher?.name,
           top: pile.cards[pile.cards.length - 1], pileName: pile.name, depth: w.depth, streak: w.streak,
-          locked: w.guesses[pid] || null
+          locked: w.guesses[pid] || null, ...stakesFor(w.depth), side: SIDE
         };
       }
       case 'reveal': {
         const mine = w.guesses[pid];
-        if (!mine) return wait(`It was ${w.drawn.r}${w.drawn.s}`, 'You didn\'t guess this one.', '🃏');
-        return wait(w.results[pid] ? 'Correct!' : 'Wrong!', `You said ${mine}. It was ${w.drawn.r}${w.drawn.s}.`, w.results[pid] ? '✅' : '❌');
+        if (!mine) return { ...wait(`It was ${w.drawn.r}${w.drawn.s}`, 'You didn\'t guess this one.', '🃏'), suspense: true };
+        return { ...wait(w.results[pid] ? 'Correct!' : 'Wrong!', `You said ${mine}. It was ${w.drawn.r}${w.drawn.s}.`, w.results[pid] ? '✅' : '❌'), suspense: true };
       }
       case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, 'Safe inside the cabin.', '🏠');
       case 'dragged': return wait(isLost ? "You got dragged off!" : `${lostName} got dragged off!`, `By ${S.danger.name}.`, S.danger.emoji);
@@ -856,13 +873,13 @@ export class Game {
       case 'triviaA': case 'finaleA': {
         const q = mg.questions[mg.qi];
         const a = mg.answers[pid];
-        return wait(a && a.i === q.a ? 'Correct!' : 'Nope!', `Answer: ${q.c[q.a]}`, a && a.i === q.a ? '✅' : '❌');
+        return { ...wait(a && a.i === q.a ? 'Correct!' : 'Nope!', `Answer: ${q.c[q.a]}`, a && a.i === q.a ? '✅' : '❌'), suspense: true };
       }
       case 'pollA': {
         const q = mg.questions[mg.qi];
         const a = mg.answers[pid];
         const hit = a && q.top > 0 && q.counts[a.i] === q.top;
-        return wait(hit ? 'You read the room!' : 'Not the crowd favorite', '', hit ? '✅' : '🤷');
+        return { ...wait(hit ? 'You read the room!' : 'Not the crowd favorite', '', hit ? '✅' : '🤷'), suspense: true };
       }
       case 'drawDraw':
         if (!mg.prompts[pid]) return wait('Everyone is drawing…', '', '🖍️');
@@ -900,8 +917,8 @@ export class Game {
       }
       case 'stakesReveal': {
         const b = mg.bets[pid];
-        if (!b) return wait(`It was ${mg.drawn.r}${mg.drawn.s}`, 'You sat this one out.', '🃏');
-        return wait(b.won ? 'You won the bet!' : 'Lost the bet!', `It was ${mg.drawn.r}${mg.drawn.s}`, b.won ? '🤑' : '💸');
+        if (!b) return { ...wait(`It was ${mg.drawn.r}${mg.drawn.s}`, 'You sat this one out.', '🃏'), suspense: true };
+        return { ...wait(b.won ? 'You won the bet!' : 'Lost the bet!', `It was ${mg.drawn.r}${mg.drawn.s}`, b.won ? '🤑' : '💸'), suspense: true };
       }
       case 'end': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;

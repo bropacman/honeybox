@@ -12,7 +12,7 @@ export function unlockAudio() {
 
 export function setMuted(m) {
   muted = m;
-  if (m) window.speechSynthesis?.cancel();
+  if (m) { window.speechSynthesis?.cancel(); setMusic('none'); }
 }
 export const isMuted = () => muted;
 
@@ -49,6 +49,27 @@ export const sfx = {
     tone(640, 1.2, { type: 'sine', vol: 0.08, delay: 0.5, slide: -300 });
   },
   lock() { tone(500, 0.06, { type: 'square', vol: 0.05 }); },
+  // snare-ish roll that builds while the card shakes
+  drumroll() {
+    if (!ctx || muted) return;
+    const hits = 22;
+    for (let i = 0; i < hits; i++) {
+      const t = ctx.currentTime + i * 0.07;
+      const len = Math.floor(ctx.sampleRate * 0.05);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * (1 - k / len);
+      const src = ctx.createBufferSource();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      f.type = 'bandpass';
+      f.frequency.value = 1800;
+      g.gain.value = 0.04 + 0.22 * (i / hits);
+      src.buffer = buf;
+      src.connect(f).connect(g).connect(ctx.destination);
+      src.start(t);
+    }
+  },
   scare() {
     // jumpscare screech: noise burst + detuned shriek
     if (ctx && !muted) {
@@ -67,6 +88,87 @@ export const sfx = {
     tone(950, 0.9, { type: 'square', vol: 0.06, slide: -500 });
   }
 };
+
+// ---------- background music ----------
+// Procedural, quiet, and mood-based: a detuned drone, a slow pulse, and an uneasy high whine.
+const MOODS = {
+  tense: { root: 55, bpm: 76, whine: 0.5, cutoff: 380, vol: 0.07 },
+  quiz: { root: 65.4, bpm: 100, whine: 0, cutoff: 520, vol: 0.05 },
+  dread: { root: 41.2, bpm: 0, whine: 1, cutoff: 260, vol: 0.08 },
+  sunrise: { root: 73.4, bpm: 88, whine: 0.25, cutoff: 700, vol: 0.06 }
+};
+let music = null;
+
+export function setMusic(mode) {
+  if (!ctx) return;
+  if ((music?.mode || 'none') === mode) return;
+  if (music) {
+    const old = music;
+    old.master.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
+    clearInterval(old.timer);
+    setTimeout(() => old.oscs.forEach(o => { try { o.stop(); } catch (e) { /* stopped */ } }), 2500);
+  }
+  music = null;
+  const m = MOODS[mode];
+  if (!m || muted) return;
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, ctx.currentTime);
+  master.gain.setTargetAtTime(m.vol, ctx.currentTime, 1.2);
+  master.connect(ctx.destination);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = m.cutoff;
+  filter.connect(master);
+  const oscs = [];
+  const add = (type, freq, vol, dest = filter) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g);
+    if (dest) g.connect(dest);
+    o.start();
+    oscs.push(o);
+    return o;
+  };
+  add('sawtooth', m.root, 0.5);
+  add('sawtooth', m.root * 1.007, 0.5);
+  add('sine', m.root * 1.5, 0.25);
+  // slow filter sweep so the drone breathes
+  const lfo = add('sine', 0.08, 0, null);
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = m.cutoff * 0.4;
+  lfo.disconnect();
+  lfo.connect(lfoGain).connect(filter.frequency);
+  if (m.whine) {
+    const w = add('sine', m.root * 16 * 1.06, 0.035 * m.whine, master);
+    const trem = add('sine', 5.5, 0, null);
+    const tg = ctx.createGain();
+    tg.gain.value = 6;
+    trem.disconnect();
+    trem.connect(tg).connect(w.frequency);
+  }
+  let timer = null;
+  if (m.bpm) {
+    timer = setInterval(() => {
+      if (muted) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(m.root * 2, t);
+      o.frequency.exponentialRampToValueAtTime(m.root, t + 0.25);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(m.vol * 3, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.35);
+    }, 60000 / m.bpm);
+  }
+  music = { mode, master, oscs, timer };
+}
 
 // ---------- character voices ----------
 // Every avatar has a little synthesized call. Happy = two rising calls, sad = one slow droopy call.

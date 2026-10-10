@@ -172,7 +172,7 @@ export function startPhone(root) {
   }
 
   function header() {
-    const g = view.gain ? `<span class="gain ${view.gain < 0 ? 'neg' : ''}">${view.gain > 0 ? '+' : ''}${view.gain}</span>` : '';
+    const g = view.gain ? `<span class="gain ${view.gain < 0 ? 'neg' : ''} ${view.suspense ? 'late' : ''}">${view.gain > 0 ? '+' : ''}${view.gain}</span>` : '';
     return `<header class="ph-head"><span>${view.me.avatar} ${esc(view.me.name)}</span><span id="ptimer" class="ptimer"></span><span>${g}</span></header>`;
   }
 
@@ -194,17 +194,20 @@ export function startPhone(root) {
           <button class="link" id="leave">Leave room</button></div>`;
         break;
       case 'wait':
-        body = `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
+        body = v.suspense
+          ? `<div class="center"><div class="suspense-ph">🥁</div><div class="late"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
+          : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;
       case 'pick':
         body = `<h2>Where do you look?</h2><p class="muted">Streak ${v.streak}/3 · deeper = more honey, bigger stakes</p>
-          <div class="pick-grid">${v.piles.map((p, i) => `<button class="pick" data-pick="${i}">${cardHtml(p.top, 'sm')}<b>${esc(p.name)}</b><small>${p.depth} deep</small></button>`).join('')}</div>`;
+          <div class="pick-grid">${v.piles.map((p, i) => `<button class="pick" data-pick="${i}">${cardHtml(p.top, 'sm')}<b>${esc(p.name)}</b><small>${p.depth} deep</small><small><span class="win">+${p.win}</span> · <span class="risk">risk ${p.risk}</span></small></button>`).join('')}</div>`;
         break;
       case 'guess':
         body = `<p class="role">${v.watcher ? `🔦 You're on watch · streak ${v.streak}/3` : `Betting on ${esc(v.watcherName)}'s card`}</p>
+          ${v.watcher ? `<div class="risk-box">Miss = dragged off · <b>${v.risk} 🍯 at stake</b></div>` : `<div class="safe-box">No risk for you · right <b>+${v.side.right}</b> · SAME <b>+${v.side.same}</b></div>`}
           <div class="center-sm">${cardHtml(v.top)}<p>${esc(v.pileName)} · ${v.depth} deep · the next card is…</p></div>
-          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c}</button>`).join('')}</div>
-          ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : v.watcher ? '' : '<p class="center-sm muted small">Right = +100 · SAME = +400</p>'}`;
+          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c} <small class="pay">+${v.watcher ? (c === 'SAME' ? v.same : v.win) : (c === 'SAME' ? v.side.same : v.side.right)}</small></button>`).join('')}</div>
+          ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
         break;
       case 'stakes': {
         const amt = (pct) => Math.max(10, Math.round(v.base * pct / 1000) * 10);
