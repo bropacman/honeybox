@@ -31,6 +31,11 @@ using [PeerJS](https://peerjs.com/) (vendored in `vendor/`) and its free public 
 
 All questions, prompts, polls and danger lines live in `js/content.js`. Add more!
 
+## Publishing changes
+
+Run `npm run stamp` before committing. It fingerprints every JS/CSS file in `index.html`, so browsers pick up
+new code right away instead of mixing cached old files with new ones.
+
 ## Testing
 
 ```bash

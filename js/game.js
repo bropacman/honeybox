@@ -29,8 +29,8 @@ export const LENGTHS = { short: 5, normal: 7, long: 10 };
 export const FINALES = {
   stakes: { name: 'Sunrise Stakes', emoji: '🌅', blurb: '5 cards, worth 200 up to 1,000. Right wins it, wrong loses it.' },
   trivia: { name: 'Trivia Blitz', emoji: '🐻', blurb: '5 questions, double honey.' },
-  draw: { name: 'Sketchy Woods', emoji: '🖍️', blurb: 'Draw, fib, guess. Double honey.' },
-  poll: { name: 'Cabin Census', emoji: '📋', blurb: 'Read the room. Double honey.' }
+  draw: { name: 'Sketchy Woods', emoji: '🖍️', blurb: 'Everyone draws a secret prompt, then fib and guess. Double honey.' },
+  poll: { name: 'Cabin Census', emoji: '📋', blurb: 'Pick what most people will pick. Double honey.' }
 };
 
 // how long the card shakes face-down before it flips
@@ -337,7 +337,7 @@ export class Game {
       // shuffle everything under the top cards back into the deck
       for (const p of S.piles) S.deck.push(...p.cards.splice(0, p.cards.length - 1));
       S.deck = shuffle(S.deck);
-      this.emit('say', 'The woodpile is empty. Restacking.');
+      this.emit('say', 'The deck is empty. Shuffling the cards back in.');
     }
     return S.deck.pop() || makeDeck().pop();
   }
@@ -679,7 +679,8 @@ export class Game {
     for (const [pid, i] of Object.entries(mg.votes)) this.emit('mood', { pid, mood: mg.options[i].real ? 'happy' : 'sad', tv: false });
     this.emit('mood', { pid: artist, mood: found ? 'happy' : 'sad', tv: true, delay: 500 });
     this.emit('sfx', found ? 'good' : 'bad');
-    this.emit('say', `The real title was: ${mg.prompts[artist]}.`);
+    // the TV reveals lies first and the truth last, so hold the narration until then
+    setTimeout(() => this.emit('say', `The real title was: ${mg.prompts[artist]}.`), (mg.options.length - 1) * 1300 * Math.min(1, this.speed * 4));
     this.go('drawReveal', TIMES.drawReveal);
   }
 
@@ -692,7 +693,7 @@ export class Game {
     else this.addScore(lost.pid, -lost.stake);
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
-    this.emit('say', ok ? `${name} escaped and found the trail home!` : `${name} lost some honey to the animatronics.`);
+    this.emit('say', ok ? `${name} escaped the animatronics!` : `${name} is still captured, and lost some honey.`);
     this.emit('mood', { pid: lost.pid, mood: ok ? 'happy' : 'sad', tv: true, delay: 400 });
     this.go('mgResult', TIMES.mgResult);
   }
@@ -722,7 +723,7 @@ export class Game {
     const options = S.mg.options;
     const kind = options.includes(choice) ? choice : pick(options);
     const picker = this.player(S.mg.picker);
-    this.emit('say', `${picker?.name || 'Last place'} chose ${FINALES[kind].name}.`);
+    if (kind !== 'draw' && kind !== 'poll') this.emit('say', `${picker?.name || 'Last place'} chose ${FINALES[kind].name}.`);
     this.emit('sfx', 'great');
     if (kind === 'stakes') return this.startStakes();
     if (kind === 'trivia') {
@@ -731,6 +732,7 @@ export class Game {
     }
     // a regular minigame, but nobody is captured and all honey is doubled
     S.mg = { type: kind, lostOk: false, finale: true, chosenBy: picker?.id };
+    this.emit('say', `${FINALES[kind].name}. ${FINALES[kind].blurb}`);
     return this.go('mgIntro', TIMES.mgIntro);
   }
 
