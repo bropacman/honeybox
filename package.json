@@ -1,0 +1,16 @@
+{
+  "name": "honeybox",
+  "version": "1.0.0",
+  "description": "Honeybox - a Jackbox-style party game",
+  "scripts": {
+    "e2e": "node tests/e2e.mjs"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "peer": "^1.0.2",
+    "peerjs": "^1.5.5",
+    "qrcode-generator": "^1.4.4"
+  },
+  "private": true
+}
