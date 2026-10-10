@@ -180,3 +180,22 @@ export const POLLS = [
   { q: 'Best season in New Hampshire?', c: ['Winter', 'Mud season', 'Summer', 'Fall'] },
   { q: 'Cabin is on fire. What do you grab first?', c: ['The dogs', 'My phone', 'The snacks', 'Other family members'] }
 ];
+
+// ---------- extra packs (js/packs/) ----------
+import TRIVIA_1 from './packs/trivia-1.js';
+import TRIVIA_2 from './packs/trivia-2.js';
+import TRIVIA_3 from './packs/trivia-3.js';
+import PROMPTS_X from './packs/prompts.js';
+import POLLS_X from './packs/polls.js';
+
+const key = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+function addUnique(list, extra, keyOf) {
+  const seen = new Set(list.map(keyOf));
+  for (const item of extra) {
+    const k = keyOf(item);
+    if (!seen.has(k)) { seen.add(k); list.push(item); }
+  }
+}
+addUnique(TRIVIA, [...TRIVIA_1, ...TRIVIA_2, ...TRIVIA_3], t => key(t.q));
+addUnique(DRAW_PROMPTS, PROMPTS_X, key);
+addUnique(POLLS, POLLS_X, p => key(p.q));
