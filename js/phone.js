@@ -209,15 +209,15 @@ export function startPhone(root) {
           <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c} <small class="pay">+${v.watcher ? (c === 'SAME' ? v.same : v.win) : (c === 'SAME' ? v.side.same : v.side.right)}</small></button>`).join('')}</div>
           ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
         break;
+      case 'finale':
+        body = `<p class="role">🌅 You're in last place…</p><h2>Choose how the night ends!</h2>
+          <div class="choices">${v.options.map(o => `<button class="choice finale-choice" data-finale="${o.key}"><span class="f-emoji">${o.emoji}</span><span><b>${esc(o.name)}</b><br><small>${esc(o.blurb)}</small></span></button>`).join('')}</div>`;
+        break;
       case 'stakes': {
-        const amt = (pct) => Math.max(10, Math.round(v.base * pct / 1000) * 10);
         body = `<p class="role">🌅 Sunrise Stakes · card ${v.round}${v.boosted ? ' · <span class="boost">1.5× boost</span>' : ''}</p>
-          <div class="center-sm">${cardHtml(v.top, 'sm')}<p>${esc(v.pileName)} · you have <b>${v.bank} 🍯</b></p></div>
-          ${v.locked ? `<div class="center-sm"><h2>${v.locked.choice} · ${v.locked.pct === 100 ? 'ALL IN 🔥' : v.locked.pct + '%'}</h2><p>${v.locked.amount} 🍯 on the line. Watch the TV!</p></div>` : `
-          <p class="muted small">1. How much?</p>
-          <div class="pcts">${v.pcts.map(p => `<button class="pct ${p === 25 ? 'sel' : ''}" data-pct="${p}">${p === 100 ? 'ALL IN 🔥' : p + '%'}<small>${amt(p)} 🍯</small></button>`).join('')}</div>
-          <p class="muted small">2. The next card is…</p>
-          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()}" data-stake="${c}">${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c}${c === 'SAME' ? ' <small>(4×)</small>' : ''}</button>`).join('')}</div>`}`;
+          <div class="center-sm">${cardHtml(v.top)}<p>${esc(v.pileName)} · this card is worth <b>${v.value} 🍯</b></p></div>
+          ${v.locked ? `<div class="center-sm"><h2>You said ${v.locked.choice}</h2><p>Watch the TV!</p></div>` : `
+          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()}" data-stake="${c}">${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c} <small class="pay">±${c === 'SAME' ? v.same : v.value}</small></button>`).join('')}</div>`}`;
         break;
       }
       case 'choices':
@@ -285,15 +285,15 @@ export function startPhone(root) {
       b.classList.add('sel');
       send({ t: 'guess', choice: b.dataset.guess });
     }));
-    let pct = 25;
-    root.querySelectorAll('[data-pct]').forEach(b => b.addEventListener('click', () => {
-      pct = Number(b.dataset.pct);
-      root.querySelectorAll('[data-pct]').forEach(x => x.classList.toggle('sel', x === b));
+    root.querySelectorAll('[data-finale]').forEach(b => b.addEventListener('click', () => {
+      root.querySelectorAll('[data-finale]').forEach(x => { x.disabled = true; });
+      b.classList.add('sel');
+      send({ t: 'finale', choice: b.dataset.finale });
     }));
     root.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => {
-      root.querySelectorAll('[data-stake], [data-pct]').forEach(x => { x.disabled = true; });
+      root.querySelectorAll('[data-stake]').forEach(x => { x.disabled = true; });
       b.classList.add('sel');
-      send({ t: 'stake', choice: b.dataset.stake, pct });
+      send({ t: 'stake', choice: b.dataset.stake });
     }));
     root.querySelectorAll('[data-answer]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-answer]').forEach(x => { x.disabled = true; });
@@ -337,9 +337,7 @@ export function startPhone(root) {
       if (view.screen === 'draw' && pad) { pad.scribble(); root.querySelector('#submit')?.click(); return; }
       const lie = root.querySelector('#lie');
       if (lie) { lie.value = choose(['A moose doing karate', 'Grandpa at the beach', 'A haunted toaster', 'Dog vs vacuum']) + ' ' + Math.floor(Math.random() * 99); root.querySelector('#send').click(); return; }
-      const pcts = enabled('[data-pct]');
-      if (pcts.length) choose(pcts).click();
-      const btns = enabled('[data-pick], [data-guess], [data-answer], [data-stake]');
+      const btns = enabled('[data-pick], [data-guess], [data-answer], [data-stake], [data-finale]');
       if (btns.length) choose(btns).click();
     }, delay);
   }

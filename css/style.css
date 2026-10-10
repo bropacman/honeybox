@@ -422,3 +422,14 @@ body.is-phone .moon { display: none; }
 .suspense-ph { font-size: 4em; text-align: center; animation: suspenseOut 1.9s ease both; }
 @keyframes suspenseOut { 0% { opacity: 1; transform: scale(1); } 85% { opacity: 1; transform: scale(1.3) rotate(8deg); } 100% { opacity: 0; transform: scale(0); height: 0; } }
 .phone .late { animation: lateIn 0.5s ease-out 1.9s both; }
+
+.ladder { display: flex; gap: 0.6em; justify-content: center; margin: 0.4em 0; }
+.ladder span { background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 0.2em 0.7em; color: var(--honey); }
+.ladder .big-card { border-color: var(--bad); font-size: 1.3em; }
+
+.finale-opts { display: flex; gap: 1.2vw; justify-content: center; margin-top: 1em; flex-wrap: wrap; }
+.finale-opt { display: flex; flex-direction: column; align-items: center; width: 13em; padding: 0.8em; border-radius: 18px; background: var(--panel); border: 2px solid var(--line); text-align: center; }
+.finale-opt .emoji-xl { font-size: 3em; }
+.finale-opt small { color: var(--muted); }
+.finale-choice { align-items: center; }
+.f-emoji { font-size: 2em; }
