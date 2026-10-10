@@ -35,6 +35,7 @@ const peerSrv = spawn(join(ROOT, 'node_modules/.bin/peerjs'), ['--port', '9000',
 await new Promise(r => setTimeout(r, 1500));
 
 const errors = [];
+const summary0 = {};
 const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined });
 const ctxTV = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
 const tv = await ctxTV.newPage();
@@ -59,10 +60,16 @@ for (let i = 0; i < PHONES; i++) {
   phones.push(p);
 }
 await tv.waitForFunction(n => document.querySelectorAll('.camper').length === n, PHONES, { timeout: 30000 });
+// switch character in the lobby
+await phones[0].waitForSelector('[data-switch="🦄"]');
+await phones[0].screenshot({ path: join(OUT, '01-phone-lobby-switch.png') });
+await phones[0].click('[data-switch="🦄"]');
+await tv.waitForFunction(() => window.__honeybox.S.players.some(p => p.avatar === '🦄'), null, { timeout: 10000 });
+summary0.avatarSwitch = true;
 await tv.screenshot({ path: join(OUT, '01-tv-lobby-full.png') });
 await phones[0].screenshot({ path: join(OUT, '01-phone-lobby.png') });
 
-const summary = { code, phones: PHONES, games: [], errors };
+const summary = { ...summary0, code, phones: PHONES, games: [], errors };
 const seenAll = new Set();
 const minigames = new Set();
 const phoneScreens = new Set();
@@ -83,7 +90,7 @@ for (let g = 0; g < GAMES; g++) {
       if (st.mg && st.mg !== 'finale') minigames.add(st.mg);
       if (!seenAll.has(tag)) {
         seenAll.add(tag);
-        await tv.waitForTimeout(150);
+        if (st.phase !== 'pick') await tv.waitForTimeout(150);
         const n = String(shot++).padStart(2, '0');
         await tv.screenshot({ path: join(OUT, `${n}-tv-${tag.replace(':', '-')}.png`) });
         // screenshot the phone that has something to do, else phone 0

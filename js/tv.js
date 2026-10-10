@@ -1,9 +1,10 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS } from './game.js';
+import { Game, MINIGAMES, LENGTHS, CLOCK } from './game.js';
 import { startHost, newRoomCode } from './net.js';
-import { sfx, say, unlockAudio, setMuted, isMuted } from './audio.js';
+import { sfx, say, unlockAudio, setMuted, isMuted, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
+import { PILE_ICONS } from './content.js';
 
 const SAVE_KEY = 'honeybox_host_save';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -72,6 +73,7 @@ export function startTV(root, { resume = null } = {}) {
         else game.answer(pid, Number(msg.i));
         break;
       case 'drawing': game.submitDrawing(pid, msg.strokes); break;
+      case 'avatar': game.setAvatar(pid, String(msg.avatar || '')); break;
       case 'fib': {
         const err = game.fib(pid, msg.text);
         if (err) net.send(connId, { t: 'toast', text: err });
@@ -124,6 +126,11 @@ export function startTV(root, { resume = null } = {}) {
     }
   }, 3000);
 
+  root.addEventListener('change', (e) => {
+    if (e.target.id === 'voice') { setVoice(e.target.value); say(STYLES[voiceSettings().style].sample); }
+  });
+  window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (game.S.phase === 'lobby') render(); });
+
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
     if (e.key === ' ') { e.preventDefault(); game.togglePause(); }
@@ -142,6 +149,8 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'skip') game.skip();
     if (act === 'mute') { setMuted(!isMuted()); render(); }
     if (act === 'again') game.restart();
+    if (act === 'style') { setStyle(b.dataset.style); say(STYLES[b.dataset.style].sample); render(); }
+    if (act === 'testvoice') say(STYLES[voiceSettings().style].sample);
     if (act === 'new') { localStorage.removeItem(SAVE_KEY); location.href = location.pathname + location.search.replace(/[?&]host=1/, ''); }
   });
 
@@ -168,10 +177,14 @@ export function startTV(root, { resume = null } = {}) {
 
   function scoreboard(big = false) {
     const ranked = game.ranked();
+    const delta = (p) => {
+      const d = p.score - ((game.S.board || {})[p.id] || 0);
+      return d ? `<span class="gain ${d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</span>` : '';
+    };
     return `<div class="scoreboard ${big ? 'big' : ''}">${ranked.map((p, i) => `
       <div class="score-row ${p.connected ? '' : 'off'}">
         <span class="rank">${i + 1}</span><span class="av">${p.avatar}</span>
-        <span class="nm">${esc(p.name)}</span><span class="pts">${p.score} 🍯${gainTag(p.id)}</span>
+        <span class="nm">${esc(p.name)}</span><span class="pts">${p.score} 🍯${big ? delta(p) : gainTag(p.id)}</span>
       </div>`).join('')}</div>`;
   }
 
@@ -186,21 +199,50 @@ export function startTV(root, { resume = null } = {}) {
     }).join('')}</div>`;
   }
 
-  function board(highlight = null, newCard = false) {
+  // Where each pile sits on the TV map (percent of the map box). Roughly NH geography.
+  const SPOTS = {
+    "Santa's Village": [36, 12], 'Mt Washington': [60, 18], 'Flume Gorge': [12, 22],
+    "Clark's Bears": [22, 48], 'The Kanc': [46, 48], 'Story Land': [80, 34],
+    'Funspot': [14, 76], 'Weirs Beach': [36, 82], 'Lake Dock': [62, 80]
+  };
+
+  function board(highlight = null) {
     const S = game.S;
-    return `<div class="board">${S.piles.map((p, i) => {
+    const piles = S.piles.map((p, i) => {
       const top = p.cards[p.cards.length - 1];
-      const hl = i === highlight;
-      return `<div class="pile ${hl ? 'hl' : ''}">
-        <div class="pile-name">${esc(p.name)}</div>
-        <div class="stack" style="--depth:${Math.min(p.cards.length, 8)}">${card(top, hl && newCard ? 'flip-in' : '')}</div>
+      const [x, y] = SPOTS[p.name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
+      return `<div class="spot ${i === highlight ? 'hl' : ''}" style="left:${x}%;top:${y}%">
+        <div class="stack" style="--depth:${Math.min(p.cards.length, 8)}">${card(top)}</div>
+        <div class="pile-name">${PILE_ICONS[p.name] || ''} ${esc(p.name)}</div>
         <div class="depth">${p.cards.length} deep · ${100 * p.cards.length}🍯</div>
       </div>`;
-    }).join('')}</div>`;
+    }).join('');
+    return `<div class="map">
+      <svg class="map-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs><radialGradient id="lake" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2c6a8f"/><stop offset="100%" stop-color="#173f57"/></radialGradient></defs>
+        <path d="M30 34 L40 12 L46 22 L54 4 L62 18 L68 8 L78 30 Z" fill="#1d3328"/>
+        <path d="M50 12 L54 4 L57 10 L55 9" fill="none" stroke="#dfe6e2" stroke-width="0.7" opacity="0.7"/>
+        <path d="M0 40 L6 22 L12 34 L18 14 L26 36 Z" fill="#1a2f25"/>
+        <path d="M20 100 C 22 86, 40 74, 58 78 S 86 92, 92 100 Z" fill="url(#lake)"/>
+        <path d="M2 50 C 20 46, 40 52, 60 47 S 86 46, 98 50" fill="none" stroke="#3a3a33" stroke-width="3.2"/>
+        <path d="M2 50 C 20 46, 40 52, 60 47 S 86 46, 98 50" fill="none" stroke="#e8c547" stroke-width="0.4" stroke-dasharray="1.6 1.6"/>
+        <path d="M88 100 C 86 80, 88 62, 86 50 S 80 30, 74 22" fill="none" stroke="#3a3a33" stroke-width="2.6"/>
+        <path d="M28 100 C 26 80, 24 64, 22 50 S 14 30, 12 10" fill="none" stroke="#3a3a33" stroke-width="2.6"/>
+      </svg>
+      <div class="deco" style="left:6%;top:58%">🌲</div><div class="deco" style="left:34%;top:62%">🌲</div>
+      <div class="deco" style="left:70%;top:60%">🌲</div><div class="deco" style="left:94%;top:70%">🌲</div>
+      <div class="deco" style="left:88%;top:12%">🌲</div><div class="deco" style="left:4%;top:92%">🌲</div>
+      <div class="map-label" style="left:40%;top:95%">Lake Winnipesaukee</div>
+      <div class="map-label" style="left:44%;top:30%">White Mountains</div>
+      <div class="map-label" style="left:88%;top:54%">Conway · Rt 16</div>
+      <div class="map-label" style="left:2%;top:54%">Lincoln</div>
+      <div class="map-label" style="left:56%;top:42%">Kancamagus Hwy →</div>
+      ${piles}
+    </div>`;
   }
 
   function streakDots(n) {
-    return `<div class="streak">${[0, 1, 2].map(i => `<span class="dot ${i < n ? 'on' : ''}">🔥</span>`).join('')}</div>`;
+    return `<div class="clock"><span class="now">🕛 ${CLOCK[Math.min(3, n)]}</span><span class="steps">${CLOCK.map((t, i) => `<i class="${i <= n ? 'on' : ''}">${t}</i>`).join('')}</span></div>`;
   }
 
   function stage() {
@@ -216,7 +258,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="lobby">
           <div class="join-box">
             <h1 class="logo">Honey<span>box</span></h1>
-            <p class="tag">Survive the night in the cabin.</p>
+            <p class="tag">Five nights in the NH woods. The animatronics are awake.</p>
             <div class="qr" id="qr"></div>
             <p class="join-at">On your phone, go to<br><b>${esc(joinUrl.replace(/^https?:\/\//, ''))}</b></p>
             <div class="code">${ready ? code : '····'}</div>
@@ -228,6 +270,11 @@ export function startTV(root, { resume = null } = {}) {
             <div class="lengths">Game length:
               ${Object.keys(LENGTHS).map(l => `<button data-act="length" data-len="${l}" class="${S.length === l ? 'sel' : ''}">${l}</button>`).join('')}
             </div>
+            <div class="voice-row">Narrator:
+              <select id="voice">${voiceOptions().map(v => `<option value="${esc(v.name)}" ${v.name === voiceSettings().voice ? 'selected' : ''}>${esc(v.label)}</option>`).join('') || '<option>Default</option>'}</select>
+              ${Object.keys(STYLES).map(k => `<button data-act="style" data-style="${k}" class="${voiceSettings().style === k ? 'sel' : ''}">${STYLES[k].label}</button>`).join('')}
+              <button data-act="testvoice">▶ Test</button>
+            </div>
             <button class="big-btn" data-act="start" ${S.players.length >= (params.has('dev') ? 1 : 2) ? '' : 'disabled'}>Start the night 🔥</button>
             <p class="muted small">Space = pause · N = skip · click a camper to remove them</p>
           </div>
@@ -236,24 +283,28 @@ export function startTV(root, { resume = null } = {}) {
       case 'intro':
         return `<div class="center story">
           <div class="emoji-xl">🏚️🌲🐕🐕🌲</div>
-          <h1>The Cabin</h1>
-          <p>The family is holed up in a cabin deep in the New Hampshire woods. Something is out there.</p>
-          <p>Each night one of you takes the <b>night watch</b>. Pick a spot, then everyone calls the next card <b>HIGH</b>, <b>LOW</b> or <b>SAME</b>.</p>
-          <p>Watcher: get <b>3 in a row</b> to make it back inside. A correct SAME is a 🍯 <b>Honey Pot</b> — straight home.</p>
-          <p>Miss, and you're <b>dragged into the woods</b>, where everyone plays for honey and you play for your life.</p>
+          <h1>Five Nights at the Cabin</h1>
+          <p>The family is holed up at the cabin on Lake Winnipesaukee, with Story Land, Funspot, Clark's and Santa's Village just up the road. Everything closed hours ago… but the animatronics didn't get the memo.</p>
+          <p>Each round one of you takes the <b>night shift</b>. Pick a spot, then everyone calls the next card <b>HIGH</b>, <b>LOW</b> or <b>SAME</b>.</p>
+          <p>Night shift: get <b>3 in a row</b> to make it to <b>6 AM</b>. A correct SAME is a 🍯 <b>Honey Pot</b> — straight to morning.</p>
+          <p>Miss, and you get <b>dragged off</b>. Everyone plays a game for honey while you play to escape.</p>
         </div>`;
       case 'turnStart':
         return `<div class="center">
           <div class="emoji-xl">🔦</div>
-          <h1>${avatar(watcher)} is on night watch</h1>
-          <p class="big">Get 3 in a row to make it back to the cabin.</p>
-          <p class="muted">Night ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
+          <p class="muted big">NIGHT ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
+          <h1>${avatar(watcher)} is on the night shift</h1>
+          <p class="big">12 AM. Get 3 in a row to make it to 6 AM.</p>
         </div>`;
       case 'pick':
-        return `<div class="watch">
-          <div class="watch-head"><h2>${avatar(watcher)} is choosing where to look…</h2>${streakDots(w.streak)}</div>
-          ${board()}
-          <p class="muted">Deeper piles pay more honey, but cost more if you get dragged off.</p>
+        return `<div class="watch pick-layout">
+          ${board(null)}
+          <div class="pick-info">
+            <h2>${avatar(watcher)} is choosing where to look…</h2>
+            ${streakDots(w.streak)}
+            <p class="muted">Make it to 6 AM: 3 right in a row.</p>
+            <p class="muted">Deeper piles pay more honey, but cost more if you get dragged off.</p>
+          </div>
         </div>`;
       case 'guess': {
         const pile = S.piles[w.pile];
@@ -279,7 +330,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="watch-head"><h2>${avatar(watcher)} said <b>${mine}</b> at the ${esc(pile.name)}</h2>${streakDots(w.streak)}</div>
           <div class="duel">
             ${card(w.top, 'huge')}
-            <div class="vs result ${ok ? 'ok' : 'bad'}">${ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The woods win ties.' : 'WRONG!'}</div>
+            <div class="vs result ${ok ? 'ok' : 'bad'}">${ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The animatronics win ties.' : 'WRONG!'}</div>
             ${card(w.drawn, 'huge flip-in')}
           </div>
           <div class="guess-cols">${groups}</div>
@@ -287,15 +338,15 @@ export function startTV(root, { resume = null } = {}) {
       }
       case 'safe':
         return `<div class="center">
-          <div class="emoji-xl bounce">🏠🐕🐕</div>
-          <h1>${avatar(watcher)} made it back to the cabin!</h1>
+          <div class="emoji-xl bounce">🌅🏠🐕🐕</div>
+          <h1>6 AM! ${avatar(watcher)} survived the night shift!</h1>
           <p class="big">+500 🍯 escape bonus</p>
         </div>`;
       case 'dragged':
         return `<div class="center dark">
-          <div class="emoji-xl shake">🌲👁️👁️🌲</div>
-          <h1>${avatar(lost)} was dragged into the woods</h1>
-          <p class="big">by ${esc(S.danger)}.</p>
+          <div class="jumpscare">${S.danger.emoji}</div>
+          <h1>${avatar(lost)} got dragged off</h1>
+          <p class="big">by ${esc(S.danger.name)}.</p>
           <p>At stake: <b>${S.lost.stake} 🍯</b></p>
         </div>`;
       case 'mgIntro': {
@@ -304,7 +355,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="emoji-xl">${m.emoji}</div>
           <h1>${m.name}</h1>
           <p class="big">${esc(m.rules)}</p>
-          <p>Lost in the woods: ${avatar(lost)} · ${S.lost.stake} 🍯 at stake</p>
+          <p>Captured: ${avatar(lost)} ${S.danger ? S.danger.emoji : ''} · ${S.lost.stake} 🍯 at stake</p>
         </div>`;
       }
       case 'triviaQ': case 'finaleQ': case 'pollQ': {
@@ -313,7 +364,7 @@ export function startTV(root, { resume = null } = {}) {
         const choices = poll ? game.pollChoices(q) : q.c;
         const title = poll ? '📋 Cabin Census' : S.phase === 'finaleQ' ? '🌅 Last Light · double honey' : '🐻 Bear Trivia';
         return `<div class="quiz">
-          <div class="quiz-head">${title} <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost && !poll && S.phase !== 'finaleQ' ? ` · lost: ${avatar(lost)}` : ''}${lost && poll ? ` · lost: ${avatar(lost)}` : ''}</div>
+          <div class="quiz-head">${title} <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost && !poll && S.phase !== 'finaleQ' ? ` · captured: ${avatar(lost)}` : ''}${lost && poll ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${esc(q.q)}</h1>
           ${poll ? '<p class="muted">Pick what you think MOST people will pick.</p>' : ''}
           <div class="answers ${choices.length > 4 ? 'many' : ''}">${choices.map((c, i) => `<div class="ans"><span class="letter">${'ABCDEFGH'[i]}</span>${esc(c)}</div>`).join('')}</div>
@@ -351,7 +402,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="emoji-xl">🖍️</div>
           <h1>Sketchy Woods</h1>
           <p class="big">Everyone: draw your secret prompt on your phone!</p>
-          <p>Lost in the woods: ${avatar(lost)} — someone needs to guess your drawing or you lose ${S.lost.stake} 🍯.</p>
+          <p>Captured: ${avatar(lost)} — someone needs to guess your drawing or you lose ${S.lost.stake} 🍯.</p>
           ${waitingStrip()}
         </div>`;
       case 'drawFib': case 'drawVote': case 'drawReveal': {
@@ -370,18 +421,18 @@ export function startTV(root, { resume = null } = {}) {
           }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
         }
         return `<div class="drawful">
-          <div class="art"><canvas id="art" width="640" height="640"></canvas><p>by ${avatar(artist)}${artist?.id === S.lost.pid ? ' <span class="lost-tag">lost in the woods</span>' : ''}</p></div>
+          <div class="art"><canvas id="art" width="640" height="640"></canvas><p>by ${avatar(artist)}${artist?.id === S.lost.pid ? ' <span class="lost-tag">captured</span>' : ''}</p></div>
           <div class="side">${side}</div>
         </div>`;
       }
       case 'mgResult':
         return `<div class="center ${mg.result ? '' : 'dark'}">
           <div class="emoji-xl ${mg.result ? 'bounce' : 'shake'}">${mg.result ? '🏠🔥' : '💀🌲'}</div>
-          <h1>${avatar(lost)} ${mg.result ? 'found the trail home!' : 'is still lost…'}</h1>
-          <p class="big">${mg.result ? '+300 🍯' : `−${S.lost.stake} 🍯 lost to the woods`}</p>
+          <h1>${avatar(lost)} ${mg.result ? 'escaped!' : 'is still captured…'}</h1>
+          <p class="big">${mg.result ? '+300 🍯' : `−${S.lost.stake} 🍯 lost to the animatronics`}</p>
         </div>`;
       case 'scores':
-        return `<div class="center"><h1>Honey Count</h1>${scoreboard(true)}<p class="muted">Night ${S.turnIdx + 1} of ${S.turnOrder.length} done</p></div>`;
+        return `<div class="center"><div class="emoji-xl">🍯</div><h1>Honey Count</h1>${scoreboard(true)}<p class="muted">Night ${S.turnIdx + 1} of ${S.turnOrder.length} survived</p></div>`;
       case 'finaleIntro':
         return `<div class="center">
           <div class="emoji-xl">🌅</div>
@@ -407,7 +458,7 @@ export function startTV(root, { resume = null } = {}) {
     root.innerHTML = `
       <div class="tv phase-${S.phase}">
         <div class="tv-main">${stage()}</div>
-        ${showSide ? `<aside class="tv-side"><div class="mini-code">${code}</div>${scoreboard()}</aside>` : ''}
+        ${showSide ? `<div class="mini-code">${code}</div>` : ''}
         <div id="timer" class="timer"></div>
         <div class="host-ctl">
           <button data-act="mute" title="Sound">${isMuted() ? '🔇' : '🔊'}</button>

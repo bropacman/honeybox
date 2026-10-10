@@ -161,7 +161,7 @@ export function startPhone(root) {
 
   function header() {
     const g = view.gain ? `<span class="gain ${view.gain < 0 ? 'neg' : ''}">${view.gain > 0 ? '+' : ''}${view.gain}</span>` : '';
-    return `<header class="ph-head"><span>${view.me.avatar} ${esc(view.me.name)}</span><span id="ptimer" class="ptimer"></span><span>${view.me.score} 🍯 ${g}</span></header>`;
+    return `<header class="ph-head"><span>${view.me.avatar} ${esc(view.me.name)}</span><span id="ptimer" class="ptimer"></span><span>${g}</span></header>`;
   }
 
   function render() {
@@ -173,7 +173,10 @@ export function startPhone(root) {
         body = '<div class="center"><p>You were removed from this room.</p><button id="leave">Back</button></div>';
         break;
       case 'lobby':
-        body = `<div class="center"><div class="emoji-xl">${v.me.avatar}</div><h2>You're in!</h2><p>Waiting for everyone to join. Start the game on the TV.</p><button class="link" id="leave">Leave room</button></div>`;
+        body = `<div class="center-sm lobby-ph"><div class="emoji-xl">${v.me.avatar}</div><h2>You're in!</h2><p>Waiting for everyone. Start the game on the TV.</p>
+          <p class="muted">Change your character:</p>
+          <div class="avatars">${AVATARS.map(a => `<button class="av ${a === v.me.avatar ? 'sel' : ''}" data-switch="${a}">${a}</button>`).join('')}</div>
+          <button class="link" id="leave">Leave room</button></div>`;
         break;
       case 'wait':
         body = `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
@@ -227,6 +230,12 @@ export function startPhone(root) {
 
   function wire() {
     root.querySelector('#leave')?.addEventListener('click', leave);
+    root.querySelectorAll('[data-switch]').forEach(b => b.addEventListener('click', () => {
+      root.querySelectorAll('[data-switch]').forEach(x => x.classList.toggle('sel', x === b));
+      session.avatar = b.dataset.switch;
+      store.setItem(SESSION_KEY, JSON.stringify({ ...session, at: Date.now() }));
+      send({ t: 'avatar', avatar: b.dataset.switch });
+    }));
     root.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-pick]').forEach(x => { x.disabled = true; });
       send({ t: 'pick', i: Number(b.dataset.pick) });

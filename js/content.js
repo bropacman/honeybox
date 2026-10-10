@@ -1,18 +1,45 @@
 // All the words in Honeybox. Edit freely: add questions, prompts and polls here.
 
 export const PILE_NAMES = [
-  'Woodshed', 'Outhouse', 'Lake Dock', 'Mailbox', 'Trailhead',
-  'Root Cellar', 'Back Porch', 'Deer Stand', 'Fire Pit'
+  'Santa\'s Village', 'Mt Washington', 'Flume Gorge',
+  'Clark\'s Bears', 'The Kanc', 'Story Land',
+  'Funspot', 'Weirs Beach', 'Lake Dock'
 ];
 
+// Little sign icon for each spot on the map
+export const PILE_ICONS = {
+  'Santa\'s Village': '🎅', 'Mt Washington': '🏔️', 'Flume Gorge': '🏞️',
+  'Clark\'s Bears': '🐻', 'The Kanc': '🛣️', 'Story Land': '🏰',
+  'Funspot': '🕹️', 'Weirs Beach': '🏖️', 'Lake Dock': '🏚️'
+};
+
+// After closing time, the Story Land animatronics wake up...
 export const DANGERS = [
-  'a black bear', 'a suspiciously large moose', 'something with too many legs',
-  'the thing that lives under the dock', 'a cloud of black flies', 'a raccoon gang',
-  'Bigfoot (allegedly)', 'the Wendigo', 'a rabid chipmunk', 'a very angry goose',
-  'whatever keeps knocking on the window', 'a porcupine with a grudge'
+  { name: 'Humpty Dumpty, cracked and grinning', emoji: '🥚' },
+  { name: 'the Pumpkin Coach (no horses, still moving)', emoji: '🎃' },
+  { name: 'Cinderella, missing a slipper and VERY upset about it', emoji: '👸' },
+  { name: 'a swan boat that paddles itself across Winnipesaukee', emoji: '🦢' },
+  { name: 'the Roar-O-Saurus, eyes glowing red', emoji: '🦖' },
+  { name: 'the Old Woman who lives in a Shoe (and all her kids)', emoji: '👢' },
+  { name: 'an animatronic bear that will not stop singing', emoji: '🐻' },
+  { name: 'a moose standing in the middle of Route 16', emoji: '🫎' },
+  { name: 'the thing that lives under the Lake Dock', emoji: '🐙' },
+  { name: 'a carousel horse that got loose', emoji: '🐴' },
+  { name: 'the Winnipesaukee lake monster', emoji: '🐍' },
+  { name: 'a clown who missed the last tram', emoji: '🤡' },
+  { name: 'a possessed Skee-Ball machine from Funspot', emoji: '🕹️' },
+  { name: 'an animatronic elf from Santa\'s Village, off-season and angry', emoji: '🧝' },
+  { name: 'the Cog Railway train, running with no conductor', emoji: '🚂' },
+  { name: 'a 231 mph gust off Mount Washington', emoji: '🌪️' },
+  { name: 'one of Clark\'s bears, done performing for the night', emoji: '🐻' },
+  { name: 'whatever lives at the bottom of the Flume', emoji: '👁️' }
 ];
 
-export const AVATARS = ['🐶', '🐕', '🦮', '🐩', '🐻', '🫎', '🦝', '🦊', '🦉', '🦌', '🐿️', '🦨', '🐺', '🪓', '🔦', '🏕️'];
+// Players stay cute.
+export const AVATARS = [
+  '🐶', '🐕', '🦮', '🐩', '🐱', '🐰', '🐻', '🐼', '🐨', '🦊', '🦝', '🐷',
+  '🐸', '🐵', '🦉', '🐧', '🦆', '🐢', '🦄', '🐝', '🦌', '🫎', '🐿️', '🦔'
+];
 
 // a = index of the correct choice
 export const TRIVIA = [
@@ -75,6 +102,23 @@ export const TRIVIA = [
   { q: "What is New Hampshire's state animal?", c: ['Moose', 'Black Bear', 'White-tailed Deer', 'Red Fox'], a: 2 },
   { q: 'What do you call a baby bear?', c: ['Kit', 'Cub', 'Pup', 'Calf'], a: 1 },
   { q: 'What do you call a baby moose?', c: ['Calf', 'Fawn', 'Cub', 'Joey'], a: 0 },
+  { q: 'Story Land, the fairy-tale theme park, is in which NH village?', c: ['Glen', 'Lincoln', 'Jefferson', 'Meredith'], a: 0 },
+  { q: 'Which large cruise ship sails on Lake Winnipesaukee?', c: ['The Lady of the Lake', 'The M/S Mount Washington', 'The Granite Queen', 'The Loon Express'], a: 1 },
+  { q: 'Weirs Beach is on which lake?', c: ['Squam Lake', 'Lake Sunapee', 'Lake Winnipesaukee', 'Ossipee Lake'], a: 2 },
+  { q: 'The Kancamagus Highway connects Conway to which town?', c: ['Lincoln', 'Laconia', 'Littleton', 'Plymouth'], a: 0 },
+  { q: 'Cathedral Ledge, a famous climbing cliff, is in which town?', c: ['Franconia', 'North Conway', 'Gorham', 'Jackson'], a: 1 },
+  { q: 'Santa\'s Village theme park is in which NH town?', c: ['Glen', 'Jefferson', 'Bartlett', 'Lincoln'], a: 1 },
+  { q: 'In "Five Nights at Freddy\'s," what time does each night end?', c: ['4 AM', '5 AM', '6 AM', 'Midnight'], a: 2 },
+  { q: 'What is the name of the restaurant in "Five Nights at Freddy\'s"?', c: ["Chuck E.'s Arcade", "Freddy Fazbear's Pizza", "Bonnie's Burger Barn", "Foxy's Fun House"], a: 1 },
+  { q: 'At what time does Cinderella\'s magic wear off?', c: ['Sunset', '10 PM', 'Midnight', 'Sunrise'], a: 2 },
+  { q: 'In the nursery rhyme, where did Humpty Dumpty sit?', c: ['On a log', 'On a wall', 'On a shelf', 'In a shoe'], a: 1 },
+  { q: 'What did Cinderella leave behind at the ball?', c: ['A glass slipper', 'A tiara', 'A pumpkin', 'A glove'], a: 0 },
+  { q: 'Funspot, near Weirs Beach, has been called the world\'s largest what?', c: ['Arcade', 'Mini golf course', 'Candy store', 'Bowling alley'], a: 0 },
+  { q: 'Clark\'s Trading Post in Lincoln is famous for its trained…', c: ['Moose', 'Black bears', 'Raccoons', 'Seals'], a: 1 },
+  { q: 'The Mount Washington Cog Railway (1869) was the world\'s first what?', c: ['Electric train', 'Mountain-climbing cog railway', 'Subway', 'Ski lift'], a: 1 },
+  { q: 'The Flume Gorge is in which state park?', c: ['Crawford Notch', 'Franconia Notch', 'Pinkham Notch', 'Dixville Notch'], a: 1 },
+  { q: 'The "Kanc" is the nickname for which road?', c: ['Route 16', 'Interstate 93', 'The Kancamagus Highway', 'Route 302'], a: 2 },
+  { q: 'Which is the tallest mountain in the Presidential Range?', c: ['Mount Adams', 'Mount Jefferson', 'Mount Washington', 'Mount Madison'], a: 2 },
   { q: 'Which of these is the classic warning about poison ivy?', c: ['Red and yellow, kill a fellow', 'Leaves of three, let it be', 'Shiny and green, stay unseen', 'Hairy vine, no friend of mine'], a: 1 }
 ];
 
@@ -94,7 +138,10 @@ export const DRAW_PROMPTS = [
   'Ducks forming a gang', 'A hammock fail', 'Bug spray in the eyes', 'A deer doing taxes',
   'Two dogs plotting', 'The scariest noise in the woods', 'A campfire song nobody asked for', 'Moose road rage',
   'A haunted rocking chair', 'Losing the paddle', 'A bat in the kitchen', 'Someone pretending they are not scared',
-  'Hiding from the bear in the outhouse', 'A chipmunk with a six-pack', 'Getting dressed in a sleeping bag', 'The worst cabin roommate'
+  'Hiding from the bear in the outhouse', "Humpty Dumpty's security camera footage", 'The Pumpkin Coach in a drive-thru',
+  'A swan boat with teeth', 'Animatronic dance party at 3 AM', 'Bigfoot shopping at the North Conway outlets', 'Traffic on Route 16',
+  'The lake monster on a jet ski', 'Skee-Ball champion of Funspot', 'A bear riding a unicycle at Clark\'s', 'Santa\'s elves on strike',
+  'Driving the Kanc in a snowstorm', 'Blown off the top of Mount Washington', 'A moose at the Weirs Beach arcade', 'A dinosaur stealing your ice cream', 'Cinderella working the night shift', 'A jumpscare that went wrong', 'A chipmunk with a six-pack', 'Getting dressed in a sleeping bag', 'The worst cabin roommate'
 ];
 
 // players: true -> the options are the players in the room
@@ -111,6 +158,13 @@ export const POLLS = [
   { q: 'Who would accidentally burn down the cabin?', players: true },
   { q: 'Who would be the villain in a cabin horror movie?', players: true },
   { q: 'Who hogs the blankets?', players: true },
+  { q: 'Who would get jumpscared first?', players: true },
+  { q: 'Who would survive five nights at Story Land?', players: true },
+  { q: 'Scariest Story Land animatronic after dark?', c: ['Humpty Dumpty', 'Cinderella', 'The swan boats', 'The Pumpkin Coach'] },
+  { q: 'Best way to spend a day near Conway?', c: ['Story Land', 'Outlet shopping', 'Hiking the Kanc', 'Napping at the cabin'] },
+  { q: 'Best NH road trip stop?', c: ['Funspot', "Clark's Trading Post", 'Flume Gorge', "Santa's Village"] },
+  { q: 'Best way to get up Mount Washington?', c: ['Hike it', 'Drive the Auto Road', 'Take the Cog Railway', 'Absolutely not'] },
+  { q: 'Best Winnipesaukee activity?', c: ['Boating', 'Weirs Beach arcade', 'Jumping off the dock', 'Ice cream run'] },
   { q: "Best s'more upgrade?", c: ["Reese's cup", 'Double marshmallow', 'Cookies instead of graham', 'Nothing. Classic.'] },
   { q: 'Worst thing to find in the outhouse?', c: ['A spider', 'A snake', 'No toilet paper', 'Another person'] },
   { q: 'Scariest thing in the NH woods?', c: ['Black bears', 'Moose', 'Ticks', 'Whatever is making that noise'] },

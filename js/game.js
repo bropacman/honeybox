@@ -1,7 +1,9 @@
 // Honeybox game rules. Runs on the TV (host). No DOM here.
 // State lives in this.S (plain JSON, so it can be saved and resumed).
 
-import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS } from './content.js';
+import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS, AVATARS } from './content.js';
+
+export const CLOCK = ['12 AM', '2 AM', '4 AM', '6 AM'];
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
@@ -15,9 +17,9 @@ export const TIMES = {
 };
 
 export const MINIGAMES = {
-  trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Lost in the woods? Get 2 right to find the trail home.' },
-  draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The lost player needs someone to guess theirs.' },
-  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Lost in the woods? Match the crowd 2 of 3 times.' }
+  trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Dragged off? Get 2 right to escape.' },
+  draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The captured player needs someone to guess theirs.' },
+  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Dragged off? Match the crowd 2 of 3 times to escape.' }
 };
 
 export const LENGTHS = { short: 5, normal: 7, long: 10 };
@@ -61,7 +63,7 @@ export class Game {
       used: { trivia: [], prompts: [], polls: [] },
       bag: [],
       gains: {},
-      danger: '',
+      danger: null,
       seq: 0
     };
     if (saved && saved.deadline) this.S.deadline = Date.now() + (saved.phaseMs || 10 * SEC);
@@ -98,6 +100,13 @@ export class Game {
     p.connected = on;
     this.changed();
     if (!on) this.checkAllDone();
+  }
+
+  setAvatar(id, avatar) {
+    const p = this.player(id);
+    if (!p || !AVATARS.includes(avatar)) return;
+    p.avatar = avatar;
+    this.changed();
   }
 
   kick(id) {
@@ -172,7 +181,8 @@ export class Game {
     S.piles = PILE_NAMES.map(name => ({ name, cards: [S.deck.pop()] }));
     S.bag = [];
     S.players.forEach(p => { p.score = 0; });
-    this.emit('say', 'Welcome to the cabin. Keep the fire going, keep the dogs close, and whatever you do, do not go into the woods.');
+    S.board = {};
+    this.emit('say', 'Welcome to the cabin on Lake Winnipesaukee. Story Land, Funspot and Santa\'s Village closed hours ago. But the animatronics are still moving. Survive until 6 A M.');
     this.go('intro', TIMES.intro);
   }
 
@@ -197,7 +207,7 @@ export class Game {
       case 'pick': return this.choosePile(S.watch.watcherId, this.bestPile());
       case 'guess': return this.resolveGuess();
       case 'reveal': return this.afterReveal();
-      case 'safe': return this.nextTurn();
+      case 'safe': this.S.gains = {}; return this.go('scores', TIMES.scores);
       case 'dragged': return this.startMinigame();
       case 'mgIntro': return this.beginMinigame();
       case 'triviaQ': case 'finaleQ': return this.revealTrivia();
@@ -209,7 +219,7 @@ export class Game {
       case 'drawVote': return this.revealVote();
       case 'drawReveal': return this.nextDrawing();
       case 'mgResult': this.S.gains = {}; return this.go('scores', TIMES.scores);
-      case 'scores': return this.nextTurn();
+      case 'scores': this.snapshotScores(); return this.nextTurn();
       case 'finaleIntro': return this.askTrivia();
       default: return undefined;
     }
@@ -225,7 +235,7 @@ export class Game {
     if (S.turnIdx >= S.turnOrder.length) return this.startFinale();
     const w = this.player(S.turnOrder[S.turnIdx]);
     S.watch = { watcherId: w.id, streak: 0, pile: null, guesses: {}, drawn: null, results: null, depth: 0 };
-    this.emit('say', `${w.name}, you're on night watch. Three in a row gets you back to the cabin.`);
+    this.emit('say', `${w.name}, you're on the night shift. Three in a row gets you to 6 A M.`);
     this.go('turnStart', TIMES.turnStart);
   }
 
@@ -314,7 +324,7 @@ export class Game {
         S.gains = {};
         this.addScore(w.watcherId, 500);
         this.emit('sfx', 'great');
-        this.emit('say', `${name} made it back to the cabin! The dogs are thrilled.`);
+        this.emit('say', `6 A M! ${name} survived the night shift. The dogs are thrilled.`);
         return this.go('safe', TIMES.safe);
       }
       w.pile = null;
@@ -324,8 +334,8 @@ export class Game {
     S.lost = { pid: w.watcherId, stake: Math.max(200, 100 * Math.max(1, w.depth)) };
     S.danger = pick(DANGERS);
     S.gains = {};
-    this.emit('sfx', 'howl');
-    this.emit('say', `Oh no. ${name} was dragged into the woods by ${S.danger}.`);
+    this.emit('sfx', 'scare');
+    this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}.`);
     return this.go('dragged', TIMES.dragged);
   }
 
@@ -603,7 +613,7 @@ export class Game {
     else this.addScore(lost.pid, -lost.stake);
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
-    this.emit('say', ok ? `${name} found the trail home!` : `${name} lost some honey to the woods.`);
+    this.emit('say', ok ? `${name} escaped and found the trail home!` : `${name} lost some honey to the animatronics.`);
     this.go('mgResult', TIMES.mgResult);
   }
 
@@ -614,7 +624,7 @@ export class Game {
     S.lost = null;
     S.gains = {};
     S.mg = { type: 'finale', questions: this.takeTrivia(5), qi: -1 };
-    this.emit('say', 'Last light. The sun is almost up. Five final questions, double honey. Make it count.');
+    this.emit('say', 'Five A M. The sun is almost up. Five final questions, double honey. Make it count.');
     this.go('finaleIntro', TIMES.finaleIntro);
   }
 
@@ -622,10 +632,12 @@ export class Game {
     const S = this.S;
     S.gains = {};
     const ranked = this.ranked();
-    if (ranked[0]) this.emit('say', `Dawn breaks. ${ranked[0].name} survived the night with the most honey. Archie and Honey approve.`);
+    if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most honey. Archie and Honey approve.`);
     this.emit('sfx', 'great');
     this.go('end', null);
   }
+
+  snapshotScores() { this.S.board = Object.fromEntries(this.S.players.map(p => [p.id, p.score])); }
 
   ranked() { return this.S.players.slice().sort((a, b) => b.score - a.score); }
 
@@ -671,8 +683,8 @@ export class Game {
       case 'lobby': return { ...base, screen: 'lobby' };
       case 'intro': return wait('Look at the TV', 'The night is starting…', '🌲');
       case 'turnStart':
-        return w.watcherId === pid ? wait("You're on night watch!", 'Get 3 in a row to get back to the cabin.', '🔦')
-          : wait(`${watcher?.name} is on night watch`, 'You can still bet on every card.', '🔦');
+        return w.watcherId === pid ? wait("You're on the night shift!", 'Get 3 in a row to make it to 6 AM.', '🔦')
+          : wait(`${watcher?.name} is on the night shift`, 'You can still bet on every card.', '🔦');
       case 'pick':
         if (w.watcherId === pid) {
           return {
@@ -680,7 +692,7 @@ export class Game {
             piles: S.piles.map(p => ({ name: p.name, top: p.cards[p.cards.length - 1], depth: p.cards.length }))
           };
         }
-        return wait(`${watcher?.name} is choosing where to look…`, `Streak: ${w.streak}/3`, '👀');
+        return wait(`${watcher?.name} is choosing where to look…`, `It's ${CLOCK[w.streak]}`, '👀');
       case 'guess': {
         const pile = S.piles[w.pile];
         return {
@@ -694,8 +706,8 @@ export class Game {
         if (!mine) return wait(`It was ${w.drawn.r}${w.drawn.s}`, 'You didn\'t guess this one.', '🃏');
         return wait(w.results[pid] ? 'Correct!' : 'Wrong!', `You said ${mine}. It was ${w.drawn.r}${w.drawn.s}.`, w.results[pid] ? '✅' : '❌');
       }
-      case 'safe': return wait(w.watcherId === pid ? 'You made it back!' : `${watcher?.name} made it back!`, 'Safe inside the cabin.', '🏠');
-      case 'dragged': return wait(isLost ? "You're lost in the woods!" : `${lostName} is lost in the woods!`, `Taken by ${S.danger}.`, '🌲');
+      case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, 'Safe inside the cabin.', '🏠');
+      case 'dragged': return wait(isLost ? "You got dragged off!" : `${lostName} got dragged off!`, `By ${S.danger.name}.`, S.danger.emoji);
       case 'mgIntro': {
         const m = MINIGAMES[mg.type];
         return wait(m.name, isLost ? `You're the lost one! ${m.rules}` : m.rules, m.emoji);
@@ -737,12 +749,12 @@ export class Game {
           locked: mg.votes[pid] ?? null
         };
       case 'drawReveal': return wait('Look at the TV', 'Who got fooled?', '😈');
-      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost honey to the woods`, '', mg.result ? '🏠' : '💀');
+      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost honey to the animatronics`, '', mg.result ? '🏠' : '💀');
       case 'scores': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return wait(`You're #${rank}`, `${me.score} 🍯`, '📊');
       }
-      case 'finaleIntro': return wait('Last Light', 'Five questions. Double honey.', '🌅');
+      case 'finaleIntro': return wait('5 AM: Last Light', 'Five questions. Double honey.', '🌅');
       case 'end': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return { ...base, screen: 'end', rank, total: S.players.length };
