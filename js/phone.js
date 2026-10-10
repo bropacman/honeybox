@@ -184,15 +184,14 @@ export function startPhone(root) {
         break;
       case 'guess':
         body = `<p class="role">${v.watcher ? `🔦 You're on watch · streak ${v.streak}/3` : `Betting on ${esc(v.watcherName)}'s card`}</p>
-          <div class="center">${cardHtml(v.top)}<p>${esc(v.pileName)} · ${v.depth} deep</p></div>
-          <p class="center">The next card is…</p>
+          <div class="center-sm">${cardHtml(v.top)}<p>${esc(v.pileName)} · ${v.depth} deep · the next card is…</p></div>
           <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c}</button>`).join('')}</div>
-          ${v.locked ? '<p class="center muted">Locked in! Watch the TV.</p>' : v.watcher ? '' : '<p class="center muted small">Right = +100 · SAME = +400</p>'}`;
+          ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : v.watcher ? '' : '<p class="center-sm muted small">Right = +100 · SAME = +400</p>'}`;
         break;
       case 'choices':
         body = `<p class="role">${esc(v.title)} ${v.num ? `· ${v.num}` : ''}</p><h2 class="q">${esc(v.q)}</h2>${v.sub ? `<p class="muted">${esc(v.sub)}</p>` : ''}
           <div class="choices">${v.choices.map((c, i) => `<button class="choice ${v.locked === i ? 'sel' : ''}" data-answer="${i}" ${v.locked != null || c.disabled ? 'disabled' : ''}><span class="letter">${'ABCDEFGH'[i]}</span>${esc(c.text)}${c.disabled ? ' <small>(yours)</small>' : ''}</button>`).join('')}</div>
-          ${v.locked != null ? '<p class="center muted">Locked in!</p>' : ''}`;
+          ${v.locked != null ? '<p class="center-sm muted">Locked in!</p>' : ''}`;
         break;
       case 'draw':
         if (v.done) {
@@ -272,7 +271,7 @@ export function startPhone(root) {
 
   // ---------- test bot: plays randomly through the real UI ----------
   function botAct() {
-    const delay = 150 + Math.random() * 500;
+    const delay = 400 + Math.random() * 500;
     setTimeout(() => {
       const enabled = (sel) => [...root.querySelectorAll(sel)].filter(b => !b.disabled);
       const choose = (list) => list[Math.floor(Math.random() * list.length)];

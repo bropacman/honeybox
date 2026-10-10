@@ -43,7 +43,7 @@ tv.on('console', m => { if (m.type() === 'error' && !/fonts\.g/.test(m.text())) 
 
 const base = 'http://127.0.0.1:5178/';
 const peer = 'peer=127.0.0.1:9000';
-await tv.goto(`${base}?host=1&${peer}&speed=0.07`);
+await tv.goto(`${base}?host=1&${peer}&speed=0.1`);
 await tv.click('#open');
 await tv.waitForFunction(() => /^[A-Z]{4}$/.test(document.querySelector('.code')?.textContent || ''), null, { timeout: 20000 });
 const code = await tv.textContent('.code');
@@ -65,6 +65,7 @@ await phones[0].screenshot({ path: join(OUT, '01-phone-lobby.png') });
 const summary = { code, phones: PHONES, games: [], errors };
 const seenAll = new Set();
 const minigames = new Set();
+const phoneScreens = new Set();
 let shot = 2;
 
 for (let g = 0; g < GAMES; g++) {
@@ -92,6 +93,14 @@ for (let g = 0; g < GAMES; g++) {
         }
         await target.screenshot({ path: join(OUT, `${n}-phone-${tag.replace(':', '-')}.png`) });
       }
+      // one screenshot per distinct phone screen, before the bot acts on it
+      for (const p of phones) {
+        const screen = await p.evaluate(() => document.querySelector('.phone')?.className.match(/screen-(\w+)/)?.[1] || null);
+        if (screen && !phoneScreens.has(screen)) {
+          phoneScreens.add(screen);
+          await p.screenshot({ path: join(OUT, `screen-${screen}.png`) });
+        }
+      }
       if (st.phase === 'end') break;
     }
     await tv.waitForTimeout(60);
@@ -113,11 +122,13 @@ await phones[1].waitForTimeout(3000);
 const after = await tv.evaluate(() => ({ n: window.__honeybox.S.players.length, connected: window.__honeybox.S.players.filter(p => p.connected).length }));
 
 summary.minigamesSeen = [...minigames];
+summary.phoneScreens = [...phoneScreens];
 summary.reconnect = { playersBefore: before, after };
 writeFileSync(join(OUT, 'summary.json'), JSON.stringify(summary, null, 2));
 
 const ok = summary.games.every(g => g.endedOk) && errors.length === 0;
 console.log('minigames seen:', summary.minigamesSeen.join(', '));
+console.log('phone screens:', summary.phoneScreens.join(', '));
 console.log('reconnect:', JSON.stringify(summary.reconnect));
 console.log('errors:', errors.length ? errors : 'none');
 await browser.close();
