@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, revealAt } from './game.js';
+import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, revealAt } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -15,7 +15,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
   dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
-  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
+  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
 
@@ -124,6 +124,7 @@ export function startTV(root, { resume = null } = {}) {
         break;
       case 'drawing': game.submitDrawing(pid, msg.strokes); break;
       case 'drawDraft': game.draftDrawing(pid, msg.strokes); break;
+      case 'guess': game.guess(pid, Number(msg.n)); break;
       case 'stake': game.stake(pid, Number(msg.i)); break;
       case 'finale': game.chooseFinale(pid, String(msg.choice || '')); break;
       case 'vip': {
@@ -629,6 +630,48 @@ export function startTV(root, { resume = null } = {}) {
             return `<div class="bar ${top ? 'right' : ''}" style="--i:${rank}"><div class="fill" style="width:${(q.counts[i] / total) * 100}%"></div>
               <span class="bl">${esc(c)}</span><span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span><span class="cnt">${q.counts[i]}</span></div>`;
           }).join('')}</div>
+        </div>`;
+      }
+      case 'hideQ': case 'hideA': {
+        // four hiding spots; on the reveal everyone's hiding place shows, then the seeker checks two spots
+        const spots = mg.rounds[mg.qi];
+        const reveal = S.phase === 'hideA';
+        const cards = spots.map((sp, i) => {
+          const order = reveal ? mg.search.indexOf(i) : -1;
+          const hiders = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
+          const at = 1200 + order * SEARCH_MS;
+          return `<div class="hide-spot ${order >= 0 ? 'searched' : reveal ? 'safe-spot' : ''}" style="--at:${at}ms;--end:${1200 + 2 * SEARCH_MS}ms">
+            ${order >= 0 ? `<div class="seeker">${mg.seeker}</div>` : ''}
+            <div class="hs-name">${esc(sp)}</div>
+            <div class="hs-who">${hiders.map(p => `<span>${p.avatar}</span>`).join('')}</div>
+            ${order >= 0 ? `<div class="hs-tag">${hiders.length ? 'FOUND!' : 'empty'}</div>` : ''}
+          </div>`;
+        }).join('');
+        const exposed = reveal ? game.connected().filter(p => !mg.answers[p.id]) : [];
+        return `<div class="quiz hide-game">
+          <div class="quiz-head">🙈 Hide and Seek <span class="muted">${mg.qi + 1}/${mg.rounds.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
+          <h1 class="q">${reveal ? 'Ready or not…' : 'Where will you hide?'}</h1>
+          ${reveal ? '' : '<p class="muted">The animatronic checks the most crowded spot first, then one more. Unfound = +200</p>'}
+          <div class="hide-grid">${cards}</div>
+          ${exposed.length ? `<p class="muted">Caught in the open: ${exposed.map(p => p.avatar).join(' ')}</p>` : ''}
+          ${reveal ? '' : waitingStrip()}
+        </div>`;
+      }
+      case 'guessQ': case 'guessA': {
+        const q = mg.questions[mg.qi];
+        const reveal = S.phase === 'guessA';
+        const fmt = (x) => Number(x).toLocaleString('en-US');
+        const rows = reveal ? mg.order.map((id, k) => {
+          const p = game.player(id);
+          const won = mg.winners.includes(id);
+          return p ? `<div class="guess-row ${won ? 'won' : ''}" style="--at:${k * GUESS_STEP}ms;--end:${mg.revealMs}ms"><span>${p.avatar} ${esc(p.name)}</span><b>${fmt(mg.answers[id].n)}</b><small>${fmt(Math.abs(mg.answers[id].n - q.a))} off</small>${gainTag(id)}</div>` : '';
+        }).join('') : '';
+        return `<div class="quiz guess-game">
+          <div class="quiz-head">📏 Closest Guess <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
+          <h1 class="q">${esc(q.q)}</h1>
+          ${reveal
+            ? `<div class="guess-rows">${rows}</div><div class="guess-answer late-n" style="--at:${mg.revealMs}ms">${fmt(q.a)} ${esc(q.unit)}</div>`
+            : `<p class="big">Type your best guess${q.unit ? ` (in ${esc(q.unit)})` : ''} on your phone. Closest wins!</p>${waitingStrip()}`}
         </div>`;
       }
       case 'drawDraw':

@@ -243,3 +243,66 @@ for (const parent of ['nature', 'movies', 'games', 'food']) {
 // Boston / New England specific content gets shown rarely (it's too local for most of the table)
 const LOCAL_RE = /\b(Boston|Bostonian|Massachusetts|Mass\b|Masshole|New England|Fenway|Red Sox|Patriots|Bruins|Celtics|the Pike|Big Dig|rotary|rotaries|packie|frappe|jimmies|ayuh|wicked|Dunkin|Munchkin|Friendly's|Fribble|Papa Gino|Howard Johnson|HoJo|Cape Cod|Sagamore|Martha's Vineyard|Nantucket|Hyannis|Provincetown|Gloucester|Salem|Walden|Thoreau|Dixville|Piscataqua|Laconia|Concord|Manchester|Nashua|Portsmouth|Dartmouth|Hanover|Montpelier|Augusta|Rhode Island|Lovecraft|Aerosmith|New Kids|Dropkick|Dirty Water|Sweet Caroline|North End|Haahvahd|duck boat|Make Way for Ducklings|Esplanade|Freedom Trail|Vermont|Maine|Connecticut|Kennedy|Weirs|Motorcycle Week|purple finch|Merrimack)\b/i;
 export const isLocal = (text) => LOCAL_RE.test(String(text));
+
+// Closest Guess: number questions. a = the answer, unit = what the number counts.
+// Stick to settled, well-documented numbers (no "about" figures that change).
+export const GUESSES = [
+  { q: 'How tall is Mount Washington?', a: 6288, unit: 'feet' },
+  { q: 'How many keys are on a standard piano?', a: 88, unit: 'keys' },
+  { q: 'In what year did the Titanic sink?', a: 1912, unit: '' },
+  { q: 'How many bones are in the adult human body?', a: 206, unit: 'bones' },
+  { q: 'In what year did Walt Disney World open?', a: 1971, unit: '' },
+  { q: 'How many episodes of Friends were made?', a: 236, unit: 'episodes' },
+  { q: 'How many US states share a border with Canada?', a: 13, unit: 'states' },
+  { q: 'In what year did Pac-Man come out?', a: 1980, unit: '' },
+  { q: 'How many feet are in a mile?', a: 5280, unit: 'feet' },
+  { q: 'At what temperature does water boil, in Fahrenheit?', a: 212, unit: 'degrees' },
+  { q: 'In what year did the first iPhone come out?', a: 2007, unit: '' },
+  { q: 'How many Oscars did Titanic win?', a: 11, unit: 'Oscars' },
+  { q: 'On average, how far away is the Moon?', a: 238855, unit: 'miles' },
+  { q: 'How many teeth does an adult have, wisdom teeth included?', a: 32, unit: 'teeth' },
+  { q: 'How many hearts does an octopus have?', a: 3, unit: 'hearts' },
+  { q: 'In what year did Star Wars come out?', a: 1977, unit: '' },
+  { q: 'How many Pokémon were in the original Pokédex?', a: 151, unit: 'Pokémon' },
+  { q: 'In what year did the Old Man of the Mountain fall?', a: 2003, unit: '' },
+  { q: 'In what year was Monopoly first sold by Parker Brothers?', a: 1935, unit: '' },
+  { q: 'How many spaces are on a Monopoly board?', a: 40, unit: 'spaces' },
+  { q: 'How many countries are members of the United Nations?', a: 193, unit: 'countries' },
+  { q: 'In what year did people first walk on the Moon?', a: 1969, unit: '' },
+  { q: 'How many floors does the Empire State Building have?', a: 102, unit: 'floors' },
+  { q: 'How many time zones does Russia have?', a: 11, unit: 'time zones' },
+  { q: 'How many dots are on a pair of standard dice, in total?', a: 42, unit: 'dots' },
+  { q: 'How many years did the Hundred Years\' War actually last?', a: 116, unit: 'years' },
+  { q: 'How many minutes are in a day?', a: 1440, unit: 'minutes' },
+  { q: 'How many eyes does a honeybee have?', a: 5, unit: 'eyes' },
+  { q: 'How many rooms are in the White House?', a: 132, unit: 'rooms' },
+  { q: 'How many seconds are in an hour?', a: 3600, unit: 'seconds' },
+  { q: 'In what year did Mount St. Helens erupt?', a: 1980, unit: '' },
+  { q: 'In what year was the first Super Bowl played?', a: 1967, unit: '' },
+  { q: 'How many points is the letter Q worth in Scrabble?', a: 10, unit: 'points' },
+  { q: 'How many dots does Pac-Man eat in the first maze, power pellets included?', a: 244, unit: 'dots' },
+  { q: 'In what year did the NES come out in America?', a: 1985, unit: '' },
+  { q: 'How many squares are on a chessboard?', a: 64, unit: 'squares' },
+  { q: 'How many strings does a standard guitar have?', a: 6, unit: 'strings' },
+  { q: 'How many years are in a millennium?', a: 1000, unit: 'years' },
+  { q: 'How many cards are in a standard deck, jokers not included?', a: 52, unit: 'cards' },
+  { q: 'How many legs does a lobster have?', a: 10, unit: 'legs' },
+  { q: 'How many stripes are on the American flag?', a: 13, unit: 'stripes' },
+  { q: 'In what year did the Red Sox finally win the World Series again after 86 years?', a: 2004, unit: '' },
+  { q: 'How many Harry Potter books are there in the main series?', a: 7, unit: 'books' },
+  { q: 'In what year did McDonald\'s introduce the Happy Meal nationwide?', a: 1979, unit: '' },
+  { q: 'How many ounces are in a gallon?', a: 128, unit: 'ounces' },
+  { q: 'How many Great Lakes are there?', a: 5, unit: 'lakes' },
+  { q: 'In what year did Nintendo release the Game Boy in North America?', a: 1989, unit: '' },
+  { q: 'How many players are on the field for one soccer team?', a: 11, unit: 'players' }
+];
+
+// Hide and Seek: each round offers four hiding spots
+export const HIDE_SETS = [
+  ['🛏️ Under the bunk bed', '🚪 In the closet', '🛶 Under the canoe', '🪵 Behind the woodpile'],
+  ['🎠 On the carousel', '🎟️ Behind the prize counter', '🕹️ Inside an arcade cabinet', '🧸 In the ball pit'],
+  ['🌲 Up a pine tree', '🪨 Behind a boulder', '🚽 In the outhouse', '🚣 Under the dock'],
+  ['🛷 In Santa\'s sleigh', '🐻 In the bear cave', '🏰 In the castle tower', '🚂 In the train car'],
+  ['🍳 In the kitchen cupboard', '🛁 In the bathtub', '📦 In the attic boxes', '🛋️ Behind the couch'],
+  ['🏔️ Behind the summit sign', '⛺ In a tent', '🚙 In the car', '🌉 Under the bridge']
+];

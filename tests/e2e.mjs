@@ -88,6 +88,8 @@ for (let g = 0; g < GAMES; g++) {
   } else {
     await tv.click('[data-act="start"]');
   }
+  // newest mini-games first, so a short test run always covers them (the bag pops from the end)
+  await tv.evaluate(() => { window.__honeybox.S.bag = ['draw', 'poll', 'trivia', 'guess', 'hide']; });
   const seen = [];
   let last = '';
   const started = Date.now();

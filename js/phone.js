@@ -213,7 +213,7 @@ export function startPhone(root) {
         body = v.spin
           ? `<div class="center"><div class="suspense-ph spin-ph">🎡</div><div class="late spin-late"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
           : v.suspense
-          ? `<div class="center"><div class="suspense-ph">🥁</div><div class="late"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
+          ? `<div class="center"><div class="suspense-ph" ${v.revealMs ? `style="animation-duration:${v.revealMs}ms"` : ''}>🥁</div><div class="late" ${v.revealMs ? `style="animation-delay:${v.revealMs}ms"` : ''}><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
           : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;
       case 'pick':
@@ -257,6 +257,13 @@ export function startPhone(root) {
         body = `<p class="role">${esc(v.title)} ${v.num ? `· ${v.num}` : ''}</p><h2 class="q">${esc(v.q)}</h2>${v.sub ? `<p class="muted">${esc(v.sub)}</p>` : ''}
           <div class="choices">${v.choices.map((c, i) => `<button class="choice ${v.locked === i ? 'sel' : ''}" data-answer="${i}" ${v.locked != null || c.disabled ? 'disabled' : ''}><span class="letter">${'ABCDEFGH'[i]}</span>${esc(c.text)}${c.disabled ? ' <small>(yours)</small>' : ''}</button>`).join('')}</div>
           ${v.locked != null ? '<p class="center-sm muted">Locked in!</p>' : ''}`;
+        break;
+      case 'number':
+        body = `<p class="role">${esc(v.title)} · ${v.num}</p><h2 class="q">${esc(v.q)}</h2>
+          ${v.locked != null
+            ? `<div class="center"><div class="emoji-xl">🔒</div><h2>${Number(v.locked).toLocaleString('en-US')} ${esc(v.unit)}</h2><p class="muted">Locked in! Watch the TV.</p></div>`
+            : `<div class="num-row"><input id="num" inputmode="decimal" autocomplete="off" placeholder="Your guess">${v.unit ? `<span class="unit">${esc(v.unit)}</span>` : ''}</div>
+              <button class="big-btn" id="num-send">Lock it in</button>`}`;
         break;
       case 'draw':
         if (v.done) {
@@ -351,6 +358,18 @@ export function startPhone(root) {
         send({ t: 'drawing', strokes: pad.strokes });
       });
     }
+    const num = root.querySelector('#num');
+    if (num) {
+      const submitNum = () => {
+        const n = Number(num.value.replace(/[^0-9.]/g, ''));
+        if (!num.value.trim() || !Number.isFinite(n)) return toast('Type a number');
+        root.querySelector('#num-send').disabled = true;
+        send({ t: 'guess', n });
+      };
+      root.querySelector('#num-send').addEventListener('click', submitNum);
+      num.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitNum(); });
+      if (!BOT) num.focus();
+    }
     const lie = root.querySelector('#lie');
     if (lie) {
       const submit = () => {
@@ -371,6 +390,8 @@ export function startPhone(root) {
       const enabled = (sel) => [...root.querySelectorAll(sel)].filter(b => !b.disabled);
       const choose = (list) => list[Math.floor(Math.random() * list.length)];
       if (view.screen === 'draw' && pad) { pad.scribble(); root.querySelector('#submit')?.click(); return; }
+      const num = root.querySelector('#num');
+      if (num) { num.value = String(Math.floor(Math.random() * 3000)); root.querySelector('#num-send').click(); return; }
       const lie = root.querySelector('#lie');
       if (lie) { lie.value = choose(['A moose doing karate', 'Grandpa at the beach', 'A haunted toaster', 'Dog vs vacuum']) + ' ' + Math.floor(Math.random() * 99); root.querySelector('#send').click(); return; }
       const btns = enabled('[data-pick], [data-tot], [data-decide], [data-answer], [data-stake], [data-finale]');

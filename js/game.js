@@ -1,7 +1,7 @@
 // Honeybox game rules. Runs on the TV (host). No DOM here.
 // State lives in this.S (plain JSON, so it can be saved and resumed).
 
-import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS, AVATARS, TOT, isLocal } from './content.js';
+import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS, AVATARS, TOT, GUESSES, HIDE_SETS, isLocal } from './content.js';
 
 export const CLOCK = ['12 AM', '2 AM', '4 AM', '6 AM'];
 
@@ -11,14 +11,20 @@ export const TIMES = {
   mgIntro: 8, triviaQ: 20, triviaA: 8, pollQ: 20, pollA: 9,
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 5,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
-  stakesIntro: 14, stakesBet: 20, stakesReveal: 7
+  stakesIntro: 14, stakesBet: 20, stakesReveal: 7,
+  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6
 };
 
 export const MINIGAMES = {
   trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Dragged off? Get 2 right to escape.' },
   draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The captured player needs someone to guess theirs.' },
-  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Dragged off? Match the crowd 2 of 3 times to escape.' }
+  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Dragged off? Match the crowd 2 of 3 times to escape.' },
+  hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Dragged off? Stay hidden 2 of 3 times to escape.' },
+  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Dragged off? Beat at least one other camper 2 of 3 times to escape.' }
 };
+// Hide and Seek: time between the animatronic's searches; Closest Guess: time between guesses popping in
+export const SEARCH_MS = 2600;
+export const GUESS_STEP = 1100;
 
 export const LENGTHS = { short: 5, normal: 7, long: 10 };
 // answer timers: short / medium / long
@@ -97,7 +103,7 @@ export const DRAW_JUDGED = 4;
 export const NARRATED = ['intro', 'turnStart', 'safe', 'dragged', 'mgIntro', 'mgResult', 'finaleIntro', 'stakesIntro'];
 
 // phases where players are answering on their phones (the last-10-seconds hurry-up applies)
-export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
+export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
 
 // Sunrise Stakes: 5 This or That questions for everyone, each worth more
 export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [1, 2, 2, 3, 3], boost: 1.5 };
@@ -372,6 +378,10 @@ export class Game {
       case 'triviaA': case 'finaleA': return this.nextTrivia();
       case 'pollQ': return this.revealPoll();
       case 'pollA': return this.nextPoll();
+      case 'hideQ': return this.revealHide();
+      case 'hideA': return this.nextHide();
+      case 'guessQ': return this.revealGuess();
+      case 'guessA': return this.nextGuess();
       case 'drawDraw': return this.startFibs();
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
@@ -506,10 +516,10 @@ export class Game {
       S.watch.answers[pid] = i;
     } else if (S.phase === 'stakesBet') {
       return this.stake(pid, i);
-    } else if (['triviaQ', 'finaleQ', 'pollQ'].includes(S.phase)) {
+    } else if (['triviaQ', 'finaleQ', 'pollQ', 'hideQ'].includes(S.phase)) {
       const mg = S.mg;
-      const q = mg.questions[mg.qi];
-      const max = S.phase === 'pollQ' ? this.pollChoices(q).length : q.c.length;
+      const q = S.phase === 'hideQ' ? null : mg.questions[mg.qi];
+      const max = S.phase === 'hideQ' ? mg.rounds[mg.qi].length : S.phase === 'pollQ' ? this.pollChoices(q).length : q.c.length;
       if (mg.answers[pid] || !(i >= 0 && i < max)) return;
       mg.answers[pid] = { i, at: Date.now() };
     } else {
@@ -673,6 +683,18 @@ export class Game {
       mg.hits = {};
       return this.askPoll();
     }
+    if (mg.type === 'hide') {
+      mg.rounds = shuffle(HIDE_SETS.slice()).slice(0, 3);
+      mg.qi = -1;
+      mg.safe = {};
+      return this.askHide();
+    }
+    if (mg.type === 'guess') {
+      mg.questions = this.takeGuesses(3);
+      mg.qi = -1;
+      mg.beat = {};
+      return this.askGuess();
+    }
     return this.startDrawing();
   }
 
@@ -811,6 +833,125 @@ export class Game {
     if (mg.qi + 1 < mg.questions.length) return this.askPoll();
     if (mg.finale) return this.finish();
     return this.finishMinigame((mg.hits[this.S.lost.pid] || 0) >= 2);
+  }
+
+  // ---------- Hide and Seek ----------
+  askHide() {
+    const mg = this.S.mg;
+    mg.qi++;
+    mg.answers = {};
+    mg.search = null;
+    this.S.gains = {};
+    this.emit('say', mg.qi === 0 ? 'Quick, hide! Pick a spot on your phone.' : `Round ${mg.qi + 1}. Hide again!`);
+    this.go('hideQ', TIMES.hideQ);
+  }
+
+  // The seeker goes straight for the most crowded spot, then checks one more at random.
+  // Anyone who didn't pick a spot is caught standing in the open.
+  revealHide() {
+    const S = this.S;
+    const mg = S.mg;
+    const spots = mg.rounds[mg.qi];
+    const k = Math.min(1, this.speed * 4);
+    const counts = spots.map((_, i) => Object.values(mg.answers).filter(a => a.i === i).length);
+    const most = Math.max(...counts);
+    const first = pick(spots.map((_, i) => i).filter(i => counts[i] === most));
+    const second = pick(spots.map((_, i) => i).filter(i => i !== first));
+    mg.search = [first, second];
+    mg.seeker = S.danger?.emoji || S.monster?.emoji || '🤖';
+    S.gains = {};
+    const ids = this.connected().map(p => p.id);
+    const caught = new Set(ids.filter(id => !mg.answers[id] || mg.search.includes(mg.answers[id].i)));
+    mg.caught = [...caught];
+    for (const id of ids) {
+      if (caught.has(id)) continue;
+      this.addScore(id, 200);
+      mg.safe[id] = (mg.safe[id] || 0) + 1;
+    }
+    const names = (i) => Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => this.player(id)?.name).filter(Boolean);
+    const line = (i) => { const n = names(i); return `${spots[i].replace(/^\S+\s/, '')}… ${n.length ? `found ${n.join(' and ')}!` : 'nobody there.'}`; };
+    this.emit('sfx', 'drumroll');
+    this.emit('say', 'Ready or not, here I come!');
+    mg.search.forEach((i, n) => setTimeout(() => {
+      this.emit('sfx', names(i).length ? 'scare' : 'flip');
+      this.emit('say', line(i));
+    }, (1200 + n * SEARCH_MS) * k));
+    const end = 1200 + 2 * SEARCH_MS;
+    for (const id of ids) this.emit('mood', { pid: id, mood: caught.has(id) ? 'sad' : 'happy', tv: false, delay: end });
+    mg.revealMs = end;
+    this.go('hideA', TIMES.hideA + end / 1000);
+  }
+
+  nextHide() {
+    const mg = this.S.mg;
+    if (mg.qi + 1 < mg.rounds.length) return this.askHide();
+    return this.finishMinigame((mg.safe[this.S.lost.pid] || 0) >= 2);
+  }
+
+  // ---------- Closest Guess ----------
+  takeGuesses(n) {
+    const S = this.S;
+    S.used.guesses = S.used.guesses || [];
+    let pool = GUESSES.map((_, i) => i).filter(i => !S.used.guesses.includes(i));
+    if (pool.length < n) { S.used.guesses = []; pool = GUESSES.map((_, i) => i); }
+    const chosen = shuffle(pool).slice(0, n);
+    S.used.guesses.push(...chosen);
+    return chosen.map(i => ({ ...GUESSES[i] }));
+  }
+
+  askGuess() {
+    const mg = this.S.mg;
+    mg.qi++;
+    mg.answers = {};
+    this.S.gains = {};
+    this.emit('say', mg.questions[mg.qi].q);
+    this.go('guessQ', TIMES.guessQ);
+  }
+
+  guess(pid, n) {
+    const S = this.S;
+    if (S.phase !== 'guessQ' || !this.player(pid) || S.mg.answers[pid] || !Number.isFinite(n) || n < 0 || n > 1e12) return;
+    S.mg.answers[pid] = { n: Math.round(n * 100) / 100, at: Date.now() };
+    this.emit('sfx', 'lock');
+    this.changed();
+    this.checkAllDone();
+  }
+
+  // Guesses pop in farthest first; the closest guess wins. "Beat" = someone else was farther off.
+  revealGuess() {
+    const S = this.S;
+    const mg = S.mg;
+    const q = mg.questions[mg.qi];
+    const k = Math.min(1, this.speed * 4);
+    const off = (id) => Math.abs(mg.answers[id].n - q.a);
+    const ids = Object.keys(mg.answers);
+    mg.order = ids.slice().sort((a, b) => off(b) - off(a));
+    const best = ids.length ? Math.min(...ids.map(off)) : null;
+    mg.winners = ids.filter(id => off(id) === best);
+    S.gains = {};
+    for (const id of mg.winners) this.addScore(id, 300);
+    const everyone = this.connected().map(p => p.id);
+    for (const id of everyone) {
+      const mine = mg.answers[id] ? off(id) : Infinity;
+      if (everyone.some(o => o !== id && (mg.answers[o] ? off(o) : Infinity) > mine)) mg.beat[id] = (mg.beat[id] || 0) + 1;
+    }
+    const end = mg.order.length * GUESS_STEP + 800;
+    mg.revealMs = end;
+    const fmt = (x) => (q.unit ? Number(x).toLocaleString('en-US') : String(x));
+    this.emit('sfx', 'drumroll');
+    setTimeout(() => {
+      this.emit('sfx', 'good');
+      const names = mg.winners.map(id => this.player(id)?.name).filter(Boolean);
+      this.emit('say', `The answer is ${fmt(q.a)}${q.unit ? ` ${q.unit}` : ''}! ${names.length ? `Closest: ${names.join(' and ')}.` : ''}`);
+    }, end * k);
+    for (const id of ids) this.emit('mood', { pid: id, mood: mg.winners.includes(id) ? 'happy' : 'sad', tv: false, delay: end });
+    this.go('guessA', TIMES.guessA + end / 1000);
+  }
+
+  nextGuess() {
+    const mg = this.S.mg;
+    if (mg.qi + 1 < mg.questions.length) return this.askGuess();
+    return this.finishMinigame((mg.beat[this.S.lost.pid] || 0) >= 2);
   }
 
   // Drawful-style
@@ -1136,7 +1277,7 @@ export class Game {
       case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
       case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
-      case 'triviaQ': case 'finaleQ': case 'pollQ': return ids.filter(id => !mg.answers[id]);
+      case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': return ids.filter(id => !mg.answers[id]);
       case 'stakesBet': return ids.filter(id => !mg.bets[id]);
       case 'finalePick': return [mg.picker].filter(id => this.player(id)?.connected);
       case 'drawDraw': return ids.filter(id => mg.prompts[id] && !mg.drawings[id]);
@@ -1147,7 +1288,7 @@ export class Game {
   }
 
   checkAllDone() {
-    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
+    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
     if (!phases.includes(this.S.phase)) return;
     if (this.waitingOn().length === 0 && this.S.pausedLeft == null) {
       // a short beat so the last lock-in is visible
@@ -1247,6 +1388,26 @@ export class Game {
         const a = mg.answers[pid];
         const hit = a && q.top > 0 && q.counts[a.i] === q.top;
         return { ...wait(hit ? 'You read the room!' : 'Not the crowd favorite', '', hit ? '✅' : '🤷'), suspense: true };
+      }
+      case 'hideQ':
+        return {
+          ...base, screen: 'choices', title: 'Hide and Seek', num: `${mg.qi + 1}/${mg.rounds.length}`,
+          q: 'Where will you hide?', sub: 'The animatronic checks the most crowded spot first!',
+          choices: mg.rounds[mg.qi].map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null
+        };
+      case 'hideA': {
+        const caught = (mg.caught || []).includes(pid);
+        return { ...wait(caught ? 'Found you!' : 'You stayed hidden!', caught ? '' : '+200 🎟️', caught ? '😱' : '🙈'), suspense: true, revealMs: mg.revealMs };
+      }
+      case 'guessQ': {
+        const q = mg.questions[mg.qi];
+        return { ...base, screen: 'number', title: 'Closest Guess', num: `${mg.qi + 1}/${mg.questions.length}`, q: q.q, unit: q.unit, locked: mg.answers[pid]?.n ?? null };
+      }
+      case 'guessA': {
+        const q = mg.questions[mg.qi];
+        const won = (mg.winners || []).includes(pid);
+        const mine = mg.answers[pid];
+        return { ...wait(won ? 'Closest!' : 'Not the closest', `Answer: ${q.a.toLocaleString('en-US')}${q.unit ? ` ${q.unit}` : ''}${mine ? ` · you said ${mine.n.toLocaleString('en-US')}` : ''}`, won ? '🎯' : '📏'), suspense: true, revealMs: mg.revealMs };
       }
       case 'drawDraw':
         if (!mg.prompts[pid]) return wait('Everyone is drawing…', '', '🖍️');

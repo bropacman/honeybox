@@ -610,3 +610,29 @@ body.is-phone .moon { display: none; }
 .pp-row.off { opacity: 0.6; }
 .pp-row select { font: inherit; background: var(--bg); color: var(--ink); border: 2px solid var(--line); border-radius: 10px; padding: 4px; }
 .tv-toast { position: fixed; bottom: 2em; left: 50%; translate: -50% 0; z-index: 50; background: var(--panel); border: 2px solid var(--good); border-radius: 14px; padding: 0.5em 1.2em; font-size: 1.2em; }
+
+/* Hide and Seek */
+.hide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1em; width: min(70vw, 900px); margin: 0.6em auto; }
+.hide-spot { position: relative; background: var(--panel); border: 3px solid var(--line); border-radius: 20px; padding: 0.8em 1em; min-height: 5.5em; display: flex; flex-direction: column; gap: 0.3em; align-items: center; justify-content: center; }
+.hs-name { font-size: 1.5em; font-weight: 800; }
+.hs-who { font-size: 2em; display: flex; gap: 0.2em; flex-wrap: wrap; justify-content: center; min-height: 1.2em; }
+.hs-tag { position: absolute; top: 0.4em; right: 0.6em; font-weight: 900; color: var(--bad); opacity: 0; animation: lateIn 0.3s ease-out var(--at) both; }
+.seeker { position: absolute; left: -0.6em; top: -0.6em; font-size: 3em; opacity: 0; animation: seek 0.6s cubic-bezier(.2,1.6,.4,1) var(--at) both; z-index: 2; filter: drop-shadow(0 0 14px rgba(255, 40, 40, 0.9)); }
+.hide-spot.searched { animation: caughtSpot 0.4s ease-out var(--at) both; }
+.hide-spot.safe-spot { animation: safeSpot 0.6s ease-out var(--end) both; }
+@keyframes seek { from { opacity: 0; transform: scale(3) rotate(-20deg); } to { opacity: 1; transform: none; } }
+@keyframes caughtSpot { to { border-color: var(--bad); box-shadow: 0 0 40px rgba(255, 60, 60, 0.6); } }
+@keyframes safeSpot { to { border-color: var(--good); box-shadow: 0 0 40px rgba(95, 209, 138, 0.5); } }
+
+/* Closest Guess */
+.guess-rows { display: flex; flex-direction: column; gap: 0.4em; width: min(70vw, 900px); margin: 0.4em auto; }
+.guess-row { display: grid; grid-template-columns: 1fr auto 8em auto; gap: 1em; align-items: center; background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 0.35em 1em; font-size: 1.4em; opacity: 0; animation: lateIn 0.4s ease-out var(--at) both; }
+.guess-row small { color: var(--muted); text-align: right; }
+.guess-row.won { animation: lateIn 0.4s ease-out var(--at) both, wonRow 0.6s ease-out var(--end) both; }
+@keyframes wonRow { to { border-color: var(--honey); box-shadow: 0 0 40px rgba(242, 177, 52, 0.6); transform: scale(1.04); } }
+.guess-answer { font-size: 3.4em; font-weight: 900; color: var(--honey2); text-shadow: 0 0 30px rgba(242, 177, 52, 0.6); }
+
+/* phone number entry */
+.num-row { display: flex; align-items: center; gap: 0.5em; margin: 1em 0; }
+.num-row input { flex: 1; font: inherit; font-size: 1.8em; padding: 0.4em; border-radius: 14px; border: 2px solid var(--line); background: var(--bg2); color: var(--ink); text-align: center; min-width: 0; }
+.num-row .unit { color: var(--muted); font-size: 1.1em; }
