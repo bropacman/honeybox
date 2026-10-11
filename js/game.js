@@ -81,8 +81,14 @@ export const EVENTS = {
   fever: { name: 'Funspot Fever', emoji: '🎪', text: 'Everyone else\'s right answers pay double tonight.' },
   wind: { name: 'Mount Washington Wind', emoji: '🌪️', text: 'The categories blew around the map!' },
   witching: { name: 'Witching Hour', emoji: '🕛', text: 'Only 10 seconds to answer tonight.' },
-  moon: { name: 'Full Moon', emoji: '🌕', text: 'Banishing the animatronic pays triple tonight.' }
+  moon: { name: 'Full Moon', emoji: '🌕', text: 'Banishing the animatronic pays triple tonight.' },
+  golden: { name: 'Golden Ticket', emoji: '⭐', text: 'A golden ticket is hidden at one spot: answer right there for +300.' },
+  nohide: { name: 'Lockdown', emoji: '🔒', text: 'The cabin door is locked. No hiding tonight until 6 AM!' },
+  freeze: { name: 'Brain Freeze', emoji: '🧊', text: 'Only the hardest questions tonight, but the pot pays 50% more.' }
 };
+export const GOLDEN = 300;
+// the player in first place has to get this many right before they're allowed to hide
+export const LEADER_MIN = 2;
 
 // Sketchy Woods: how many drawings get the full fib-and-vote treatment
 export const DRAW_JUDGED = 4;
@@ -313,7 +319,7 @@ export class Game {
       'Welcome to the cabin. Tonight, you sneak out to win arcade tickets. At sunrise, whoever has the most claims the grand prize… if the animatronics don\'t get you first.',
       'Take turns sneaking out on the night shift. Each round, one player is up.',
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
-      'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have.',
+      'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have. Whoever is in the lead has to get two right before they can hide.',
       'Three in a row gets you to 6 A M, and a bonus.',
       'Miss, and you drop the pot and get dragged into a mini game. Do well to escape.',
       'At sunrise, last place picks the finale. Most tickets wins the grand prize!'
@@ -384,6 +390,7 @@ export class Game {
       const cats = shuffle(S.spots.map(sp => sp.cat));
       S.spots.forEach((sp, i) => { sp.cat = cats[i]; });
     }
+    S.golden = S.event === 'golden' ? pick(S.spots.map((_, i) => i).filter(i => i !== S.monster?.spot)) : null;
     const ev = EVENTS[S.event];
     // the TV spins a wheel of everyone still waiting for a turn this round; it lands on the next player in the fair order
     const n = new Set(S.turnOrder).size || 1;
@@ -414,7 +421,7 @@ export class Game {
   }
 
   // ---------- money ----------
-  potValue(streak) { return POT[Math.min(streak, POT.length - 1)] * (this.S.event === 'jackpot' ? 2 : 1); }
+  potValue(streak) { return POT[Math.min(streak, POT.length - 1)] * ({ jackpot: 2, freeze: 1.5 }[this.S.event] || 1); }
   banishValue() { return BANISH * (this.S.event === 'moon' ? 3 : 1); }
   sideRight() { return SIDE.right * (this.S.event === 'fever' ? 2 : 1); }
 
@@ -428,7 +435,8 @@ export class Game {
       pot: w ? w.pot : 0,
       risk: STAKE * (haunted ? 2 : 1),
       haunted,
-      banish: haunted ? this.banishValue() : 0
+      banish: haunted ? this.banishValue() : 0,
+      golden: S.event === 'golden' && S.golden === spot ? GOLDEN : 0
     };
   }
 
@@ -463,11 +471,13 @@ export class Game {
     if (S.phase !== 'pick' || pid !== w.watcherId || !S.spots[i]) return;
     w.spot = i;
     w.st = this.stakesNow(i);
-    w.q = this.takeTot(S.spots[i].cat, w.streak + 1);
+    w.q = this.takeTot(S.spots[i].cat, S.event === 'freeze' ? 3 : w.streak + 1);
     w.answers = {};
     w.results = null;
     w.saved = false;
     w.banished = false;
+    w.golden = false;
+    w.forced = null;
     this.emit('sfx', 'lock');
     this.emit('say', `${w.st.haunted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(w.q)}`);
     this.go('tot', S.event === 'witching' ? 10 / (TIMERS[S.timers] || 1) : TIMES.tot);
@@ -516,6 +526,7 @@ export class Game {
       w.pot += w.st.win;
       w.streak++;
       if (w.st.haunted) { w.banished = true; w.pot += w.st.banish; }
+      if (w.st.golden) { w.golden = true; w.pot += w.st.golden; S.golden = null; }
     } else if (S.event === 'dogs' && !w.dogsUsed) {
       w.saved = true;
       w.dogsUsed = true;
@@ -525,7 +536,7 @@ export class Game {
     this.emit('sfx', 'drumroll');
     setTimeout(() => {
       this.emit('sfx', ok ? (w.banished ? 'great' : 'good') : w.saved ? 'good' : 'bad');
-      this.emit('say', `It's ${q.opts[q.ans]}!`);
+      this.emit('say', `It's ${q.opts[q.ans]}!${w.golden ? ' And that\'s the golden ticket!' : ''}`);
     }, at * k);
     for (const [pid, r] of Object.entries(results)) this.emit('mood', { pid, mood: r ? 'happy' : 'sad', tv: pid === w.watcherId, delay: at + 300 });
     this.go('totReveal', TIMES.totReveal + at / 1000);
@@ -555,6 +566,15 @@ export class Game {
         this.emit('mood', { pid: w.watcherId, mood: 'happy', tv: true, delay: 600 });
         return this.go('safe', TIMES.safe);
       }
+      // no hiding for the leader until 2 right (or for anyone during a Lockdown)
+      const forced = this.mustKeep(w);
+      if (forced) {
+        w.decision = 'keep';
+        w.forced = forced;
+        this.emit('sfx', 'drumroll');
+        this.emit('say', forced === 'leader' ? `${name} is in the lead, so no hiding yet! Keep going.` : `The cabin is locked. No hiding, ${name}! Keep going.`);
+        return this.go('decideReveal', TIMES.decideReveal);
+      }
       w.decision = null;
       this.emit('say', `${name}, you're risking ${w.pot} tickets. Keep going for ${this.potValue(w.streak)} more… or hide till morning?`);
       return this.go('decide', TIMES.decide);
@@ -565,6 +585,15 @@ export class Game {
     this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}${w.pot ? `, and dropped ${w.pot} tickets` : ''}.`);
     this.emit('mood', { pid: w.watcherId, mood: 'sad', tv: true, delay: 1300 });
     return this.go('dragged', TIMES.dragged);
+  }
+
+  // 'leader' | 'lockdown' | null: why the night shift can't hide after this answer
+  mustKeep(w) {
+    if (this.S.event === 'nohide') return 'lockdown';
+    const me = this.player(w.watcherId);
+    const others = this.S.players.filter(p => p.id !== w.watcherId);
+    const leading = me && me.score > 0 && others.length && others.every(p => me.score > p.score);
+    return leading && w.streak < LEADER_MIN ? 'leader' : null;
   }
 
   decide(pid, choice) {
@@ -1171,7 +1200,8 @@ export class Game {
         };
       case 'decideReveal': {
         const bank = w.decision === 'bank';
-        if (pid === w.watcherId) return bank ? wait(`You're hiding with ${w.pot} 🎟️!`, 'Safe till morning.', '🛏️') : wait('You kept going!', 'Pick your next category…', '🔦');
+        const why = w.forced === 'leader' ? 'You\'re in the lead: no hiding until 2 right.' : w.forced === 'lockdown' ? 'Lockdown: no hiding tonight.' : 'Pick your next category…';
+        if (pid === w.watcherId) return bank ? wait(`You're hiding with ${w.pot} 🎟️!`, 'Safe till morning.', '🛏️') : wait(w.forced ? 'No hiding yet!' : 'You kept going!', why, '🔦');
         return wait(bank ? `${watcher?.name} is hiding till morning!` : `${watcher?.name} kept going!`, '', bank ? '🛏️' : '🔦');
       }
       case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, `${w.pot} 🎟️ + ${SIX_AM} bonus`, '🌅');

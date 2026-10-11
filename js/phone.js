@@ -206,12 +206,12 @@ export function startPhone(root) {
           <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🎟️</b> · next right answer <b class="win">+${v.win}</b></p>
           ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
           <p class="small">${v.monster.emoji} lurks at <b>${esc(v.spots[v.monster.spot].name)}</b>: miss there = double stake, right = <b class="win">+${v.spots[v.monster.spot].banish}</b></p>
-          <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${esc(p.name)}</small></button>`).join('')}</div>`;
+          <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small></button>`).join('')}</div>`;
         break;
       case 'tot':
         body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>
           ${v.watcher
-            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🎟️)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''} · Miss = lose the pot & get dragged off</div>`
+            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🎟️)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''}${v.golden ? ` + <b>${v.golden}</b> golden ticket` : ''} · Miss = lose the pot & get dragged off</div>`
             : `<div class="safe-box">No risk for you · right answer <b>+${v.side}</b></div>`}
           <h2 class="q">${esc(v.q)}</h2>
           <div class="tot-btns">${v.opts.map((o, i) => `<button class="tot-btn ${v.locked === i ? 'sel' : ''}" data-tot="${i}" ${v.locked != null ? 'disabled' : ''}><span class="letter">${'AB'[i]}</span>${esc(o)}</button>`).join('<div class="or">or</div>')}</div>

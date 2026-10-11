@@ -557,7 +557,7 @@ body.is-phone .moon { display: none; }
 .shift-dots i { font-style: normal; }
 
 /* winner's arcade prize */
-.grand-prize { display: flex; align-items: center; gap: 0.6em; background: var(--panel); border: 3px solid var(--honey); border-radius: 20px; padding: 0.4em 1.2em; margin: 0.3em 0 0.6em; box-shadow: 0 0 40px rgba(242, 177, 52, 0.45); animation: lateIn 0.6s ease-out 1.2s both; }
+.grand-prize { display: flex; align-items: center; gap: 0.6em; background: var(--panel); border: 3px solid var(--honey); border-radius: 20px; padding: 0.4em 1.2em; margin: 0.3em 0 0.6em; box-shadow: 0 0 40px rgba(242, 177, 52, 0.45); }
 .grand-prize .emoji-xl { font-size: 3em; }
 .grand-prize div { display: flex; flex-direction: column; text-align: left; }
 .grand-prize small { color: var(--muted); }
@@ -574,3 +574,30 @@ body.is-phone .moon { display: none; }
 .final-row.winner .f-rank { color: var(--honey2); }
 .drum-line { font-size: 1.6em; font-weight: 800; margin: 0.2em 0; }
 .drum-line.shown:not(.still) { animation: lateIn 0.5s ease-out both, pulseA 0.5s ease-in-out 0.5s 5; }
+
+/* golden ticket */
+.golden-tag { position: absolute; top: -1.4em; left: -1.6em; font-size: 1.1em; font-weight: 900; color: #3a2a00; background: linear-gradient(135deg, #ffe680, #f2b134); border-radius: 10px; padding: 0.05em 0.45em; z-index: 3; box-shadow: 0 0 18px rgba(255, 210, 80, 0.9); animation: lurk 1.8s ease-in-out infinite; }
+.medal.golden-m { border-color: #ffd34d; box-shadow: 0 0 30px rgba(255, 210, 80, 0.6); }
+
+/* round event effects: a layer of drifting emoji over the TV for the whole turn */
+#ev-fx { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+#ev-fx i { position: absolute; font-style: normal; font-size: var(--sz, 2.2em); opacity: 0.55; left: var(--x); top: -10%; animation: evFall var(--dur, 9s) linear var(--d) infinite; }
+#ev-fx.rise i { top: auto; bottom: -10%; animation-name: evRise; }
+#ev-fx.blow i { top: var(--y); left: -10%; animation-name: evBlow; animation-duration: calc(var(--dur, 9s) * 0.5); }
+#ev-fx.walk i { top: auto; bottom: 4%; left: -6%; animation-name: evBlow; animation-timing-function: steps(14); opacity: 0.35; }
+#ev-fx.twinkle i { top: var(--y); animation-name: evTwinkle; animation-duration: 3s; }
+#ev-fx.pulse { box-shadow: inset 0 0 160px rgba(255, 40, 40, 0.35); animation: evPulse 1.2s ease-in-out infinite; }
+#ev-fx.pulse i, #ev-fx.lock i { top: var(--y); animation-name: evTwinkle; animation-duration: 2.4s; }
+#ev-fx.dark { background: radial-gradient(circle at 50% 45%, transparent 25%, rgba(0, 0, 0, 0.55) 75%); }
+#ev-fx.dark i { top: var(--y); animation-name: evFlash; animation-duration: 5s; }
+#ev-fx.frost { box-shadow: inset 0 0 120px rgba(170, 220, 255, 0.45); }
+#ev-fx.moon::before { content: '🌕'; position: absolute; top: 4%; right: 6%; font-size: 7em; filter: drop-shadow(0 0 60px rgba(255, 250, 200, 0.8)); opacity: 0.8; }
+#ev-fx.gold { box-shadow: inset 0 0 120px rgba(255, 210, 80, 0.35); }
+#ev-fx.fever { animation: evHue 3s linear infinite; box-shadow: inset 0 0 90px rgba(255, 90, 200, 0.35); }
+@keyframes evFall { from { transform: translateY(0) rotate(0); } to { transform: translateY(125vh) rotate(360deg); } }
+@keyframes evRise { from { transform: translateY(0); } to { transform: translateY(-125vh); } }
+@keyframes evBlow { from { transform: translateX(0) rotate(0); } to { transform: translateX(125vw) rotate(720deg); } }
+@keyframes evTwinkle { 0%, 100% { opacity: 0; transform: scale(0.6); } 50% { opacity: 0.7; transform: scale(1.1); } }
+@keyframes evPulse { 50% { box-shadow: inset 0 0 220px rgba(255, 40, 40, 0.55); } }
+@keyframes evFlash { 0%, 88%, 100% { opacity: 0; } 90%, 94% { opacity: 0.9; } 92% { opacity: 0.1; } }
+@keyframes evHue { to { filter: hue-rotate(360deg); } }

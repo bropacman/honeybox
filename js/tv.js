@@ -308,6 +308,7 @@ export function startTV(root, { resume = null } = {}) {
       const [x, y] = SPOTS[sp.name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
       return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
         ${st.haunted ? `<div class="lurker" title="${esc(S.monster.name)}">${S.monster.emoji}</div>` : ''}
+        ${st.golden ? '<div class="golden-tag">⭐ +' + st.golden + '</div>' : ''}
         <div class="cat-badge">${hidden ? '❓' : c.emoji}</div>
         <div class="cat-name">${hidden ? 'Mystery' : esc(c.name)}</div>
         <div class="pile-name">${PILE_ICONS[sp.name] || ''} ${esc(sp.name)}</div>
@@ -455,7 +456,7 @@ export function startTV(root, { resume = null } = {}) {
           <ol class="steps">
             <li data-step="1"><span>🔦</span><div><b>Take turns sneaking out on the night shift.</b> Each round, one player is up.</div></li>
             <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
-            <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have.</div></li>
+            <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have. <b>👑 The leader</b> needs 2 right before they can hide.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
             <li data-step="5"><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
             <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most tickets wins the grand prize!</div></li>
@@ -497,6 +498,7 @@ export function startTV(root, { resume = null } = {}) {
                 <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${w.st.win}</span><span class="m-sub">into the pot</span></div>
                 <div class="medal same-m"><span class="m-icon">🎟️</span><span class="m-big">${w.pot}</span><span class="m-sub">pot so far</span></div>
                 <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.pot}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: dragged off, ${w.st.risk} at stake` : 'miss = drop the pot, dragged off'}</span></div>
+                ${w.st.golden ? `<div class="medal golden-m"><span class="m-icon">⭐</span><span class="m-big">+${w.st.golden}</span><span class="m-sub">golden ticket</span></div>` : ''}
                 ${w.st.haunted ? `<div class="medal banish-m"><span class="m-icon">⚡</span><span class="m-big">+${w.st.banish}</span><span class="m-sub">banish ${S.monster.emoji}</span></div>` : ''}
               </div>
               <div class="side-note">Everyone else: right answer <b class="win">+${game.sideRight()}</b> ${eventCard(false)}</div>
@@ -518,7 +520,7 @@ export function startTV(root, { resume = null } = {}) {
               <span class="emoji-xl">🛏️</span><b>HIDE TILL MORNING</b><small>Keep ${w.pot} 🎟️, end the shift safely</small>
             </div>
           </div>
-          ${reveal ? `<p class="big">${bank ? `🛏️ ${esc(watcher?.name)} hides till morning!` : `🔦 ${esc(watcher?.name)} keeps going!`}</p>` : `<p class="muted">${esc(watcher?.name)} is deciding…</p>`}
+          ${reveal ? `<p class="big">${bank ? `🛏️ ${esc(watcher?.name)} hides till morning!` : w.forced === 'leader' ? `👑 ${esc(watcher?.name)} is in the lead: no hiding yet!` : w.forced === 'lockdown' ? '🔒 Lockdown: no hiding tonight!' : `🔦 ${esc(watcher?.name)} keeps going!`}</p>` : `<p class="muted">${esc(watcher?.name)} is deciding…</p>`}
         </div>`;
       }
       case 'safe':
@@ -607,7 +609,7 @@ export function startTV(root, { resume = null } = {}) {
             const voters = Object.entries(mg.votes).filter(([, v]) => v === i).map(([id]) => game.player(id)).filter(Boolean);
             const owners = o.owners.map(id => game.player(id)).filter(Boolean);
             const by = o.real ? `the truth, drawn by ${artist?.avatar} ${esc(artist?.name)}` : o.house ? 'a house lie' : `lie by ${owners.map(p => `${p.avatar} ${esc(p.name)}`).join(', ')}`;
-            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${mg.revealAt?.[i] ?? k * REVEAL_STEP}ms"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.length ? `fooled: ${voters.map(p => p.avatar).join(' ')}` : '—'}</span></div>`;
+            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${mg.revealAt?.[i] ?? k * REVEAL_STEP}ms"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.length ? `${o.real ? '✅ found it' : 'fooled'}: ${voters.map(p => p.avatar).join(' ')}` : '—'}</span></div>`;
           }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line late-n" style="--at:${mg.revealEnd ?? order.length * REVEAL_STEP}ms">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
         }
         return `<div class="drawful">
@@ -690,8 +692,33 @@ export function startTV(root, { resume = null } = {}) {
     }
   }
 
+  // Each round event gets its own effect layer for the whole turn (kept outside the re-rendered DOM)
+  const EV_FX = {
+    calm: ['twinkle', '✨', 10], outage: ['dark', '⚡', 4], dogs: ['walk', '🐾', 10], jackpot: ['fall', '🎟️', 16],
+    fever: ['rise fever', '🎈', 12], wind: ['blow', '🍂', 16], witching: ['pulse', '🕛', 6], moon: ['moon', '🦇', 7],
+    golden: ['fall gold', '⭐', 12], nohide: ['lock', '🔒', 8], freeze: ['fall frost', '❄️', 16]
+  };
+  const TURN_PHASES = ['turnStart', 'pick', 'tot', 'totReveal', 'decide', 'decideReveal'];
+  let evKey = null;
+  function eventFx(S) {
+    let layer = document.getElementById('ev-fx');
+    if (!layer) { layer = document.createElement('div'); layer.id = 'ev-fx'; document.body.appendChild(layer); }
+    const fx = TURN_PHASES.includes(S.phase) && EV_FX[S.event];
+    const key = fx ? `${S.turnIdx}:${S.event}` : null;
+    if (key === evKey) return;
+    evKey = key;
+    layer.className = fx ? fx[0] : '';
+    if (!fx) { layer.innerHTML = ''; return; }
+    const [, emoji, n] = fx;
+    layer.innerHTML = Array.from({ length: n }, (_, i) => {
+      const r = (k) => ((i * 7919 + k * 104729) % 1000) / 1000;
+      return `<i style="--x:${Math.round(r(1) * 100)}%;--y:${Math.round(r(2) * 90)}%;--d:-${(r(3) * 9).toFixed(1)}s;--dur:${(7 + r(4) * 6).toFixed(1)}s;--sz:${(1.6 + r(5) * 1.6).toFixed(1)}em">${emoji}</i>`;
+    }).join('');
+  }
+
   function render() {
     const S = game.S;
+    eventFx(S);
     const splashKey = `${S.phase}:${S.turnIdx}:${S.watch?.streak}:${S.watch?.spot}:${S.mg?.type}:${S.mg?.round}:${S.mg?.qi}`;
     const splash = splashKey !== lastSplash ? splashFor(S) : '';
     if (splash) { lastSplash = splashKey; sfx.whoosh(); }
