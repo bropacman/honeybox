@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, revealAt } from './game.js';
+import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -15,7 +15,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
   dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
-  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
+  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', zoomQ: 'quiz', zoomA: 'quiz', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
 
@@ -221,6 +221,11 @@ export function startTV(root, { resume = null } = {}) {
   let hurryOn = false;
   setInterval(() => {
     game.speaking = SPEED >= 1 && isSpeaking();
+    const worth = root.querySelector('#zoom-worth');
+    if (worth && game.S.mg?.startedAt && game.S.deadline) {
+      const f = (Date.now() - game.S.mg.startedAt) / Math.max(1, game.S.deadline - game.S.mg.startedAt);
+      worth.textContent = `Worth ${ZOOM_POINTS[Math.min(2, Math.max(0, Math.floor(f * 3)))]} 🎟️ right now`;
+    }
     game.tick();
     const left = game.timeLeft();
     const S = game.S;
@@ -655,6 +660,28 @@ export function startTV(root, { resume = null } = {}) {
           <div class="hide-grid">${cards}</div>
           ${exposed.length ? `<p class="muted">Caught in the open: ${exposed.map(p => p.avatar).join(' ')}</p>` : ''}
           ${reveal ? '' : waitingStrip()}
+        </div>`;
+      }
+      case 'zoomQ': case 'zoomA': {
+        // the photo starts zoomed way in and eases out; the animation's negative delay keeps it in place across re-renders
+        const q = mg.questions[mg.qi];
+        const reveal = S.phase === 'zoomA';
+        const total = Math.max(1, (S.deadline || Date.now()) - mg.startedAt);
+        const elapsed = Math.min(total, Date.now() - mg.startedAt);
+        const img = `<img src="${esc(q.file)}" alt="" style="transform-origin:${q.fx * 100}% ${q.fy * 100}%;${reveal ? '' : `animation:zoomOut ${total}ms linear -${elapsed}ms both;`}${game.isPaused() ? 'animation-play-state:paused;' : ''}">`;
+        return `<div class="quiz zoom-game">
+          <div class="quiz-head">🔍 Zoom In <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
+          <div class="zoom-row">
+            <div class="zoom-frame ${reveal ? 'revealed' : ''}">${img}</div>
+            <div class="zoom-side">
+              ${reveal ? '' : '<h2>What is it?</h2><p class="zoom-worth" id="zoom-worth"></p>'}
+              <div class="answers">${q.c.map((c, i) => {
+                const who = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
+                return `<div class="ans ${reveal ? (i === q.a ? 'right-n' : 'wrong-n') : ''}" style="--at:0ms"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span></div>`;
+              }).join('')}</div>
+              ${reveal ? '' : waitingStrip()}
+            </div>
+          </div>
         </div>`;
       }
       case 'doorQ': case 'doorA': {

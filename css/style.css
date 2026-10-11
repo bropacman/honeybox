@@ -653,3 +653,13 @@ body.is-phone .moon { display: none; }
 .door-wrap.opens .door-panel { animation: doorOpen 0.9s ease-in var(--at) both; }
 @keyframes doorOpen { to { transform: rotateY(-105deg); opacity: 0.15; } }
 .door-who { position: absolute; bottom: 0; font-size: 2em; min-height: 1.3em; }
+
+/* Zoom In */
+.zoom-row { display: flex; gap: 2.5vw; align-items: center; justify-content: center; width: 100%; }
+.zoom-frame { width: 58vh; height: 58vh; border-radius: 24px; overflow: hidden; border: 6px solid var(--honey); box-shadow: 0 0 60px rgba(242, 177, 52, 0.35); background: #000; flex: none; }
+.zoom-frame img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.15); }
+.zoom-frame.revealed img { transition: transform 1.2s ease-out; transform: scale(1); }
+@keyframes zoomOut { from { transform: scale(9); } 85% { transform: scale(1.6); } to { transform: scale(1.4); } }
+.zoom-side { display: flex; flex-direction: column; gap: 0.6em; min-width: 30vw; }
+.zoom-side .answers { grid-template-columns: 1fr; }
+.zoom-worth { font-size: 1.4em; font-weight: 900; color: var(--honey2); margin: 0; }

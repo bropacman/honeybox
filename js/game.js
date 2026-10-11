@@ -2,6 +2,7 @@
 // State lives in this.S (plain JSON, so it can be saved and resumed).
 
 import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS, AVATARS, TOT, GUESSES, HIDE_SETS, isLocal } from './content.js';
+import ZOOM from './packs/zoom.js';
 
 export const CLOCK = ['12 AM', '2 AM', '4 AM', '6 AM'];
 
@@ -12,7 +13,7 @@ export const TIMES = {
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 5,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
   stakesIntro: 14, stakesBet: 20, stakesReveal: 7,
-  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4
+  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4, zoomQ: 21, zoomA: 6
 };
 
 export const MINIGAMES = {
@@ -21,6 +22,7 @@ export const MINIGAMES = {
   poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Dragged off? Match the crowd 2 of 3 times to escape.' },
   hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Dragged off? Stay hidden 2 of 3 times to escape.' },
   guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Dragged off? Beat at least one other camper 2 of 3 times to escape.' },
+  zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. Lock in early for 300, later for 200, last for 100. Dragged off? Get 2 of 3 right to escape.' },
   door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and an animatronic. Pick one. Dragged off? Dodge the animatronic 2 of 3 times to escape.' }
 };
 // Pick a Door: what's behind the three doors, and the door sets for each round
@@ -33,6 +35,8 @@ export const DOOR_SETS = [
   ['🛖 Outhouse', '⛺ Tent', '🛶 Boathouse']
 ];
 export const DOOR_STEP = 2400;
+// Zoom In: points by when you lock in (first, middle, last third of the zoom)
+export const ZOOM_POINTS = [300, 200, 100];
 // Hide and Seek: time between the animatronic's searches; Closest Guess: time between guesses popping in
 export const SEARCH_MS = 2600;
 export const GUESS_STEP = 1100;
@@ -114,7 +118,7 @@ export const DRAW_JUDGED = 4;
 export const NARRATED = ['intro', 'turnStart', 'safe', 'dragged', 'mgIntro', 'mgResult', 'finaleIntro', 'stakesIntro'];
 
 // phases where players are answering on their phones (the last-10-seconds hurry-up applies)
-export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
+export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'zoomQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
 
 // Sunrise Stakes: 5 This or That questions for everyone, each worth more
 export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [2, 2, 3, 3, 3], boost: 1.5 };
@@ -398,6 +402,8 @@ export class Game {
       case 'guessA': return this.nextGuess();
       case 'doorQ': return this.revealDoor();
       case 'doorA': return this.nextDoor();
+      case 'zoomQ': return this.revealZoom();
+      case 'zoomA': return this.nextZoom();
       case 'drawDraw': return this.startFibs();
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
@@ -532,6 +538,11 @@ export class Game {
       S.watch.answers[pid] = i;
     } else if (S.phase === 'stakesBet') {
       return this.stake(pid, i);
+    } else if (S.phase === 'zoomQ') {
+      const mg = S.mg;
+      if (mg.answers[pid] || !(i >= 0 && i < 4)) return;
+      const frac = (Date.now() - mg.startedAt) / Math.max(1, (S.deadline || Date.now()) - mg.startedAt);
+      mg.answers[pid] = { i, at: Date.now(), worth: ZOOM_POINTS[Math.min(2, Math.max(0, Math.floor(frac * 3)))] };
     } else if (['triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'doorQ'].includes(S.phase)) {
       const mg = S.mg;
       const q = ['hideQ', 'doorQ'].includes(S.phase) ? null : mg.questions[mg.qi];
@@ -675,7 +686,7 @@ export class Game {
   startMinigame() {
     const S = this.S;
     // Cabin Census needs a crowd: skip it with fewer than 3 players
-    const allowed = Object.keys(MINIGAMES).filter(t => t !== 'poll' || this.connected().length >= 3);
+    const allowed = Object.keys(MINIGAMES).filter(t => (t !== 'poll' || this.connected().length >= 3) && (t !== 'zoom' || ZOOM.length >= 8));
     S.bag = S.bag.filter(t => allowed.includes(t));
     if (!S.bag.length) S.bag = shuffle(allowed);
     const type = S.bag.pop();
@@ -704,6 +715,12 @@ export class Game {
       mg.qi = -1;
       mg.safe = {};
       return this.askHide();
+    }
+    if (mg.type === 'zoom') {
+      mg.questions = this.takeZooms(3);
+      mg.qi = -1;
+      mg.correct = {};
+      return this.askZoom();
     }
     if (mg.type === 'door') {
       mg.rounds = shuffle(DOOR_SETS.slice()).slice(0, 3);
@@ -909,6 +926,56 @@ export class Game {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.rounds.length) return this.askHide();
     return this.finishMinigame((mg.safe[this.S.lost.pid] || 0) >= 2);
+  }
+
+  // ---------- Zoom In ----------
+  takeZooms(n) {
+    const S = this.S;
+    S.used.zoom = S.used.zoom || [];
+    let pool = ZOOM.map((_, i) => i).filter(i => !S.used.zoom.includes(i));
+    if (pool.length < n) { S.used.zoom = []; pool = ZOOM.map((_, i) => i); }
+    const chosen = shuffle(pool).slice(0, n);
+    S.used.zoom.push(...chosen);
+    return chosen.map(i => {
+      const z = ZOOM[i];
+      const others = shuffle(ZOOM.filter(o => o.name !== z.name).map(o => o.name)).slice(0, 3);
+      const c = shuffle([z.name, ...others]);
+      // start the zoom near the photo's subject, nudged a little so it's never dead center
+      const jitter = () => (Math.random() - 0.5) * 0.16;
+      return { file: z.file, c, a: c.indexOf(z.name), fx: Math.min(0.85, Math.max(0.15, (z.fx ?? 0.5) + jitter())), fy: Math.min(0.85, Math.max(0.15, (z.fy ?? 0.5) + jitter())) };
+    });
+  }
+
+  askZoom() {
+    const mg = this.S.mg;
+    mg.qi++;
+    mg.answers = {};
+    this.S.gains = {};
+    this.emit('say', mg.qi === 0 ? 'What is it? Lock in early for more tickets.' : 'Next picture!');
+    this.go('zoomQ', TIMES.zoomQ);
+    mg.startedAt = Date.now();
+  }
+
+  revealZoom() {
+    const S = this.S;
+    const mg = S.mg;
+    const q = mg.questions[mg.qi];
+    S.gains = {};
+    for (const [pid, a] of Object.entries(mg.answers)) {
+      if (a.i !== q.a) continue;
+      this.addScore(pid, a.worth);
+      mg.correct[pid] = (mg.correct[pid] || 0) + 1;
+    }
+    this.emit('sfx', 'good');
+    this.emit('say', `It's ${q.c[q.a]}!`);
+    for (const [pid, a] of Object.entries(mg.answers)) this.emit('mood', { pid, mood: a.i === q.a ? 'happy' : 'sad', tv: false, delay: 600 });
+    this.go('zoomA', TIMES.zoomA);
+  }
+
+  nextZoom() {
+    const mg = this.S.mg;
+    if (mg.qi + 1 < mg.questions.length) return this.askZoom();
+    return this.finishMinigame((mg.correct[this.S.lost.pid] || 0) >= 2);
   }
 
   // ---------- Pick a Door ----------
@@ -1355,7 +1422,7 @@ export class Game {
       case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
       case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
-      case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': case 'doorQ': return ids.filter(id => !mg.answers[id]);
+      case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': case 'doorQ': case 'zoomQ': return ids.filter(id => !mg.answers[id]);
       case 'stakesBet': return ids.filter(id => !mg.bets[id]);
       case 'finalePick': return [mg.picker].filter(id => this.player(id)?.connected);
       case 'drawDraw': return ids.filter(id => mg.prompts[id] && !mg.drawings[id]);
@@ -1366,7 +1433,7 @@ export class Game {
   }
 
   checkAllDone() {
-    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
+    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'zoomQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
     if (!phases.includes(this.S.phase)) return;
     if (this.waitingOn().length === 0 && this.S.pausedLeft == null) {
       // a short beat so the last lock-in is visible
@@ -1476,6 +1543,18 @@ export class Game {
       case 'hideA': {
         const caught = (mg.caught || []).includes(pid);
         return { ...wait(caught ? 'Found you!' : 'You stayed hidden!', caught ? '' : '+200 🎟️', caught ? '😱' : '🙈'), suspense: true, revealMs: mg.revealMs };
+      }
+      case 'zoomQ':
+        return {
+          ...base, screen: 'choices', title: 'Zoom In', num: `${mg.qi + 1}/${mg.questions.length}`,
+          q: 'What is it?', sub: 'Lock in early for 300 · later 200 · last 100',
+          choices: mg.questions[mg.qi].c.map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null
+        };
+      case 'zoomA': {
+        const q = mg.questions[mg.qi];
+        const a = mg.answers[pid];
+        const ok = a && a.i === q.a;
+        return wait(ok ? `Got it! +${a.worth}` : 'Nope!', `It's ${q.c[q.a]}`, ok ? '🔍' : '❌');
       }
       case 'doorQ':
         return {
