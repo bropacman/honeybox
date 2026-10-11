@@ -224,7 +224,7 @@ export function startPhone(root) {
             <h2>Your pot: ${v.pot} 🍯</h2>
             <div class="tot-btns">
               <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Right: pot grows to ${v.pot + v.next} 🍯${v.sixAm ? ` + ${v.sixAm} 6 AM bonus` : ''}<br>Miss: lose all ${v.pot} 🍯 and get dragged off</small></button>
-              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 Bank it<small>Take ${v.pot} 🍯 home safe. Ends your shift.</small></button>
+              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🛏️ Hide till morning<small>Keep your ${v.pot} 🍯 safe. Ends your shift.</small></button>
             </div>`;
         break;
       case 'finale':

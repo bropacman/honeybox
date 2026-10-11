@@ -301,7 +301,7 @@ export class Game {
       'Welcome to the cabin. The animatronics are awake. Survive until sunrise with the most honey.',
       'Take turns on the night shift. Each round, one player is up.',
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
-      'Right answers fill your pot. After each one, bank it and end your turn safely, or keep going.',
+      'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have.',
       'Three in a row gets you to 6 A M, and a bonus.',
       'Miss, and you drop the pot and get dragged into a mini game. Do well to escape.',
       'At sunrise, last place picks the finale. Most honey wins!'
@@ -544,7 +544,7 @@ export class Game {
         return this.go('safe', TIMES.safe);
       }
       w.decision = null;
-      this.emit('say', `${name}, you're risking ${w.pot} honey. Keep going for ${this.potValue(w.streak)} more… or bank it and run back to the cabin?`);
+      this.emit('say', `${name}, you're risking ${w.pot} honey. Keep going for ${this.potValue(w.streak)} more… or hide till morning?`);
       return this.go('decide', TIMES.decide);
     }
     S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot };
@@ -574,7 +574,7 @@ export class Game {
     if (w.decision === 'bank') {
       this.addScore(w.watcherId, w.pot);
       this.emit('sfx', 'good');
-      this.emit('say', `${name} banks ${w.pot} honey and runs back to the cabin!`);
+      this.emit('say', `${name} hides till morning with ${w.pot} honey!`);
     } else {
       this.emit('sfx', 'drumroll');
       this.emit('say', `${name} keeps going! Brave… or foolish.`);
@@ -1100,15 +1100,15 @@ export class Game {
         return { ...wait(w.results[pid] ? 'Correct!' : 'Wrong!', `It's ${right}.`, w.results[pid] ? '✅' : '❌'), suspense: true };
       }
       case 'decide':
-        if (w.watcherId !== pid) return wait(`${watcher?.name} has ${w.pot} 🍯`, 'Bank it… or keep going?', '🤔');
+        if (w.watcherId !== pid) return wait(`${watcher?.name} has ${w.pot} 🍯`, 'Keep going… or hide till morning?', '🤔');
         return {
           ...base, screen: 'decide', watcher: w.watcherId === pid, watcherName: watcher?.name, pot: w.pot, next: this.potValue(w.streak),
           streak: w.streak, risk: STAKE, locked: w.decision, sixAm: w.streak + 1 >= 3 ? SIX_AM : 0
         };
       case 'decideReveal': {
         const bank = w.decision === 'bank';
-        if (pid === w.watcherId) return bank ? wait(`You banked ${w.pot} 🍯!`, 'Safe in the cabin.', '🏠') : wait('You kept going!', 'Pick your next category…', '🔦');
-        return wait(bank ? `${watcher?.name} banked it!` : `${watcher?.name} kept going!`, '', bank ? '🏠' : '🔦');
+        if (pid === w.watcherId) return bank ? wait(`You're hiding with ${w.pot} 🍯!`, 'Safe till morning.', '🛏️') : wait('You kept going!', 'Pick your next category…', '🔦');
+        return wait(bank ? `${watcher?.name} is hiding till morning!` : `${watcher?.name} kept going!`, '', bank ? '🛏️' : '🔦');
       }
       case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, `${w.pot} 🍯 + ${SIX_AM} bonus`, '🌅');
       case 'dragged': return wait(isLost ? "You got dragged off!" : `${lostName} got dragged off!`, `By ${S.danger.name}.`, S.danger.emoji);
