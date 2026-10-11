@@ -504,8 +504,6 @@ export function startTV(root, { resume = null } = {}) {
               <div class="campers">${S.players.map((p, i) => `<button class="camper ${p.connected ? '' : 'off'}" style="--i:${i}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
               <div class="fire">🔥</div>
             </div>
-            <p class="lobby-summary">${esc(S.length)} game · ${esc(S.timers)} timers · ${Object.keys(CATEGORIES).filter(c => c !== 'wild' && !(S.offCats || []).includes(c)).length} categories · effects ${esc(fx.level)}
-              <button data-act="settings">⚙️ Settings</button></p>
             <button class="big-btn" data-act="start" ${S.players.length >= MIN_PLAYERS ? '' : 'disabled'}>Start the night 🔥</button>
             <p class="muted small">Best with 3–8 players. ${S.players[0] ? `⭐ VIP ${esc(game.player(game.vipId())?.name || '')} can also start, pause and skip from their phone.` : 'The first player to join becomes the ⭐ VIP.'}</p>
             <p class="muted small">Space = pause · N = skip · click a camper to remove them</p>
@@ -955,6 +953,7 @@ export function startTV(root, { resume = null } = {}) {
         ${showSide ? `<div class="mini-code">${code}</div>` : ''}
         <div id="timer" class="battery idle"><div class="cells">${'<i></i>'.repeat(5)}</div><span class="secs"></span></div>
         <div class="host-ctl">
+          ${S.phase === 'lobby' ? '<button data-act="settings" title="Settings">⚙️ Settings</button>' : ''}
           <button data-act="mute" title="Sound">${isMuted() ? '🔇' : '🔊'}</button>
           <button data-act="retro" title="Film grain">${fx.retro ? '📺' : '🖥️'}</button>
           <button data-act="fxlevel" title="Effects: ${fx.level}">✨ ${fx.level}</button>
