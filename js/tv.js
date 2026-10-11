@@ -428,14 +428,14 @@ export function startTV(root, { resume = null } = {}) {
       case 'intro':
         return `<div class="center howto">
           <h1>How to Play</h1>
-          <p class="muted" data-step="0">The cabin is surrounded. The animatronics are awake. Survive until sunrise with the most 🎟️ tickets.</p>
+          <p class="muted" data-step="0">Win 🎟️ tickets all night. At sunrise, whoever has the most claims the 🏆 grand prize at the arcade counter… if the animatronics don't get you first.</p>
           <ol class="steps">
             <li data-step="1"><span>🔦</span><div><b>Take turns on the night shift.</b> Each round, one player is up.</div></li>
             <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
             <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
             <li data-step="5"><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
-            <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most tickets win!</div></li>
+            <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most tickets wins the grand prize!</div></li>
           </ol>
         </div>`;
       case 'turnStart':
@@ -649,6 +649,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="center">
           <div class="emoji-xl bounce">🌄🏆🐕🐕</div>
           <h1>${r[0] ? `${r[0].avatar} ${esc(r[0].name)} survived the night!` : 'Dawn breaks.'}</h1>
+          ${r[0] && S.prize ? `<div class="grand-prize"><span class="emoji-xl">${S.prize.emoji}</span><div><small>🎟️ Grand prize at the arcade counter</small><b>${esc(S.prize.name)}</b></div></div>` : ''}
           ${scoreboard(true)}
           <div class="row"><button class="big-btn" data-act="again">Play again (same campers)</button><button data-act="new">New room</button></div>
         </div>`;

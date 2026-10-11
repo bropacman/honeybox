@@ -265,7 +265,7 @@ export function startPhone(root) {
         }
         break;
       case 'end':
-        body = `<div class="center"><div class="emoji-xl">${v.rank === 1 ? '🏆' : v.rank === v.total ? '💀' : '🌄'}</div><h2>You finished #${v.rank} of ${v.total}</h2><p>${v.me.score} 🎟️</p>${v.vip ? '<button class="big-btn" data-vip="again">Play again 🔁</button>' : '<p class="muted">The VIP can start another round.</p>'}</div>`;
+        body = `<div class="center"><div class="emoji-xl">${v.rank === 1 ? '🏆' : v.rank === v.total ? '💀' : '🌄'}</div><h2>You finished #${v.rank} of ${v.total}</h2><p>${v.me.score} 🎟️</p>${v.prize ? `<p class="big">You won the grand prize: ${v.prize.emoji} <b>${esc(v.prize.name)}</b>!</p>` : ''}${v.vip ? '<button class="big-btn" data-vip="again">Play again 🔁</button>' : '<p class="muted">The VIP can start another round.</p>'}</div>`;
         break;
       default:
         body = '<div class="center"><p>Look at the TV</p></div>';

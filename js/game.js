@@ -25,6 +25,15 @@ export const LENGTHS = { short: 5, normal: 7, long: 10 };
 export const TIMERS = { short: 0.7, medium: 1, long: 1.4 };
 
 // Finale choices for last place
+// The winner cashes their tickets in for the top-shelf prize at the arcade counter.
+export const PRIZES = [
+  { name: 'a giant stuffed moose', emoji: '🫎' }, { name: 'a lava lamp', emoji: '🪔' },
+  { name: 'a glow-in-the-dark yo-yo', emoji: '🪀' }, { name: 'a remote control monster truck', emoji: '🛻' },
+  { name: 'a stuffed bear with one eye that follows you', emoji: '🧸' }, { name: 'a disco ball', emoji: '🪩' },
+  { name: 'a giant inflatable guitar', emoji: '🎸' }, { name: 'a lifetime supply of Fun Dip', emoji: '🍬' },
+  { name: 'a slightly haunted music box', emoji: '🎶' }, { name: 'a plush Archie and Honey', emoji: '🐕' }
+];
+
 export const FINALES = {
   stakes: { name: 'Sunrise Stakes', emoji: '🌅', blurb: '5 This or That questions for everyone, worth 200 up to 1,000. Right wins it, wrong loses it.' },
   trivia: { name: 'Trivia Blitz', emoji: '🐻', blurb: '5 questions, double tickets.' },
@@ -298,13 +307,13 @@ export class Game {
     this.spawnMonster();
     // one line per How to Play step; the TV reveals each step as its line starts
     this.emit('say', [
-      'Welcome to the cabin. The animatronics are awake. Survive until sunrise with the most tickets.',
+      'Welcome to the arcade after dark. Win tickets all night. At sunrise, whoever has the most claims the grand prize… if the animatronics don\'t get you first.',
       'Take turns on the night shift. Each round, one player is up.',
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
       'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have.',
       'Three in a row gets you to 6 A M, and a bonus.',
       'Miss, and you drop the pot and get dragged into a mini game. Do well to escape.',
-      'At sunrise, last place picks the finale. Most tickets win!'
+      'At sunrise, last place picks the finale. Most tickets wins the grand prize!'
     ]);
     this.go('intro', TIMES.intro);
   }
@@ -1005,7 +1014,8 @@ export class Game {
     const S = this.S;
     S.gains = {};
     const ranked = this.ranked();
-    if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most tickets. Archie and Honey approve.`);
+    S.prize = pick(PRIZES);
+    if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most tickets, and takes home the grand prize: ${S.prize.name}! Archie and Honey approve.`);
     if (ranked[0]) this.emit('mood', { pid: ranked[0].id, mood: 'happy', tv: true, delay: 1200 });
     if (ranked.length > 1) this.emit('mood', { pid: ranked[ranked.length - 1].id, mood: 'sad', tv: true, delay: 2200 });
     this.emit('sfx', 'great');
@@ -1181,7 +1191,7 @@ export class Game {
       }
       case 'end': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
-        return { ...base, screen: 'end', rank, total: S.players.length };
+        return { ...base, screen: 'end', rank, total: S.players.length, prize: rank === 1 ? S.prize : null };
       }
       default: return wait('Look at the TV', '', '📺');
     }
