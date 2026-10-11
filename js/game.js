@@ -307,8 +307,8 @@ export class Game {
     this.spawnMonster();
     // one line per How to Play step; the TV reveals each step as its line starts
     this.emit('say', [
-      'Welcome to the arcade after dark. Win tickets all night. At sunrise, whoever has the most claims the grand prize… if the animatronics don\'t get you first.',
-      'Take turns on the night shift. Each round, one player is up.',
+      'Welcome to the cabin. Tonight, you sneak out to win arcade tickets. At sunrise, whoever has the most claims the grand prize… if the animatronics don\'t get you first.',
+      'Take turns sneaking out on the night shift. Each round, one player is up.',
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
       'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have.',
       'Three in a row gets you to 6 A M, and a bonus.',
