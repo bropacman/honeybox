@@ -733,3 +733,4 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 @keyframes struggle { 0%, 100% { transform: translateX(0) rotate(-6deg); } 25% { transform: translateX(-3px) rotate(7deg); } 50% { transform: translateX(3px) rotate(-8deg); } 75% { transform: translateX(-2px) rotate(5deg); } }
 @keyframes capLoom { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.06) rotate(2deg); } }
 @keyframes sweat { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, 14px); } }
+.fx-bit img.px { width: 1.6em; height: 1.6em; }

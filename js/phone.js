@@ -1,5 +1,6 @@
 // The phone controller.
 
+import { spritify } from './sprites.js';
 import { startClient } from './net.js';
 import { AVATARS } from './content.js';
 import { drawingPad, INK } from './draw.js';
@@ -296,6 +297,7 @@ export function startPhone(root) {
       ? `<div class="vip-bar"><span>⭐ VIP</span><button data-vip="pause" id="vip-pause">${paused ? '▶️ Resume' : '⏸ Pause'}</button><button data-vip="skip">⏭ Skip</button><button data-vip="lobby">🏠 End</button></div>`
       : '';
     root.innerHTML = `<div class="phone screen-${v.screen} ${vipBar ? 'has-vip' : ''}">${header()}<main>${body}</main>${vipBar}</div>`;
+    spritify(root);
     wire();
     if (BOT) botAct();
   }

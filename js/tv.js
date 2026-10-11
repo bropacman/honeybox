@@ -5,6 +5,7 @@ import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
 import { startFx } from './fx.js';
+import { spritify, spriteImg } from './sprites.js';
 import { PILE_ICONS } from './content.js';
 
 const SAVE_KEY = 'honeybox_host_save';
@@ -209,8 +210,8 @@ export function startTV(root, { resume = null } = {}) {
       // juice: the screen reacts to the big sounds
       if (data === 'scare') fx.scare();
       else if (data === 'bad' || data === 'howl') fx.shake();
-      else if (data === 'great') { fx.punch(); fx.confetti(30); }
-      else if (data === 'good') { fx.punch(); fx.confetti(8); }
+      else if (data === 'great') { fx.punch(); fx.confetti(30, spriteImg('🎟️')); }
+      else if (data === 'good' && /Reveal$|A$|^safe$|^mgResult$/.test(game.S.phase)) { fx.punch(); fx.confetti(8, spriteImg('🎟️')); }
     }
     else if (type === 'say') {
       if (Array.isArray(data)) {
@@ -941,6 +942,7 @@ export function startTV(root, { resume = null } = {}) {
         ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
         ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
       </div>`;
+    spritify(root);
     if (S.phase === 'intro' || S.phase === 'end') showSteps(true);
 
     if (S.phase === 'lobby') {
