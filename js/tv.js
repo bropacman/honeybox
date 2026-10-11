@@ -4,6 +4,7 @@ import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASE
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
+import { startFx } from './fx.js';
 import { PILE_ICONS } from './content.js';
 
 const SAVE_KEY = 'honeybox_host_save';
@@ -195,12 +196,22 @@ export function startTV(root, { resume = null } = {}) {
     lines.forEach((line, i) => { setTimeout(() => cue(i), t); t += typeof line === 'number' ? line : 3000; });
   }
 
+  const fx = startFx();
+  // phases where the night shift is out in the dark (the flashlight narrows as the timer runs down)
+  const DARK_PHASES = ['pick', 'tot', 'decide'];
   game.on((type, data) => {
     if (type === 'change') {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify({ at: Date.now(), S: game.S })); } catch (e) { /* full */ }
       render();
       sendViews();
-    } else if (type === 'sfx') sfx[data]?.();
+    } else if (type === 'sfx') {
+      sfx[data]?.();
+      // juice: the screen reacts to the big sounds
+      if (data === 'scare') fx.scare();
+      else if (data === 'bad' || data === 'howl') fx.shake();
+      else if (data === 'great') { fx.punch(); fx.confetti(30); }
+      else if (data === 'good') { fx.punch(); fx.confetti(8); }
+    }
     else if (type === 'say') {
       if (Array.isArray(data)) {
         cueLines(data);
@@ -236,10 +247,17 @@ export function startTV(root, { resume = null } = {}) {
     tv?.classList.toggle('hurry', hurry);
     const el = root.querySelector('#timer');
     const s = left == null ? '' : Math.ceil(left / 1000);
+    // the timer is the flashlight battery: five cells drain as time runs out
+    const charge = left == null || !S.phaseMs ? 1 : Math.max(0, Math.min(1, left / S.phaseMs));
     if (el) {
-      el.textContent = game.isPaused() ? '⏸' : game.isNarrated() ? '' : s;
-      el.classList.toggle('urgent', hurry);
+      const show = answering || game.isPaused();
+      el.classList.toggle('idle', !show);
+      el.classList.toggle('mid', charge < 0.5 && charge >= 0.25);
+      el.classList.toggle('low', charge < 0.25);
+      el.querySelectorAll('.cells i').forEach((c, i) => c.classList.toggle('off', charge <= i / 5));
+      el.querySelector('.secs').textContent = game.isPaused() ? '⏸' : show ? s : '';
     }
+    fx.setDark(DARK_PHASES.includes(S.phase) && !game.isPaused(), charge, S.phase === 'pick');
     const big = root.querySelector('#final-count');
     if (big) big.textContent = hurry && s <= 3 ? s : '';
     if (hurry) {
@@ -287,6 +305,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'cat') game.toggleCategory(b.dataset.cat);
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'players') { playersOpen = !playersOpen; render(); }
+    if (act === 'retro') { fx.toggleRetro(); render(); }
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
     if (act === 'mute') { setMuted(!isMuted()); if (isMuted()) stepShown = 99; render(); }
@@ -888,9 +907,10 @@ export function startTV(root, { resume = null } = {}) {
         ${splash}
         <div class="tv-main">${stage()}</div>
         ${showSide ? `<div class="mini-code">${code}</div>` : ''}
-        <div id="timer" class="timer"></div>
+        <div id="timer" class="battery idle"><div class="cells">${'<i></i>'.repeat(5)}</div><span class="secs"></span></div>
         <div class="host-ctl">
           <button data-act="mute" title="Sound">${isMuted() ? '🔇' : '🔊'}</button>
+          <button data-act="retro" title="Film grain">${fx.retro ? '📺' : '🖥️'}</button>
           ${S.phase !== 'lobby' ? '<button data-act="players" title="Players">👥</button>' : ''}
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
         </div>

@@ -663,3 +663,63 @@ body.is-phone .moon { display: none; }
 .zoom-side { display: flex; flex-direction: column; gap: 0.6em; min-width: 30vw; }
 .zoom-side .answers { grid-template-columns: 1fr; }
 .zoom-worth { font-size: 1.4em; font-weight: 900; color: var(--honey2); margin: 0; }
+
+/* ---------- presentation layer (js/fx.js) ---------- */
+@font-face { font-family: 'Pixelify Sans'; src: url('../fonts/pixelify-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Pixelify Sans'; src: url('../fonts/pixelify-sans-latin-700-normal.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
+.tv h1:not(.q):not(.tot-q), .quiz-head, .battery, .pts, .pot-big, .final-title, .f-pts, .m-big, .guess-answer, .zoom-worth, .splash b, .choice-card b { font-family: 'Pixelify Sans', 'Nunito', sans-serif; letter-spacing: 0.02em; }
+
+/* flashlight: everything outside the beam is dark; the beam narrows as the battery drains */
+.fx-dark { position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: 0; transition: opacity 0.8s;
+  --x: 50%; --y: 52%; --r: 70vmax;
+  background: radial-gradient(circle var(--r) at var(--x) var(--y), transparent 0, transparent 48%, rgba(4, 7, 6, 0.5) 72%, rgba(2, 4, 3, 0.92) 100%); }
+.fx-dark.on { opacity: 1; }
+.fx-dark.sweep { animation: beamSweep 7s ease-in-out infinite alternate; }
+.fx-dark.low { animation: beamFlicker 1.3s steps(1) infinite; }
+@keyframes beamSweep { 0% { --x: 22%; --y: 40%; } 50% { --x: 70%; --y: 65%; } 100% { --x: 55%; --y: 30%; } }
+@property --x { syntax: '<percentage>'; inherits: true; initial-value: 50%; }
+@property --y { syntax: '<percentage>'; inherits: true; initial-value: 52%; }
+@keyframes beamFlicker { 0%, 100% { opacity: 1; } 8% { opacity: 0.75; } 10% { opacity: 1; } 55% { opacity: 0.85; } 57% { opacity: 1; } }
+.fx-eyes { position: absolute; width: 2.6em; height: 0.8em; translate: -50% -50%; opacity: 0; animation: eyesBlink 9s ease-in-out infinite;
+  background: radial-gradient(circle 0.32em at 22% 50%, #ffe36b 60%, transparent 70%), radial-gradient(circle 0.32em at 78% 50%, #ffe36b 60%, transparent 70%);
+  filter: drop-shadow(0 0 6px #ffcf3a); }
+@keyframes eyesBlink { 0%, 60%, 100% { opacity: 0; } 66%, 80% { opacity: 0.85; } 72% { opacity: 0; } 73% { opacity: 0.85; } }
+
+/* film grain + faint scanlines + vignette (toggle with the 📺 button) */
+.fx-grain { position: fixed; inset: -50%; pointer-events: none; z-index: 60; display: none; opacity: 0.09; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 0.8s steps(4) infinite; }
+.fx-grain.on { display: block; }
+.fx-grain.on::after { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.5) 0 1px, transparent 1px 3px); opacity: 0.6; }
+@keyframes grain { 0% { transform: translate(0, 0); } 25% { transform: translate(-6%, 4%); } 50% { transform: translate(5%, -7%); } 75% { transform: translate(-3%, 8%); } }
+body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 19; box-shadow: inset 0 0 18vmin rgba(0, 0, 0, 0.65); }
+
+/* hits and scares */
+.fx-flash { position: fixed; inset: 0; pointer-events: none; z-index: 70; opacity: 0; }
+.fx-flash.red { animation: redFlash 0.6s ease-out; }
+@keyframes redFlash { 0% { opacity: 0.75; background: #c0141e; } 100% { opacity: 0; background: #c0141e; } }
+.fx-shake { animation: shake 0.45s cubic-bezier(.36,.07,.19,.97); }
+.fx-shake-big { animation: shakeBig 0.7s cubic-bezier(.36,.07,.19,.97); }
+@keyframes shake { 10%, 90% { transform: translate(-3px, 1px); } 20%, 80% { transform: translate(5px, -2px); } 30%, 50%, 70% { transform: translate(-7px, 2px); } 40%, 60% { transform: translate(7px, -1px); } }
+@keyframes shakeBig { 10%, 90% { transform: translate(-6px, 3px) rotate(-0.4deg); } 20%, 80% { transform: translate(10px, -4px) rotate(0.5deg); } 30%, 50%, 70% { transform: translate(-14px, 5px) rotate(-0.6deg); } 40%, 60% { transform: translate(14px, -3px) rotate(0.6deg); } }
+.fx-punch { animation: punch 0.4s cubic-bezier(.2,1.6,.4,1); }
+@keyframes punch { 0% { transform: scale(1); } 35% { transform: scale(1.035); } 100% { transform: scale(1); } }
+.fx-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 65; overflow: hidden; }
+.fx-bit { position: absolute; top: -8%; font-size: 2.2em; animation: bitFall 2.4s cubic-bezier(.3,.6,.6,1) both; }
+@keyframes bitFall { to { transform: translate(var(--dx), 115vh) rotate(var(--rot)); } }
+
+/* diegetic HUD: the wall clock (12 AM to 6 AM) and the flashlight battery as the timer */
+.wall-clock { position: fixed; top: 0.6em; left: 0.9em; z-index: 25; display: flex; align-items: center; gap: 0.4em; font-size: 1.5em; color: var(--honey2); background: rgba(0,0,0,0.55); border: 2px solid var(--line); border-radius: 12px; padding: 0.1em 0.6em; text-shadow: 0 0 10px rgba(255, 207, 92, 0.5); }
+.battery { position: fixed; top: 0.6em; left: 50%; translate: -50% 0; z-index: 25; display: flex; align-items: center; gap: 0.45em; font-size: 1.3em; color: var(--ink); }
+.battery .cells { display: flex; gap: 3px; padding: 3px; border: 3px solid var(--ink); border-radius: 6px; position: relative; background: rgba(0,0,0,0.5); }
+.battery .cells::after { content: ''; position: absolute; right: -8px; top: 30%; width: 5px; height: 40%; background: var(--ink); border-radius: 0 2px 2px 0; }
+.battery .cells i { width: 0.75em; height: 1.1em; background: var(--good); border-radius: 2px; transition: background 0.3s, opacity 0.3s; }
+.battery .cells i.off { opacity: 0.12; }
+.battery.mid .cells i { background: var(--honey); }
+.battery.low .cells i { background: var(--bad); }
+.battery.low .cells { animation: pulseA 0.6s ease-in-out infinite; }
+.battery .secs { min-width: 1.6em; text-align: right; }
+.battery.idle { opacity: 0; }
+
+/* pixel sprites standing in for emoji (js/sprites.js) */
+img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-rendering: crisp-edges; vertical-align: -0.18em; display: inline-block; }
