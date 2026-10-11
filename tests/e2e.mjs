@@ -78,7 +78,10 @@ const phoneScreens = new Set();
 let shot = 2;
 
 for (let g = 0; g < GAMES; g++) {
+  // game settings live in the lobby's ⚙️ Settings pop-up
+  await tv.click('[data-act="settings"]');
   await tv.click('[data-act="length"][data-len="long"]');
+  await tv.click('.settings-panel [data-act="settings"]');
   if (g === 0) {
     // first phone to join is the VIP and starts the night from their phone
     await phones[0].waitForSelector('[data-vip="start"]:not([disabled])');

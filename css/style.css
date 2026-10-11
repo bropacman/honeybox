@@ -749,3 +749,17 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 :root[data-fx="intense"] { --fx-layer: 1; --fx-dark: 1; --fx-grain: 0.12; --fx-vig: 1; }
 :root[data-fx="off"] { --fx-layer: 0; --fx-dark: 0; --fx-grain: 0; --fx-vig: 0.25; }
 .fx-levels button.sel { border-color: var(--honey); color: var(--honey); }
+
+/* lobby: campers around the campfire; settings live in a pop-up */
+.campfire { display: flex; flex-direction: column; align-items: center; gap: 0.2em; margin: 0.4em 0 0.8em; }
+.campfire .campers { justify-content: center; }
+.campfire .camper { font-size: 2.6em; animation: camperBob 2.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.37s); }
+.campfire .camper span { font-size: 0.32em; }
+.campfire .camper img.px { width: 1.3em; height: 1.3em; }
+.campfire .fire { font-size: 3em; filter: drop-shadow(0 0 24px rgba(255, 150, 40, 0.8)); animation: fireFlicker 0.9s steps(2) infinite; }
+.campfire .fire img.px { width: 1.2em; height: 1.2em; }
+@keyframes camperBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes fireFlicker { 50% { transform: scale(1.06) rotate(2deg); filter: drop-shadow(0 0 34px rgba(255, 120, 30, 0.9)); } }
+.lobby-summary { color: var(--muted); display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; text-transform: capitalize; }
+.settings-panel { width: min(80vw, 1100px); gap: 0.7em; }
+.settings-panel .big-btn { align-self: center; }

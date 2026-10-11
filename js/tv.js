@@ -308,6 +308,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'cat') game.toggleCategory(b.dataset.cat);
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'players') { playersOpen = !playersOpen; render(); }
+    if (act === 'settings') { settingsOpen = !settingsOpen; render(); }
     if (act === 'retro') { fx.toggleRetro(); render(); }
     if (act === 'fxlevel') { fx.setLevel(FX_LEVELS[(FX_LEVELS.indexOf(fx.level) + 1) % FX_LEVELS.length]); render(); }
     if (act === 'fxset') { fx.setLevel(b.dataset.l); render(); }
@@ -498,27 +499,13 @@ export function startTV(root, { resume = null } = {}) {
             ${ready ? '' : '<p class="muted">Opening the cabin…</p>'}
           </div>
           <div class="lobby-side">
-            <h2>Campers (${S.players.length}/8)</h2>
-            <div class="campers">${S.players.map(p => `<button class="camper ${p.connected ? '' : 'off'}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
-            <div class="cat-toggles">Categories:
-              ${Object.keys(CATEGORIES).filter(c => c !== 'wild').map(c => `<button data-act="cat" data-cat="${c}" class="${(S.offCats || []).includes(c) ? 'off' : 'sel'}">${CATEGORIES[c].emoji} ${CATEGORIES[c].name}</button>`).join('')}
+            <h2>Around the campfire (${S.players.length}/8)</h2>
+            <div class="campfire">
+              <div class="campers">${S.players.map((p, i) => `<button class="camper ${p.connected ? '' : 'off'}" style="--i:${i}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
+              <div class="fire">🔥</div>
             </div>
-            <div class="lengths">Timers:
-              ${Object.keys(TIMERS).map(t => `<button data-act="timers" data-t="${t}" class="${S.timers === t ? 'sel' : ''}">${t}</button>`).join('')}
-            </div>
-            <div class="lengths">Game length:
-              ${Object.keys(LENGTHS).map(l => `<button data-act="length" data-len="${l}" class="${S.length === l ? 'sel' : ''}">${l}</button>`).join('')}
-            </div>
-            <div class="voice-row fx-levels"><b>Effects</b> <span class="muted">background effects, darkness and grain:</span>
-              ${FX_LEVELS.map(l => `<button data-act="fxset" data-l="${l}" class="${fx.level === l ? 'sel' : ''}">${l}</button>`).join('')}
-            </div>
-            <div class="voice-row"><b>Narrator</b> <span class="muted">reads the game out loud.</span> Voice:
-              <select id="voice">${voiceOptions().map(v => `<option value="${esc(v.name)}" ${v.name === voiceSettings().voice ? 'selected' : ''}>${esc(v.label)}</option>`).join('') || '<option>Default</option>'}</select>
-              <button data-act="testvoice">▶ Hear it</button>
-            </div>
-            <div class="voice-row">Style:
-              ${Object.keys(STYLES).map(k => `<button data-act="style" data-style="${k}" class="${voiceSettings().style === k ? 'sel' : ''}">${STYLES[k].label}</button>`).join('')}
-            </div>
+            <p class="lobby-summary">${esc(S.length)} game · ${esc(S.timers)} timers · ${Object.keys(CATEGORIES).filter(c => c !== 'wild' && !(S.offCats || []).includes(c)).length} categories · effects ${esc(fx.level)}
+              <button data-act="settings">⚙️ Settings</button></p>
             <button class="big-btn" data-act="start" ${S.players.length >= MIN_PLAYERS ? '' : 'disabled'}>Start the night 🔥</button>
             <p class="muted small">Best with 3–8 players. ${S.players[0] ? `⭐ VIP ${esc(game.player(game.vipId())?.name || '')} can also start, pause and skip from their phone.` : 'The first player to join becomes the ⭐ VIP.'}</p>
             <p class="muted small">Space = pause · N = skip · click a camper to remove them</p>
@@ -903,6 +890,33 @@ export function startTV(root, { resume = null } = {}) {
     </div>`;
   }
 
+  // ⚙️ lobby settings live in a pop-up so the lobby itself stays about the campers
+  let settingsOpen = false;
+  function settingsPanel() {
+    const S = game.S;
+    return `<div class="players-panel settings-panel"><h2>⚙️ Settings</h2>
+            <div class="cat-toggles">Categories:
+              ${Object.keys(CATEGORIES).filter(c => c !== 'wild').map(c => `<button data-act="cat" data-cat="${c}" class="${(S.offCats || []).includes(c) ? 'off' : 'sel'}">${CATEGORIES[c].emoji} ${CATEGORIES[c].name}</button>`).join('')}
+            </div>
+            <div class="lengths">Timers:
+              ${Object.keys(TIMERS).map(t => `<button data-act="timers" data-t="${t}" class="${S.timers === t ? 'sel' : ''}">${t}</button>`).join('')}
+            </div>
+            <div class="lengths">Game length:
+              ${Object.keys(LENGTHS).map(l => `<button data-act="length" data-len="${l}" class="${S.length === l ? 'sel' : ''}">${l}</button>`).join('')}
+            </div>
+            <div class="voice-row fx-levels"><b>Effects</b> <span class="muted">background effects, darkness and grain:</span>
+              ${FX_LEVELS.map(l => `<button data-act="fxset" data-l="${l}" class="${fx.level === l ? 'sel' : ''}">${l}</button>`).join('')}
+            </div>
+            <div class="voice-row"><b>Narrator</b> <span class="muted">reads the game out loud.</span> Voice:
+              <select id="voice">${voiceOptions().map(v => `<option value="${esc(v.name)}" ${v.name === voiceSettings().voice ? 'selected' : ''}>${esc(v.label)}</option>`).join('') || '<option>Default</option>'}</select>
+              <button data-act="testvoice">▶ Hear it</button>
+            </div>
+            <div class="voice-row">Style:
+              ${Object.keys(STYLES).map(k => `<button data-act="style" data-style="${k}" class="${voiceSettings().style === k ? 'sel' : ''}">${STYLES[k].label}</button>`).join('')}
+            </div>
+      <button class="big-btn" data-act="settings">Done</button></div>`;
+  }
+
   // 👥 host menu: everyone's connection status; merge a re-joined player into their old seat
   let playersOpen = false;
   function playersPanel() {
@@ -951,6 +965,7 @@ export function startTV(root, { resume = null } = {}) {
         ${captive(S)}
         ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
         ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
+        ${settingsOpen && S.phase === 'lobby' ? settingsPanel() : ''}
       </div>`;
     spritify(root);
     if (S.phase === 'intro' || S.phase === 'end') showSteps(true);
