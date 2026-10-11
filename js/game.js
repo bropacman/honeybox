@@ -102,6 +102,9 @@ export const SPIN_MS = 3800; // the turn wheel's spin
 export const REVEAL_STEP = 3600; // Sketchy Woods: time per answer in the reveal
 export const revealAt = (n) => 900 + n * CHIP_MS;
 
+const cleanStrokes = (strokes) => strokes.slice(0, 400).map(st => ({
+  c: String(st.c).slice(0, 9), w: Math.min(40, Number(st.w) || 10), p: (st.p || []).slice(0, 4000).map(Number)
+}));
 const shuffle = (arr) => {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -784,13 +787,25 @@ export class Game {
     this.go('drawDraw', TIMES.drawDraw);
   }
 
+  // work in progress from a phone; used if the timer runs out before they hit Done
+  draftDrawing(pid, strokes) {
+    if (this.S.phase !== 'drawDraw' || !Array.isArray(strokes)) return;
+    this.drafts = this.drafts || {};
+    this.drafts[pid] = strokes;
+  }
+
+  // the TV finished revealing the final standings; phones can now show each player's place
+  revealEnd() {
+    if (this.S.phase !== 'end' || this.S.endRevealed) return;
+    this.S.endRevealed = true;
+    this.changed();
+  }
+
   submitDrawing(pid, strokes) {
     const S = this.S;
     if (S.phase !== 'drawDraw' || !S.mg.prompts[pid] || S.mg.drawings[pid]) return;
     if (!Array.isArray(strokes)) return;
-    S.mg.drawings[pid] = strokes.slice(0, 400).map(st => ({
-      c: String(st.c).slice(0, 9), w: Math.min(40, Number(st.w) || 10), p: (st.p || []).slice(0, 4000).map(Number)
-    }));
+    S.mg.drawings[pid] = cleanStrokes(strokes);
     this.changed();
     this.checkAllDone();
   }
@@ -798,6 +813,11 @@ export class Game {
   startFibs() {
     const S = this.S;
     const mg = S.mg;
+    // the timer ran out: half-finished drawings still count
+    for (const [pid, strokes] of Object.entries(this.drafts || {})) {
+      if (mg.prompts[pid] && !mg.drawings[pid] && strokes.length) mg.drawings[pid] = cleanStrokes(strokes);
+    }
+    this.drafts = {};
     const lostId = S.lost?.pid;
     const others = shuffle(Object.keys(mg.drawings).filter(id => id !== lostId && mg.drawings[id].length));
     // judge everyone's drawing (captured player first); with a big group the extras go to a gallery
@@ -886,22 +906,38 @@ export class Game {
       else for (const owner of o.owners) this.addScore(owner, 300);
     }
     if (S.lost && artist === S.lost.pid) mg.lostOk = found > 0;
-    const end = (mg.options.length - 1) * REVEAL_STEP;
+    // reveal order: lies nobody fell for flash up together in one quick line, then each lie that fooled
+    // someone gets its own beat, and the truth comes last
+    const fooledBy = (i) => Object.values(mg.votes).filter(v => v === i).length;
+    const lies = mg.options.map((o, i) => i).filter(i => !mg.options[i].real);
+    const misses = lies.filter(i => !fooledBy(i));
+    const hits = shuffle(lies.filter(i => fooledBy(i)));
+    const truth = mg.options.findIndex(o => o.real);
+    mg.revealSeq = [...misses, ...hits, truth];
+    mg.revealAt = {};
+    const beats = [];
+    let t = 0;
+    if (misses.length) {
+      misses.forEach((i, n) => { mg.revealAt[i] = n * 250; });
+      beats.push([0, misses.length === 1 ? `Nobody fell for ${mg.options[misses[0]].text}.` : 'Nobody fell for these.']);
+      t = 1800;
+    }
+    for (const i of hits) {
+      const o = mg.options[i];
+      const by = o.house ? 'our lie' : o.owners.map(id => this.player(id)?.name).filter(Boolean).join(' and ');
+      mg.revealAt[i] = t;
+      beats.push([t, `${o.text}. By ${by}. Fooled ${fooledBy(i)}!`]);
+      t += REVEAL_STEP;
+    }
+    mg.revealAt[truth] = t;
+    beats.push([t, `The real title… ${mg.options[truth].text}!`]);
+    mg.revealEnd = t + 1500;
+    const end = t;
     for (const [pid, i] of Object.entries(mg.votes)) this.emit('mood', { pid, mood: mg.options[i].real ? 'happy' : 'sad', tv: false, delay: end });
     this.emit('mood', { pid: artist, mood: found ? 'happy' : 'sad', tv: true, delay: end + 800 });
     setTimeout(() => this.emit('sfx', found ? 'good' : 'bad'), end * k);
-    // read each answer out loud, lies first and the truth last, in step with the TV
-    mg.revealSeq = mg.options.map((o, i) => i).sort((a, b) => (mg.options[a].real ? 1 : 0) - (mg.options[b].real ? 1 : 0));
-    mg.revealSeq.forEach((i, step) => {
-      const o = mg.options[i];
-      const fooled = Object.values(mg.votes).filter(v => v === i).length;
-      const by = o.owners.map(id => this.player(id)?.name).filter(Boolean).join(' and ');
-      const line = o.real
-        ? `And the real title is… ${o.text}! Drawn by ${this.player(artist)?.name || 'our artist'}.`
-        : `${o.text}. ${o.house ? 'That one was our lie' : `Written by ${by}`}. ${fooled ? `It fooled ${fooled}!` : 'Nobody fell for it.'}`;
-      setTimeout(() => this.emit('say', line), step * REVEAL_STEP * k);
-    });
-    this.go('drawReveal', (mg.options.length * REVEAL_STEP) / 1000 + 4);
+    for (const [at, line] of beats) setTimeout(() => this.emit('say', line), at * k);
+    this.go('drawReveal', mg.revealEnd / 1000 + 4);
   }
 
   finishMinigame(ok) {
@@ -1015,10 +1051,28 @@ export class Game {
     S.gains = {};
     const ranked = this.ranked();
     S.prize = pick(PRIZES);
-    if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most tickets, and takes home the grand prize: ${S.prize.name}! Archie and Honey approve.`);
-    if (ranked[0]) this.emit('mood', { pid: ranked[0].id, mood: 'happy', tv: true, delay: 1200 });
-    if (ranked.length > 1) this.emit('mood', { pid: ranked[ranked.length - 1].id, mood: 'sad', tv: true, delay: 2200 });
-    this.emit('sfx', 'great');
+    S.endRevealed = false;
+    // Final standings, last place to first. Each narration line reveals its row on the TV (S.endSteps maps
+    // rows to line numbers); numbers in the list are dramatic pauses.
+    const ord = (n) => ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'][n - 1] || `number ${n}`;
+    const lines = ['The sun is coming up. Time for the final standings.', 1500];
+    const steps = { rows: {} };
+    for (let r = ranked.length; r >= 2; r--) {
+      const p = ranked[r - 1];
+      steps.rows[p.id] = lines.length;
+      lines.push(`In ${ord(r)} place… ${p.name}, with ${p.score} tickets.`, 1800);
+    }
+    const win = ranked[0];
+    if (win) {
+      steps.drum = lines.length;
+      lines.push('And the winner of the grand prize is…', 2800);
+      steps.rows[win.id] = lines.length;
+      lines.push(`${win.name}! With ${win.score} tickets!`, 1200);
+      steps.prize = lines.length;
+      lines.push(`${win.name} takes home ${S.prize.name}. Archie and Honey approve.`);
+    }
+    S.endSteps = steps;
+    this.emit('say', lines);
     this.go('end', null);
   }
 
@@ -1190,6 +1244,7 @@ export class Game {
         return { ...wait(b.won ? 'You won it!' : 'Lost it!', `It's ${right}.`, b.won ? '🤑' : '💸'), suspense: true };
       }
       case 'end': {
+        if (!S.endRevealed) return wait('Final standings…', 'Look at the TV!', '🥁');
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return { ...base, screen: 'end', rank, total: S.players.length, prize: rank === 1 ? S.prize : null };
       }

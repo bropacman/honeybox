@@ -126,9 +126,11 @@ for (let g = 0; g < GAMES; g++) {
     await tv.waitForTimeout(60);
   }
   const final = await tv.evaluate(() => window.__honeybox.ranked().map(p => ({ name: p.name, score: p.score })));
-  const endedOk = last.startsWith('end');
+  // the final standings reveal must finish so phones show their places
+  const revealed = last.startsWith('end') && await tv.waitForFunction(() => window.__honeybox.S.endRevealed, null, { timeout: 120000 }).then(() => true, () => false);
+  const endedOk = last.startsWith('end') && revealed;
   summary.games.push({ phases: seen, final, endedOk });
-  console.log(`game ${g + 1}: ${seen.length} phases, ended=${endedOk}`, final);
+  console.log(`game ${g + 1}: ${seen.length} phases, ended=${endedOk}, standingsRevealed=${revealed}`, final);
   if (!endedOk) break;
   if (minigames.size === 3 && g >= 0) break;
   await tv.click('[data-act="again"]');

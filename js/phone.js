@@ -318,7 +318,12 @@ export function startPhone(root) {
     }));
     const canvas = root.querySelector('#pad');
     if (canvas) {
-      pad = drawingPad(canvas);
+      // send the work in progress after each stroke, so a half-finished drawing still counts when time runs out
+      let draftTimer = null;
+      pad = drawingPad(canvas, () => {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => send({ t: 'drawDraft', strokes: pad.strokes }), 400);
+      });
       root.querySelectorAll('[data-ink]').forEach(b => b.addEventListener('click', () => {
         pad.setColor(b.dataset.ink);
         root.querySelectorAll('[data-ink]').forEach(x => x.classList.toggle('sel', x === b));

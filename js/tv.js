@@ -16,7 +16,7 @@ const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
   dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
   triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
-  finalePick: 'tense', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
+  finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
 
 export function savedGame() {
@@ -82,6 +82,7 @@ export function startTV(root, { resume = null } = {}) {
         else game.answer(pid, Number(msg.i));
         break;
       case 'drawing': game.submitDrawing(pid, msg.strokes); break;
+      case 'drawDraft': game.draftDrawing(pid, msg.strokes); break;
       case 'stake': game.stake(pid, Number(msg.i)); break;
       case 'finale': game.chooseFinale(pid, String(msg.choice || '')); break;
       case 'vip': {
@@ -117,14 +118,39 @@ export function startTV(root, { resume = null } = {}) {
     }
   }
 
-  let introShown = 99;
-  // still = re-render: steps already showing appear without replaying their entrance
-  function showIntroSteps(still = false) {
-    document.querySelectorAll('.howto [data-step]').forEach(el => {
-      const on = Number(el.dataset.step) < introShown;
-      if (on && !el.classList.contains('shown') && still) el.classList.add('still');
+  // Narrated reveals (How to Play, final standings): elements with data-step="i" appear as line i starts.
+  // data-fx on a step plays an effect the moment it appears.
+  let stepShown = 99;
+  let musicOverride = null;
+  const FX = {
+    drumroll: () => sfx.drumroll(),
+    winner: () => {
+      sfx.great();
+      musicOverride = 'anthem';
+      setMusic('anthem');
+      const w = game.ranked()[0];
+      if (w) characterSound(w.avatar, 'happy', 300);
+    },
+    done: () => game.revealEnd()
+  };
+  function showSteps(still = false) {
+    document.querySelectorAll('.tv-main [data-step]').forEach(el => {
+      const on = Number(el.dataset.step) < stepShown;
+      if (on && !el.classList.contains('shown')) {
+        if (still) el.classList.add('still');
+        else if (el.dataset.fx) FX[el.dataset.fx]?.();
+      }
+      if (on && el.dataset.fx === 'done') FX.done();
       el.classList.toggle('shown', on);
     });
+  }
+  function cueLines(lines) {
+    stepShown = 0;
+    const cue = (i) => { stepShown = Math.max(stepShown, i + 1); showSteps(); };
+    if (say(lines, cue)) return;
+    // no voice: reveal on a timer instead (pauses count, lines get 3 seconds each)
+    let t = 0;
+    lines.forEach((line, i) => { setTimeout(() => cue(i), t); t += typeof line === 'number' ? line : 3000; });
   }
 
   game.on((type, data) => {
@@ -135,11 +161,7 @@ export function startTV(root, { resume = null } = {}) {
     } else if (type === 'sfx') sfx[data]?.();
     else if (type === 'say') {
       if (Array.isArray(data)) {
-        // reveal each How to Play step as the narrator reaches it (all at once if there's no voice)
-        introShown = 0;
-        const cue = (i) => { introShown = Math.max(introShown, i + 1); showIntroSteps(); };
-        if (!say(data, cue)) introShown = 99;
-        showIntroSteps();
+        cueLines(data);
       } else say(data);
     }
     else if (type === 'mood') {
@@ -182,7 +204,8 @@ export function startTV(root, { resume = null } = {}) {
       if (s !== lastSec && s > 0) (s <= 3 ? sfx.tick() : sfx.clock());
     } else if (hurriedPhase && !answering) {
       hurriedPhase = null;
-      setMusic(hurryOn ? 'panic' : (MUSIC[S.phase] || 'none'));
+      if (S.phase !== 'end') musicOverride = null;
+    setMusic(hurryOn ? 'panic' : (musicOverride || MUSIC[S.phase] || 'none'));
     }
     lastSec = s;
   }, 200);
@@ -217,7 +240,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
-    if (act === 'mute') { setMuted(!isMuted()); if (isMuted()) introShown = 99; render(); }
+    if (act === 'mute') { setMuted(!isMuted()); if (isMuted()) stepShown = 99; render(); }
     if (act === 'again') game.restart();
     if (act === 'style') { setStyle(b.dataset.style); stopSpeaking(); say(STYLES[b.dataset.style].sample); render(); }
     if (act === 'testvoice') { stopSpeaking(); say(STYLES[voiceSettings().style].sample); }
@@ -584,8 +607,8 @@ export function startTV(root, { resume = null } = {}) {
             const voters = Object.entries(mg.votes).filter(([, v]) => v === i).map(([id]) => game.player(id)).filter(Boolean);
             const owners = o.owners.map(id => game.player(id)).filter(Boolean);
             const by = o.real ? `the truth, drawn by ${artist?.avatar} ${esc(artist?.name)}` : o.house ? 'a house lie' : `lie by ${owners.map(p => `${p.avatar} ${esc(p.name)}`).join(', ')}`;
-            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${k * REVEAL_STEP}ms"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.length ? `fooled: ${voters.map(p => p.avatar).join(' ')}` : '—'}</span></div>`;
-          }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line late-n" style="--at:${order.length * REVEAL_STEP}ms">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
+            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${mg.revealAt?.[i] ?? k * REVEAL_STEP}ms"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.length ? `fooled: ${voters.map(p => p.avatar).join(' ')}` : '—'}</span></div>`;
+          }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line late-n" style="--at:${mg.revealEnd ?? order.length * REVEAL_STEP}ms">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
         }
         return `<div class="drawful">
           <div class="art"><canvas id="art" width="640" height="640"></canvas><p>by ${avatar(artist)}${S.lost && artist?.id === S.lost.pid ? ' <span class="lost-tag">captured</span>' : ''}</p></div>
@@ -645,13 +668,22 @@ export function startTV(root, { resume = null } = {}) {
         </div>`;
       }
       case 'end': {
+        // final standings, revealed last place to first in step with the narrator
         const r = game.ranked();
-        return `<div class="center">
-          <div class="emoji-xl bounce">🌄🏆🐕🐕</div>
-          <h1>${r[0] ? `${r[0].avatar} ${esc(r[0].name)} survived the night!` : 'Dawn breaks.'}</h1>
-          ${r[0] && S.prize ? `<div class="grand-prize"><span class="emoji-xl">${S.prize.emoji}</span><div><small>🎟️ Grand prize at the arcade counter</small><b>${esc(S.prize.name)}</b></div></div>` : ''}
-          ${scoreboard(true)}
-          <div class="row"><button class="big-btn" data-act="again">Play again (same campers)</button><button data-act="new">New room</button></div>
+        const st = S.endSteps || { rows: {} };
+        const last = st.prize ?? 0;
+        const rows = r.slice().reverse().map(p => {
+          const rank = r.indexOf(p) + 1;
+          return `<div class="final-row ${rank === 1 ? 'winner' : ''}" data-step="${st.rows[p.id] ?? 0}" ${rank === 1 ? 'data-fx="winner"' : ''}>
+            <span class="f-rank">#${rank}</span><span class="f-av">${p.avatar}</span><span class="f-nm">${esc(p.name)}</span><span class="f-pts">${p.score} 🎟️</span></div>`;
+        });
+        // the drumroll line sits right above the winner's row
+        if (st.drum != null) rows.splice(rows.length - 1, 0, `<p class="drum-line" data-step="${st.drum}" data-fx="drumroll">🥁 And the winner of the grand prize is…</p>`);
+        return `<div class="center finale-end">
+          <div data-step="0"><p class="muted big">🌅 Sunrise</p><h1 class="final-title">FINAL STANDINGS</h1></div>
+          <div class="final-rows">${rows.join('')}</div>
+          ${r[0] && S.prize ? `<div class="grand-prize" data-step="${last}" data-fx="done"><span class="emoji-xl">${S.prize.emoji}</span><div><small>🎟️ ${esc(r[0].name)} wins the grand prize</small><b>${esc(S.prize.name)}</b></div></div>` : ''}
+          <div class="row" data-step="${last}"><button class="big-btn" data-act="again">Play again (same campers)</button><button data-act="new">New room</button></div>
         </div>`;
       }
       default: return '';
@@ -663,7 +695,8 @@ export function startTV(root, { resume = null } = {}) {
     const splashKey = `${S.phase}:${S.turnIdx}:${S.watch?.streak}:${S.watch?.spot}:${S.mg?.type}:${S.mg?.round}:${S.mg?.qi}`;
     const splash = splashKey !== lastSplash ? splashFor(S) : '';
     if (splash) { lastSplash = splashKey; sfx.whoosh(); }
-    setMusic(hurryOn ? 'panic' : (MUSIC[S.phase] || 'none'));
+    if (S.phase !== 'end') musicOverride = null;
+    setMusic(hurryOn ? 'panic' : (musicOverride || MUSIC[S.phase] || 'none'));
     const showSide = !['lobby', 'end', 'scores', 'intro'].includes(S.phase);
     root.innerHTML = `
       <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''}">
@@ -678,7 +711,7 @@ export function startTV(root, { resume = null } = {}) {
         </div>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
       </div>`;
-    if (S.phase === 'intro') showIntroSteps(true);
+    if (S.phase === 'intro' || S.phase === 'end') showSteps(true);
 
     if (S.phase === 'lobby') {
       const el = root.querySelector('#qr');

@@ -130,6 +130,8 @@ const MOODS = {
   quiz: { root: 65.4, bpm: 100, whine: 0, cutoff: 520, vol: 0.05 },
   dread: { root: 41.2, bpm: 0, whine: 1, cutoff: 260, vol: 0.08 },
   sunrise: { root: 73.4, bpm: 88, whine: 0.25, cutoff: 700, vol: 0.06 },
+  // final standings: a slow, low heartbeat building to the winner
+  standings: { root: 49, bpm: 56, whine: 0.35, cutoff: 480, vol: 0.07 },
   // the last 10 seconds: higher, faster, more whine
   panic: { root: 82.4, bpm: 150, whine: 1, cutoff: 900, vol: 0.08 }
 };
@@ -145,6 +147,7 @@ export function setMusic(mode) {
     setTimeout(() => old.oscs.forEach(o => { try { o.stop(); } catch (e) { /* stopped */ } }), 2500);
   }
   music = null;
+  if (mode === 'anthem' && !muted) { music = anthem(); return; }
   const m = MOODS[mode];
   if (!m || muted) return;
   const master = ctx.createGain();
@@ -204,6 +207,45 @@ export function setMusic(mode) {
     }, 60000 / m.bpm);
   }
   music = { mode, master, oscs, timer };
+}
+
+// The winner's anthem: a bright brassy fanfare loop (I - IV - V - I in D major) with a marching drum.
+function anthem() {
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, ctx.currentTime);
+  master.gain.setTargetAtTime(0.09, ctx.currentTime, 0.3);
+  master.connect(ctx.destination);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 2400;
+  filter.connect(master);
+  const chords = [[146.83, 185.0, 220.0], [196.0, 246.94, 293.66], [220.0, 277.18, 329.63], [146.83, 185.0, 220.0]];
+  const tune = [[293.66, 369.99, 440.0, 587.33], [392.0, 493.88, 587.33, 493.88], [440.0, 554.37, 659.25, 554.37], [587.33, 440.0, 369.99, 293.66]];
+  const note = (f, t, len, type, vol) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(vol * 0.5, t + len * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(filter);
+    o.start(t);
+    o.stop(t + len + 0.05);
+  };
+  let bar = 0;
+  const playBar = () => {
+    if (muted) return;
+    const t = ctx.currentTime + 0.05;
+    const n = bar % 4;
+    chords[n].forEach(f => { note(f, t, 1.9, 'sawtooth', 0.05); note(f / 2, t, 1.9, 'triangle', 0.07); });
+    tune[n].forEach((f, i) => note(f, t + i * 0.5, 0.42, 'square', 0.035));
+    [0, 0.5, 1, 1.5].forEach((d, i) => tone(i % 2 ? 160 : 90, 0.18, { delay: t - ctx.currentTime + d, type: 'sine', vol: i % 2 ? 0.05 : 0.12, slide: -40 }));
+    bar++;
+  };
+  playBar();
+  return { mode: 'anthem', master, oscs: [], timer: setInterval(playBar, 2000) };
 }
 
 // ---------- character voices ----------
@@ -377,8 +419,11 @@ function chunks(text) {
 // text can be a string or a list of lines; onLine(i) fires as line i starts being spoken
 export function say(text, onLine) {
   if (muted || !window.speechSynthesis || !text) return false;
+  // a number in the list is a pause, in milliseconds
   (Array.isArray(text) ? text : [text]).forEach((line, i) => {
-    chunks(line).forEach((t, j) => queue.push({ text: t, cue: j === 0 && onLine ? () => onLine(i) : null }));
+    const cue = onLine ? () => onLine(i) : null;
+    if (typeof line === 'number') queue.push({ pause: line, cue });
+    else chunks(line).forEach((t, j) => queue.push({ text: t, cue: j === 0 ? cue : null }));
   });
   if (!current) speakNext();
   return true;
@@ -388,6 +433,13 @@ function speakNext() {
   const item = queue.shift();
   if (!item || muted) { current = null; return; }
   const { text, cue } = item;
+  if (item.pause) {
+    const token = {};
+    current = token;
+    cue?.();
+    setTimeout(() => { if (current === token) { current = null; speakNext(); } }, item.pause);
+    return;
+  }
   const u = new SpeechSynthesisUtterance(text);
   const name = voiceSettings().voice;
   const v = englishVoices().find(x => x.name === name);

@@ -51,7 +51,7 @@ export function drawStrokes(canvas, strokes, { animate = false, onDone } = {}) {
 }
 
 // Attaches a drawing pad to a canvas. Returns { strokes, undo, clear, setColor, setWidth }.
-export function drawingPad(canvas) {
+export function drawingPad(canvas, onChange = () => {}) {
   const strokes = [];
   let color = INK[0];
   let width = 10;
@@ -84,15 +84,15 @@ export function drawingPad(canvas) {
     p.push(x, y);
     redraw();
   });
-  const end = () => { current = null; };
+  const end = () => { if (current) onChange(); current = null; };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
   canvas.addEventListener('pointerleave', end);
 
   return {
     strokes,
-    undo() { strokes.pop(); redraw(); },
-    clear() { strokes.length = 0; redraw(); },
+    undo() { strokes.pop(); redraw(); onChange(); },
+    clear() { strokes.length = 0; redraw(); onChange(); },
     setColor(c) { color = c; },
     setWidth(w) { width = w; },
     // used by the test bot

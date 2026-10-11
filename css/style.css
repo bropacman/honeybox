@@ -9,6 +9,7 @@
   --honey2: #ffcf5c;
   --good: #5fd18a;
   --bad: #ff5d4f;
+  --hide: #5aa9e6;
   --high: #3f8fe0;
   --low: #e07a3f;
   --same: #f2b134;
@@ -484,8 +485,8 @@ body.is-phone .moon { display: none; }
 .choice-card { width: 26vw; padding: 1.2em; border-radius: 24px; background: var(--panel); border: 4px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 0.3em; font-size: 1.3em; }
 .choice-card b { font-size: 1.4em; }
 .choice-card small { color: var(--muted); }
-.choice-card.bank { border-color: var(--good); }
-.choice-card.keep { border-color: var(--bad); }
+.choice-card.keep { border-color: var(--good); }
+.choice-card.bank { border-color: var(--hide); }
 .choice-card.chosen { animation: verdict 0.7s cubic-bezier(.2,1.6,.4,1) both; box-shadow: 0 0 40px rgba(242, 177, 52, 0.6); }
 .choice-card.faded { opacity: 0.35; }
 .choice-card .pred { min-height: 1.6em; }
@@ -511,8 +512,8 @@ body.is-phone .moon { display: none; }
 .tot-btn .letter { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); }
 .tot-btn small { font-size: 0.6em; color: var(--muted); }
 .tot-btn.sel { background: var(--honey); color: #2b1a00; opacity: 1; }
-.tot-btn.bank { border-color: var(--good); }
-.tot-btn.keep { border-color: var(--bad); }
+.tot-btn.keep { border-color: var(--good); }
+.tot-btn.bank { border-color: var(--hide); }
 .tot-btns .or { text-align: center; color: var(--honey); font-family: 'Creepster', cursive; font-size: 1.4em; }
 .cat-em { font-size: 2em; line-height: 1; }
 
@@ -526,9 +527,9 @@ body.is-phone .moon { display: none; }
 .steps { list-style: none; padding: 0; margin: 0.8em 0 0; display: flex; flex-direction: column; gap: 0.55em; max-width: 52em; text-align: left; }
 .steps li { display: flex; gap: 0.8em; align-items: center; background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 0.5em 1em; font-size: 1.05em; font-weight: 600; }
 /* each step stays hidden until the narrator reaches it */
-.howto [data-step] { opacity: 0; transition: opacity 0.2s; }
-.howto [data-step].shown { opacity: 1; animation: lateIn 0.5s ease-out both; }
-.howto [data-step].shown.still { animation: none; }
+.tv-main [data-step] { opacity: 0; transition: opacity 0.2s; }
+.tv-main [data-step].shown { opacity: 1; animation: lateIn 0.5s ease-out both; }
+.tv-main [data-step].shown.still { animation: none; }
 .steps li span { font-size: 1.8em; }
 .steps b { color: var(--honey2); }
 
@@ -561,3 +562,15 @@ body.is-phone .moon { display: none; }
 .grand-prize div { display: flex; flex-direction: column; text-align: left; }
 .grand-prize small { color: var(--muted); }
 .grand-prize b { font-size: 1.5em; color: var(--honey2); }
+
+/* final standings */
+.finale-end { gap: 0.4em; }
+.final-title { font-size: 3.2em; letter-spacing: 0.08em; margin: 0; color: var(--honey2); text-shadow: 0 0 30px rgba(242, 177, 52, 0.6); }
+.final-rows { display: flex; flex-direction: column; gap: 0.45em; min-width: 40vw; }
+.final-row { display: grid; grid-template-columns: 2.6em 1.6em 1fr auto; align-items: center; gap: 0.6em; background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 0.35em 1em; font-size: 1.5em; font-weight: 800; }
+.final-row .f-rank { color: var(--muted); }
+.final-row.winner { font-size: 2.2em; border: 4px solid var(--honey); box-shadow: 0 0 60px rgba(242, 177, 52, 0.7); }
+.final-row.winner.shown:not(.still) { animation: verdict 0.9s cubic-bezier(.2,1.6,.4,1) both; }
+.final-row.winner .f-rank { color: var(--honey2); }
+.drum-line { font-size: 1.6em; font-weight: 800; margin: 0.2em 0; }
+.drum-line.shown:not(.still) { animation: lateIn 0.5s ease-out both, pulseA 0.5s ease-in-out 0.5s 5; }
