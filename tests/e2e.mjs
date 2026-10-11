@@ -143,12 +143,43 @@ await phones[1].reload();
 await phones[1].waitForTimeout(3000);
 const after = await tv.evaluate(() => ({ n: window.__honeybox.S.players.length, connected: window.__honeybox.S.players.filter(p => p.connected).length }));
 
+// new-device check (game is over but not in the lobby): a phone drops, comes back on a "new device"
+// (fresh storage) and claims its old seat; then another drops, rejoins as new, and the host merges it back
+const tvState = () => tv.evaluate(() => ({ n: window.__honeybox.S.players.length, connected: window.__honeybox.S.players.filter(p => p.connected).length }));
+const newDevice = async (extra) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  const p = await ctx.newPage();
+  p.on('pageerror', e => errors.push(`newdevice: ${e.message}`));
+  await p.goto(`${base}?room=${code}&${peer}&bot=1${extra}`);
+  return p;
+};
+await tv.click('[data-act="start"]');
+await tv.waitForFunction(() => window.__honeybox.S.phase !== 'lobby', null, { timeout: 30000 });
+const seats = (await tvState()).n;
+await phones[2].context().close();
+await tv.waitForFunction(() => window.__honeybox.S.players.some(p => !p.connected), null, { timeout: 30000 });
+await newDevice('&botclaim=1');
+await tv.waitForFunction(() => window.__honeybox.S.players.every(p => p.connected), null, { timeout: 30000 }).catch(() => {});
+const claimed = await tvState();
+await phones[0].context().close();
+await tv.waitForFunction(() => window.__honeybox.S.players.some(p => !p.connected), null, { timeout: 30000 });
+await newDevice('');
+await tv.waitForFunction(n => window.__honeybox.S.players.length === n + 1, seats, { timeout: 30000 }).catch(() => {});
+const joinedNew = await tvState();
+await tv.click('[data-act="players"]');
+await tv.selectOption('select[data-merge]', { index: 1 });
+await tv.waitForTimeout(1000);
+const merged = await tvState();
+summary.newDevice = { claimed, joinedNew, merged };
+const newDeviceOk = claimed.n === seats && claimed.connected === seats && joinedNew.n === seats + 1 && merged.n === seats && merged.connected === seats;
+console.log('new device:', JSON.stringify(summary.newDevice), newDeviceOk ? 'OK' : 'FAILED');
+
 summary.minigamesSeen = [...minigames];
 summary.phoneScreens = [...phoneScreens];
 summary.reconnect = { playersBefore: before, after };
 writeFileSync(join(OUT, 'summary.json'), JSON.stringify(summary, null, 2));
 
-const ok = summary.games.every(g => g.endedOk) && errors.length === 0;
+const ok = summary.games.every(g => g.endedOk) && newDeviceOk && errors.length === 0;
 console.log('minigames seen:', summary.minigamesSeen.join(', '));
 console.log('phone screens:', summary.phoneScreens.join(', '));
 console.log('reconnect:', JSON.stringify(summary.reconnect));

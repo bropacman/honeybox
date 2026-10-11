@@ -202,6 +202,21 @@ export class Game {
     return true;
   }
 
+  // A player came back on a new device and joined as someone new: fold the new player into their old seat
+  // (the old seat keeps its score and turns; anything the new one earned carries over).
+  mergePlayer(newId, oldId) {
+    const S = this.S;
+    const nw = this.player(newId);
+    const old = this.player(oldId);
+    if (!nw || !old || newId === oldId) return false;
+    S.players = S.players.filter(p => p.id !== newId);
+    old.score += nw.score;
+    old.connected = true;
+    this.changed();
+    this.checkAllDone();
+    return true;
+  }
+
   kick(id) {
     if (this.S.phase !== 'lobby') return;
     this.S.players = this.S.players.filter(p => p.id !== id);

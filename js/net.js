@@ -22,6 +22,9 @@ export function peerOptions() {
   return { ...base, host, port: Number(port) || 9000, path: '/', secure: false };
 }
 
+const HEARTBEAT_MS = 4000;
+const HEARTBEAT_DEAD = 20000;
+
 export function newRoomCode() {
   const letters = 'BCDFGHJKLMNPQRSTVWXZ';
   let code = '';
@@ -39,12 +42,20 @@ export function startHost(code, { onReady, onData, onClose, onFatal }) {
     peer = new Peer(PREFIX + code, peerOptions());
     peer.on('open', () => { attempts = 0; onReady?.(code); });
     peer.on('connection', (conn) => {
-      conn.on('open', () => conns.set(conn.connectionId, conn));
-      conn.on('data', (msg) => onData(conn.connectionId, msg));
+      conn.on('open', () => { conn.lastSeen = Date.now(); conns.set(conn.connectionId, conn); });
+      conn.on('data', (msg) => {
+        conn.lastSeen = Date.now();
+        if (msg?.t === 'ping') return;
+        onData(conn.connectionId, msg);
+      });
+      let gone = false;
       const closed = () => {
+        if (gone) return;
+        gone = true;
         if (conns.get(conn.connectionId) === conn) conns.delete(conn.connectionId);
         onClose(conn.connectionId);
       };
+      conn.dead = closed;
       conn.on('close', closed);
       conn.on('error', closed);
     });
@@ -65,6 +76,16 @@ export function startHost(code, { onReady, onData, onClose, onFatal }) {
     });
   }
   open();
+
+  // Heartbeat: a phone that drops off Wi-Fi often never sends a "close", so ping everyone and
+  // treat a phone that has been silent for 20 seconds as gone (it rejoins on its own when it's back)
+  setInterval(() => {
+    const now = Date.now();
+    for (const conn of [...conns.values()]) {
+      if (now - (conn.lastSeen || now) > HEARTBEAT_DEAD) { try { conn.close(); } catch (e) { /* closed */ } conn.dead?.(); continue; }
+      if (conn.open) { try { conn.send({ t: 'ping' }); } catch (e) { /* retry next beat */ } }
+    }
+  }, HEARTBEAT_MS);
 
   return {
     send(connId, msg) {
@@ -125,11 +146,16 @@ export function startClient(code, { onOpen, onData, onStatus }) {
     const timeout = setTimeout(() => { if (!c.open) { c.close(); retry(500); } }, 8000);
     c.on('open', () => {
       clearTimeout(timeout);
+      c.lastSeen = Date.now();
       notFound = 0;
       onStatus?.('open');
       onOpen?.();
     });
-    c.on('data', onData);
+    c.on('data', (msg) => {
+      c.lastSeen = Date.now();
+      if (msg?.t === 'ping') return;
+      onData(msg);
+    });
     c.on('close', () => {
       clearTimeout(timeout);
       if (conn === c) { conn = null; onStatus?.('connecting'); retry(1500); }
@@ -141,6 +167,19 @@ export function startClient(code, { onOpen, onData, onStatus }) {
     if (document.visibilityState === 'visible' && !(conn && conn.open)) retry(100);
   };
   document.addEventListener('visibilitychange', onVisible);
+  // ping the TV; if it has gone quiet (laptop slept, TV page reloaded), reconnect
+  const beat = setInterval(() => {
+    if (stopped || !conn?.open) return;
+    if (Date.now() - (conn.lastSeen || Date.now()) > HEARTBEAT_DEAD) {
+      const c = conn;
+      conn = null;
+      try { c.close(); } catch (e) { /* closed */ }
+      onStatus?.('connecting');
+      retry(500);
+      return;
+    }
+    try { conn.send({ t: 'ping' }); } catch (e) { /* next beat */ }
+  }, HEARTBEAT_MS);
   connect();
 
   return {
@@ -154,6 +193,7 @@ export function startClient(code, { onOpen, onData, onStatus }) {
     stop() {
       stopped = true;
       clearTimeout(retryTimer);
+      clearInterval(beat);
       document.removeEventListener('visibilitychange', onVisible);
       conn?.close();
       peer?.destroy();

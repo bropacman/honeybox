@@ -54,6 +54,28 @@ export function startTV(root, { resume = null } = {}) {
     }
   });
 
+  // point a phone connection at a player seat and tell the phone to remember that id
+  function seat(connId, id) {
+    const prev = connToPlayer.get(connId);
+    if (prev && prev !== id) playerToConn.delete(prev);
+    const old = playerToConn.get(id);
+    if (old && old !== connId) { connToPlayer.delete(old); net.drop(old); }
+    connToPlayer.set(connId, id);
+    playerToConn.set(id, connId);
+    net.send(connId, { t: 'adopt', pid: id });
+    lastSent.delete(id);
+    sendViews(true);
+  }
+
+  // host menu: someone rejoined as a new player -> merge them back into their old seat
+  function mergeInto(newId, oldId) {
+    const conn = playerToConn.get(newId);
+    if (!game.mergePlayer(newId, oldId)) return;
+    playerToConn.delete(newId);
+    if (conn) seat(conn, oldId);
+    toastTV(`Merged: welcome back, ${game.player(oldId)?.name}!`);
+  }
+
   function handle(connId, msg) {
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'hello') {
@@ -61,6 +83,12 @@ export function startTV(root, { resume = null } = {}) {
       if (!pid) return;
       const name = String(msg.name || '').trim().slice(0, 14);
       const avatar = String(msg.avatar || '').slice(0, 8);
+      // a phone we don't know, mid-game, while someone is offline: probably them on a new device. Ask first.
+      const offline = game.S.players.filter(p => !p.connected);
+      if (!game.player(pid) && game.S.phase !== 'lobby' && !msg.fresh && offline.length) {
+        net.send(connId, { t: 'whoareyou', options: offline.map(p => ({ id: p.id, name: p.name, avatar: p.avatar })) });
+        return;
+      }
       const old = playerToConn.get(pid);
       if (old && old !== connId) { connToPlayer.delete(old); net.drop(old); }
       const res = game.join(pid, name, avatar);
@@ -70,6 +98,19 @@ export function startTV(root, { resume = null } = {}) {
       playerToConn.set(pid, connId);
       lastSent.delete(pid);
       sendViews(true);
+      return;
+    }
+    if (msg.t === 'claim') {
+      // "I'm Jon": take over Jon's offline seat
+      const p = game.player(String(msg.id || ''));
+      if (!p || p.connected) {
+        const offline = game.S.players.filter(x => !x.connected);
+        net.send(connId, { t: 'whoareyou', options: offline.map(x => ({ id: x.id, name: x.name, avatar: x.avatar })) });
+        return;
+      }
+      seat(connId, p.id);
+      game.setConnected(p.id, true);
+      game.emit('mood', { pid: p.id, mood: 'happy', tv: true });
       return;
     }
     const pid = connToPlayer.get(connId);
@@ -218,6 +259,7 @@ export function startTV(root, { resume = null } = {}) {
   }, 3000);
 
   root.addEventListener('change', (e) => {
+    if (e.target.dataset.merge && e.target.value) { mergeInto(e.target.dataset.merge, e.target.value); playersOpen = false; render(); return; }
     if (e.target.id === 'voice') { setVoice(e.target.value); stopSpeaking(); say(STYLES[voiceSettings().style].sample); }
   });
   window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (game.S.phase === 'lobby') render(); });
@@ -238,6 +280,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'timers') game.setTimers(b.dataset.t);
     if (act === 'cat') game.toggleCategory(b.dataset.cat);
     if (act === 'kick') game.kick(b.dataset.id);
+    if (act === 'players') { playersOpen = !playersOpen; render(); }
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
     if (act === 'mute') { setMuted(!isMuted()); if (isMuted()) stepShown = 99; render(); }
@@ -716,6 +759,27 @@ export function startTV(root, { resume = null } = {}) {
     }).join('');
   }
 
+  // 👥 host menu: everyone's connection status; merge a re-joined player into their old seat
+  let playersOpen = false;
+  function playersPanel() {
+    const S = game.S;
+    const offline = S.players.filter(p => !p.connected);
+    return `<div class="players-panel"><h2>👥 Players</h2>
+      <p class="muted small">Someone's phone dropped and they rejoined as a new player? Pick who they really are to merge them back. Pause first with ⏸ if you need time.</p>
+      ${S.players.map(p => `<div class="pp-row ${p.connected ? '' : 'off'}">
+        <span>${p.connected ? '🟢' : '📵'} ${p.avatar} <b>${esc(p.name)}</b> · ${p.score} 🎟️</span>
+        ${p.connected && S.players.length > 1 ? `<select data-merge="${esc(p.id)}"><option value="">This is really…</option>${[...offline, ...S.players.filter(o => o.connected && o.id !== p.id)].map(o => `<option value="${esc(o.id)}">${o.connected ? '' : '📵 '}${o.avatar} ${esc(o.name)}</option>`).join('')}</select>` : ''}
+      </div>`).join('')}
+      <button data-act="players">Close</button></div>`;
+  }
+  function toastTV(text) {
+    const t = document.createElement('div');
+    t.className = 'tv-toast';
+    t.textContent = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+
   function render() {
     const S = game.S;
     eventFx(S);
@@ -734,9 +798,12 @@ export function startTV(root, { resume = null } = {}) {
         <div id="timer" class="timer"></div>
         <div class="host-ctl">
           <button data-act="mute" title="Sound">${isMuted() ? '🔇' : '🔊'}</button>
+          ${S.phase !== 'lobby' ? '<button data-act="players" title="Players">👥</button>' : ''}
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
         </div>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
+        ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
+        ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
       </div>`;
     if (S.phase === 'intro' || S.phase === 'end') showSteps(true);
 

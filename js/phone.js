@@ -29,7 +29,7 @@ function savedSession() {
 }
 
 export function startPhone(root) {
-  const pid = myId();
+  let pid = myId();
   let client = null;
   let session = null;
   let view = null;
@@ -81,7 +81,7 @@ export function startPhone(root) {
     status = 'connecting';
     renderStatus();
     client = startClient(s.code, {
-      onOpen: () => client.send({ t: 'hello', pid, name: s.name, avatar: s.avatar }),
+      onOpen: () => client.send({ t: 'hello', pid, name: s.name, avatar: s.avatar, fresh: s.fresh }),
       onData: onMessage,
       onStatus: (st) => { status = st; renderStatus(); }
     });
@@ -102,6 +102,21 @@ export function startPhone(root) {
 
   function onMessage(msg) {
     if (!msg || typeof msg !== 'object') return;
+    // the TV moved us into an existing seat (rejoining on a new device): remember it for next time
+    if (msg.t === 'adopt') { pid = String(msg.pid); store.setItem('honeybox_pid', pid); return; }
+    // joined mid-game while someone is offline: are we them?
+    if (msg.t === 'whoareyou') {
+      view = null;
+      viewKey = '';
+      root.innerHTML = `<div class="phone join"><h1 class="logo">Honey<span>box</span></h1>
+        <h2>Welcome back?</h2><p class="muted">A game is going. If your phone dropped out, tap who you are to pick up where you left off.</p>
+        <div class="choices">${msg.options.map(o => `<button class="choice" data-claim="${esc(o.id)}">${o.avatar} ${esc(o.name)}</button>`).join('')}</div>
+        <button id="fresh">I'm new, join as a new player</button></div>`;
+      root.querySelectorAll('[data-claim]').forEach(b => b.addEventListener('click', () => send({ t: 'claim', id: b.dataset.claim })));
+      root.querySelector('#fresh').addEventListener('click', () => { session.fresh = true; send({ t: 'hello', pid, name: session.name, avatar: session.avatar, fresh: true }); });
+      if (BOT) (params.has('botclaim') ? root.querySelector('[data-claim]') : root.querySelector('#fresh')).click();
+      return;
+    }
     if (msg.t === 'view') {
       setTime(msg.ms, false);
       const key = JSON.stringify(msg.v);
