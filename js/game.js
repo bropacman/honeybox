@@ -17,13 +17,13 @@ export const TIMES = {
 };
 
 export const MINIGAMES = {
-  trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Dragged off? Get 2 right to escape.' },
+  trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Caught? Get 2 right to escape its grasp.' },
   draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The captured player needs someone to guess theirs.' },
-  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Dragged off? Match the crowd 2 of 3 times to escape.' },
-  hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Dragged off? Stay hidden 2 of 3 times to escape.' },
-  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Dragged off? Beat at least one other camper 2 of 3 times to escape.' },
-  zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. Lock in early for 300, later for 200, last for 100. Dragged off? Get 2 of 3 right to escape.' },
-  door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and an animatronic. Pick one. Dragged off? Dodge the animatronic 2 of 3 times to escape.' }
+  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Caught? Match the crowd 2 of 3 times to escape its grasp.' },
+  hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Caught? Stay hidden 2 of 3 times to escape its grasp.' },
+  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Caught? Beat at least one other camper 2 of 3 times to escape its grasp.' },
+  zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. Lock in early for 300, later for 200, last for 100. Caught? Get 2 of 3 right to escape its grasp.' },
+  door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and an animatronic. Pick one. Caught? Dodge the animatronic 2 of 3 times to escape its grasp.' }
 };
 // Pick a Door: what's behind the three doors, and the door sets for each round
 export const DOOR_PRIZES = [{ kind: 'big', tickets: 300, emoji: '🎁' }, { kind: 'small', tickets: 100, emoji: '🍬' }, { kind: 'monster', tickets: 0, emoji: '' }];
@@ -360,7 +360,7 @@ export class Game {
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
       'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have. Whoever is in the lead has to get two right before they can hide.',
       'Three in a row gets you to 6 A M, and a bonus.',
-      'Miss, and you drop the pot and get dragged into a mini game. Do well to escape.',
+      'Miss, and an animatronic catches you and you drop the pot. Win the mini game to escape its grasp.',
       'At sunrise, last place picks the finale. Most tickets wins the grand prize!'
     ]);
     this.go('intro', TIMES.intro);
@@ -634,7 +634,8 @@ export class Game {
     S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot };
     S.danger = w.st.haunted ? { name: lurker.name, emoji: lurker.emoji } : pick(DANGERS);
     this.emit('sfx', 'scare');
-    this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}${w.pot ? `, and dropped ${w.pot} tickets` : ''}.`);
+    const villain = S.danger.name.charAt(0).toUpperCase() + S.danger.name.slice(1);
+    this.emit('say', `Oh no! ${villain} caught ${name}${w.pot ? `, and ${w.pot} tickets went flying` : ''}! Win the mini game to escape its grasp.`);
     this.emit('mood', { pid: w.watcherId, mood: 'sad', tv: true, delay: 1300 });
     return this.go('dragged', TIMES.dragged);
   }
@@ -1506,10 +1507,10 @@ export class Game {
         return wait(bank ? `${watcher?.name} is hiding till morning!` : `${watcher?.name} kept going!`, '', bank ? '🛏️' : '🔦');
       }
       case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, `${w.pot} 🎟️ + ${SIX_AM} bonus`, '🌅');
-      case 'dragged': return wait(isLost ? "You got dragged off!" : `${lostName} got dragged off!`, `By ${S.danger.name}.`, S.danger.emoji);
+      case 'dragged': return wait(isLost ? "You've been caught!" : `${lostName} got caught!`, isLost ? `By ${S.danger.name}. Win the mini-game to escape its grasp!` : `By ${S.danger.name}.`, S.danger.emoji);
       case 'mgIntro': {
         const m = MINIGAMES[mg.type];
-        return wait(m.name, isLost ? `You're the lost one! ${m.rules}` : m.rules, m.emoji);
+        return wait(m.name, isLost ? `You're caught! ${m.rules}` : m.rules, m.emoji);
       }
       case 'triviaQ': case 'finaleQ': case 'pollQ': {
         const q = mg.questions[mg.qi];

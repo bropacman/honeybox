@@ -507,7 +507,7 @@ export function startTV(root, { resume = null } = {}) {
             <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
             <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have. <b>👑 The leader</b> needs 2 right before they can hide.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
-            <li data-step="5"><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
+            <li data-step="5"><span>💀</span><div><b>Miss and an animatronic catches you</b> and you drop the pot. Everyone plays a mini-game; win it to escape its grasp.</div></li>
             <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most tickets wins the grand prize!</div></li>
           </ol>
         </div>`;
@@ -546,7 +546,7 @@ export function startTV(root, { resume = null } = {}) {
             : `<div class="medals">
                 <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${w.st.win}</span><span class="m-sub">into the pot</span></div>
                 <div class="medal same-m"><span class="m-icon">🎟️</span><span class="m-big">${w.pot}</span><span class="m-sub">pot so far</span></div>
-                <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.pot}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: dragged off, ${w.st.risk} at stake` : 'miss = drop the pot, dragged off'}</span></div>
+                <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.pot}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: caught, ${w.st.risk} at stake` : 'miss = drop the pot, get caught'}</span></div>
                 ${w.st.golden ? `<div class="medal golden-m"><span class="m-icon">⭐</span><span class="m-big">+${w.st.golden}</span><span class="m-sub">golden ticket</span></div>` : ''}
                 ${w.st.haunted ? `<div class="medal banish-m"><span class="m-icon">⚡</span><span class="m-big">+${w.st.banish}</span><span class="m-sub">banish ${S.monster.emoji}</span></div>` : ''}
               </div>
@@ -581,8 +581,8 @@ export function startTV(root, { resume = null } = {}) {
       case 'dragged':
         return `<div class="center dark">
           <div class="jumpscare">${S.danger.emoji}</div>
-          <h1>${avatar(lost)} got dragged off</h1>
-          <p class="big">by ${esc(S.danger.name)}.</p>
+          <h1>${esc(S.danger.name.charAt(0).toUpperCase() + S.danger.name.slice(1))} caught ${avatar(lost)}!</h1>
+          <p class="big">Win the mini-game to escape its grasp.</p>
           <p>At stake: <b>${S.lost.stake} 🎟️</b></p>
         </div>`;
       case 'mgIntro': {
@@ -762,7 +762,7 @@ export function startTV(root, { resume = null } = {}) {
       case 'mgResult':
         return `<div class="center ${mg.result ? '' : 'dark'}">
           <div class="emoji-xl ${mg.result ? 'bounce' : 'shake'}">${mg.result ? '🏠🔥' : '💀🌲'}</div>
-          <h1>${avatar(lost)} ${mg.result ? 'escaped!' : 'is still captured…'}</h1>
+          <h1>${avatar(lost)} ${mg.result ? `broke free from ${S.danger.emoji}!` : `is still in ${S.danger.emoji}'s grasp…`}</h1>
           <p class="big">${mg.result ? '+300 🎟️' : `−${S.lost.stake} 🎟️ lost to the animatronics`}</p>
         </div>`;
       case 'scores':
@@ -852,6 +852,28 @@ export function startTV(root, { resume = null } = {}) {
     }).join('');
   }
 
+  // While a mini-game decides their fate, the caught player is shown struggling in the villain's grasp,
+  // with how close they are to escaping.
+  const CAPTIVE_PHASES = ['mgIntro', 'triviaQ', 'triviaA', 'pollQ', 'pollA', 'hideQ', 'hideA', 'guessQ', 'guessA', 'doorQ', 'doorA',
+    'zoomQ', 'zoomA', 'drawDraw', 'drawFib', 'drawVote', 'drawReveal', 'drawGallery'];
+  function escapeProgress(S) {
+    const mg = S.mg;
+    const id = S.lost.pid;
+    const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged, zoom: mg.correct }[mg.type];
+    if (mg.type === 'draw') return 'Escape: someone guesses their drawing';
+    return tally ? `Escape: ${Math.min(2, tally[id] || 0)} of 2` : '';
+  }
+  function captive(S) {
+    if (!S.lost || !S.danger || !S.mg || S.mg.finale || !CAPTIVE_PHASES.includes(S.phase)) return '';
+    const p = game.player(S.lost.pid);
+    if (!p) return '';
+    return `<div class="captive">
+      <div class="cap-villain">${S.danger.emoji}</div>
+      <div class="cap-player">${p.avatar}<span class="cap-sweat">💦</span></div>
+      <div class="cap-text"><b>${esc(p.name)}</b> is caught!<small>${escapeProgress(S)}</small></div>
+    </div>`;
+  }
+
   // 👥 host menu: everyone's connection status; merge a re-joined player into their old seat
   let playersOpen = false;
   function playersPanel() {
@@ -895,6 +917,7 @@ export function startTV(root, { resume = null } = {}) {
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
         </div>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
+        ${captive(S)}
         ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
         ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
       </div>`;
