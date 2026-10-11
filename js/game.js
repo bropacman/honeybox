@@ -40,13 +40,15 @@ export const CATEGORIES = {
   history: { name: 'History', emoji: '📜' },
   movies: { name: 'Movies & Cartoons', emoji: '🎬' },
   games: { name: 'Games, TV & Tech', emoji: '🕹️' },
-  music: { name: 'Music & Sports', emoji: '🎵' },
+  music: { name: 'Music', emoji: '🎵' },
+  sports: { name: 'Sports', emoji: '🏆' },
   food: { name: 'Food & Brands', emoji: '🍔' },
   wild: { name: 'Wild Card', emoji: '🎲' }
 };
 export const SPOT_CATEGORIES = {
   'Mt Washington': 'nature', "Clark's Bears": 'animals', 'Flume Gorge': 'geo', 'The Kanc': 'history', 'Story Land': 'movies',
-  'Funspot': 'games', 'Weirs Beach': 'music', "Santa's Village": 'food', 'Lake Dock': 'wild'
+  'Funspot': 'games', 'Weirs Beach': 'music', "Santa's Village": 'food', 'Lake Dock': 'wild',
+  'Loudon Speedway': 'sports'
 };
 
 // The night shift: each right answer adds to the pot (question 1, 2, 3). Bank it any time; 3 in a row = 6 AM bonus.

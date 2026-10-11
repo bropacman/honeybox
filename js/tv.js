@@ -255,7 +255,8 @@ export function startTV(root, { resume = null } = {}) {
   const SPOTS = {
     "Santa's Village": [36, 12], 'Mt Washington': [60, 18], 'Flume Gorge': [12, 22],
     "Clark's Bears": [22, 48], 'The Kanc': [46, 48], 'Story Land': [80, 34],
-    'Funspot': [14, 76], 'Weirs Beach': [36, 82], 'Lake Dock': [62, 80]
+    'Funspot': [14, 76], 'Weirs Beach': [36, 82], 'Lake Dock': [62, 80],
+    'Loudon Speedway': [86, 64]
   };
 
   function board(highlight = null) {

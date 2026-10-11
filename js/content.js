@@ -3,14 +3,16 @@
 export const PILE_NAMES = [
   'Santa\'s Village', 'Mt Washington', 'Flume Gorge',
   'Clark\'s Bears', 'The Kanc', 'Story Land',
-  'Funspot', 'Weirs Beach', 'Lake Dock'
+  'Funspot', 'Weirs Beach', 'Lake Dock',
+  'Loudon Speedway'
 ];
 
 // Little sign icon for each spot on the map
 export const PILE_ICONS = {
   'Santa\'s Village': '🎅', 'Mt Washington': '🏔️', 'Flume Gorge': '🏞️',
   'Clark\'s Bears': '🐻', 'The Kanc': '🛣️', 'Story Land': '🏰',
-  'Funspot': '🕹️', 'Weirs Beach': '🏖️', 'Lake Dock': '🏚️'
+  'Funspot': '🕹️', 'Weirs Beach': '🏖️', 'Lake Dock': '🏚️',
+  'Loudon Speedway': '🏁'
 };
 
 // After closing time, the Story Land animatronics wake up...
@@ -225,6 +227,13 @@ export const TOT = {
 };
 // researched "believe it or not" packs, sorted into their categories
 for (const x of [...FUN_1, ...FUN_2]) if (TOT[x.cat]) TOT[x.cat] = mergeTot(TOT[x.cat], [x]);
+
+// Sports questions were written into the music lists; pull them out into their own category.
+const SPORTS_RE = /sport|ball|olymp|nba|nfl|nhl|team|player|goal|hockey|tennis|golf|soccer|basket|super bowl|stanley|world cup|marathon|medal|race|wimbledon|iditarod|lacrosse|gatorade|jordan|babe ruth|chamberlain|puck|touchdown|home run|slam|dunk|chess|derby|indy 500|tour de france|tarzan|airplane|comaneci/i;
+const NOT_SPORTS = new Set(['A guitar', 'A grand piano', 'A violin', 'Michael Jackson', 'Bruce Springsteen', 'Peter Hernandez', 'Paul Hewson', 'Gordon Sumner']);
+const isSports = (x) => !NOT_SPORTS.has(x.right) && (SPORTS_RE.test(`${x.q} ${x.right} ${x.wrong} ${x.note || ''}`) || x.right === 'Yao Ming');
+TOT.sports = TOT.music.filter(isSports);
+TOT.music = TOT.music.filter(x => !isSports(x));
 
 // Boston / New England specific content gets shown rarely (it's too local for most of the table)
 const LOCAL_RE = /\b(Boston|Bostonian|Massachusetts|Mass\b|Masshole|New England|Fenway|Red Sox|Patriots|Bruins|Celtics|the Pike|Big Dig|rotary|rotaries|packie|frappe|jimmies|ayuh|wicked|Dunkin|Munchkin|Friendly's|Fribble|Papa Gino|Howard Johnson|HoJo|Cape Cod|Sagamore|Martha's Vineyard|Nantucket|Hyannis|Provincetown|Gloucester|Salem|Walden|Thoreau|Dixville|Piscataqua|Laconia|Concord|Manchester|Nashua|Portsmouth|Dartmouth|Hanover|Montpelier|Augusta|Rhode Island|Lovecraft|Aerosmith|New Kids|Dropkick|Dirty Water|Sweet Caroline|North End|Haahvahd|duck boat|Make Way for Ducklings|Esplanade|Freedom Trail|Vermont|Maine|Connecticut|Kennedy|Weirs|Motorcycle Week|purple finch|Merrimack)\b/i;
