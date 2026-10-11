@@ -205,8 +205,22 @@ addUnique(POLLS, POLLS_X, p => key(p.q));
 // ---------- This or That (js/packs/tot-*.js) ----------
 import { NATURE, ANIMALS, GEO } from './packs/tot-1.js';
 import { HISTORY, MOVIES, GAMES, MUSIC, FOOD } from './packs/tot-2.js';
+import { NATURE_2, ANIMALS_2 } from './packs/tot-3.js';
+import { GEO_2, HISTORY_2 } from './packs/tot-4.js';
+import { MOVIES_2, GAMES_2 } from './packs/tot-5.js';
+import { MUSIC_2, FOOD_2 } from './packs/tot-6.js';
 
-export const TOT = { nature: NATURE, animals: ANIMALS, geo: GEO, history: HISTORY, movies: MOVIES, games: GAMES, music: MUSIC, food: FOOD };
+// merge packs per category, dropping exact duplicates (same question and same pair)
+const totKey = (x) => `${x.q}|${[x.right, x.wrong].sort().join('|')}`.toLowerCase();
+const mergeTot = (...lists) => {
+  const seen = new Set();
+  return lists.flat().filter(x => { const k = totKey(x); if (seen.has(k)) return false; seen.add(k); return true; });
+};
+export const TOT = {
+  nature: mergeTot(NATURE, NATURE_2), animals: mergeTot(ANIMALS, ANIMALS_2), geo: mergeTot(GEO, GEO_2),
+  history: mergeTot(HISTORY, HISTORY_2), movies: mergeTot(MOVIES, MOVIES_2), games: mergeTot(GAMES, GAMES_2),
+  music: mergeTot(MUSIC, MUSIC_2), food: mergeTot(FOOD, FOOD_2)
+};
 
 // Boston / New England specific content gets shown rarely (it's too local for most of the table)
 const LOCAL_RE = /\b(Boston|Bostonian|Massachusetts|Mass\b|Masshole|New England|Fenway|Red Sox|Patriots|Bruins|Celtics|the Pike|Big Dig|rotary|rotaries|packie|frappe|jimmies|ayuh|wicked|Dunkin|Munchkin|Friendly's|Fribble|Papa Gino|Howard Johnson|HoJo|Cape Cod|Sagamore|Martha's Vineyard|Nantucket|Hyannis|Provincetown|Gloucester|Salem|Walden|Thoreau|Dixville|Piscataqua|Laconia|Concord|Manchester|Nashua|Portsmouth|Dartmouth|Hanover|Montpelier|Augusta|Rhode Island|Lovecraft|Aerosmith|New Kids|Dropkick|Dirty Water|Sweet Caroline|North End|Haahvahd|duck boat|Make Way for Ducklings|Esplanade|Freedom Trail|Vermont|Maine|Connecticut|Kennedy|Weirs|Motorcycle Week|purple finch|Merrimack)\b/i;
