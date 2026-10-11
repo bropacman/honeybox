@@ -32,6 +32,7 @@ function tone(freq, dur, { type = 'sine', vol = 0.15, delay = 0, slide = 0 } = {
   osc.stop(t + dur + 0.05);
 }
 
+let clockFlip = false;
 export const sfx = {
   join() { tone(660, 0.12); tone(880, 0.15, { delay: 0.1 }); },
   // spooky countdown: a low heartbeat "lub-dub"
@@ -49,6 +50,29 @@ export const sfx = {
     tone(640, 1.2, { type: 'sine', vol: 0.08, delay: 0.5, slide: -300 });
   },
   lock() { tone(500, 0.06, { type: 'square', vol: 0.05 }); },
+  // swoosh for title cards
+  whoosh() {
+    if (!ctx || muted) return;
+    const len = Math.floor(ctx.sampleRate * 0.6);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / len);
+    const src = ctx.createBufferSource();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    f.type = 'bandpass';
+    f.frequency.setValueAtTime(300, ctx.currentTime);
+    f.frequency.exponentialRampToValueAtTime(3000, ctx.currentTime + 0.5);
+    g.gain.value = 0.18;
+    src.buffer = buf;
+    src.connect(f).connect(g).connect(ctx.destination);
+    src.start();
+  },
+  // last-10-seconds clock: alternating tick… tock…
+  clock() {
+    clockFlip = !clockFlip;
+    tone(clockFlip ? 1500 : 1100, 0.05, { type: 'square', vol: 0.07 });
+  },
   // snare-ish roll that builds while the card shakes
   drumroll() {
     if (!ctx || muted) return;
@@ -95,7 +119,9 @@ const MOODS = {
   tense: { root: 55, bpm: 76, whine: 0.5, cutoff: 380, vol: 0.07 },
   quiz: { root: 65.4, bpm: 100, whine: 0, cutoff: 520, vol: 0.05 },
   dread: { root: 41.2, bpm: 0, whine: 1, cutoff: 260, vol: 0.08 },
-  sunrise: { root: 73.4, bpm: 88, whine: 0.25, cutoff: 700, vol: 0.06 }
+  sunrise: { root: 73.4, bpm: 88, whine: 0.25, cutoff: 700, vol: 0.06 },
+  // the last 10 seconds: higher, faster, more whine
+  panic: { root: 82.4, bpm: 150, whine: 1, cutoff: 900, vol: 0.08 }
 };
 let music = null;
 

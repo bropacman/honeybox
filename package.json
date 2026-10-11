@@ -4,7 +4,8 @@
   "description": "Honeybox - a Jackbox-style party game",
   "scripts": {
     "e2e": "node tests/e2e.mjs",
-    "stamp": "node scripts/stamp.mjs"
+    "stamp": "node scripts/stamp.mjs",
+    "e2e:fast": "TURBO=1 GAMES=1 node tests/e2e.mjs"
   },
   "author": "",
   "license": "ISC",

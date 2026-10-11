@@ -201,3 +201,13 @@ function addUnique(list, extra, keyOf) {
 addUnique(TRIVIA, [...TRIVIA_1, ...TRIVIA_2, ...TRIVIA_3, ...TRIVIA_4], t => key(t.q));
 addUnique(DRAW_PROMPTS, [...PROMPTS_X, ...PROMPTS_2], key);
 addUnique(POLLS, POLLS_X, p => key(p.q));
+
+// ---------- This or That (js/packs/tot-*.js) ----------
+import { NATURE, ANIMALS, GEO } from './packs/tot-1.js';
+import { HISTORY, MOVIES, GAMES, MUSIC, FOOD } from './packs/tot-2.js';
+
+export const TOT = { nature: NATURE, animals: ANIMALS, geo: GEO, history: HISTORY, movies: MOVIES, games: GAMES, music: MUSIC, food: FOOD };
+
+// Boston / New England specific content gets shown rarely (it's too local for most of the table)
+const LOCAL_RE = /\b(Boston|Bostonian|Massachusetts|Mass\b|Masshole|New England|Fenway|Red Sox|Patriots|Bruins|Celtics|the Pike|Big Dig|rotary|rotaries|packie|frappe|jimmies|ayuh|wicked|Dunkin|Munchkin|Friendly's|Fribble|Papa Gino|Howard Johnson|HoJo|Cape Cod|Sagamore|Martha's Vineyard|Nantucket|Hyannis|Provincetown|Gloucester|Salem|Walden|Thoreau|Dixville|Piscataqua|Laconia|Concord|Manchester|Nashua|Portsmouth|Dartmouth|Hanover|Montpelier|Augusta|Rhode Island|Lovecraft|Aerosmith|New Kids|Dropkick|Dirty Water|Sweet Caroline|North End|Haahvahd|duck boat|Make Way for Ducklings|Esplanade|Freedom Trail|Vermont|Maine|Connecticut|Kennedy|Weirs|Motorcycle Week|purple finch|Merrimack)\b/i;
+export const isLocal = (text) => LOCAL_RE.test(String(text));

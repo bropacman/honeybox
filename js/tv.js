@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, CLOCK, STAKES, NARRATED, SIDE, stakesFor, FINALES, EVENTS, BANISH } from './game.js';
+import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, revealAt } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -13,16 +13,16 @@ const SPEED = Number(params.get('speed')) || 1;
 const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 // background music mood for each phase (anything missing is silence)
 const MUSIC = {
-  intro: 'dread', turnStart: 'tense', pick: 'tense', guess: 'tense', reveal: 'tense',
+  intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
   dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
   triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
-  finalePick: 'tense', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesShow: 'tense', stakesReveal: 'sunrise'
+  finalePick: 'tense', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
 
 export function savedGame() {
   try {
     const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-    if (raw && Date.now() - raw.at < 4 * 3600 * 1000 && raw.S.phase !== 'lobby' && raw.S.phase !== 'end') return raw.S;
+    if (raw && raw.S.spots && Date.now() - raw.at < 4 * 3600 * 1000 && raw.S.phase !== 'lobby' && raw.S.phase !== 'end') return raw.S;
   } catch (e) { /* ignore */ }
   return null;
 }
@@ -75,14 +75,14 @@ export function startTV(root, { resume = null } = {}) {
     const pid = connToPlayer.get(connId);
     if (!pid) return;
     switch (msg.t) {
-      case 'pick': game.choosePile(pid, Number(msg.i)); break;
-      case 'guess': game.guess(pid, msg.choice); break;
+      case 'pick': game.chooseSpot(pid, Number(msg.i)); break;
+      case 'decide': game.decide(pid, String(msg.choice || '')); break;
       case 'answer':
         if (game.S.phase === 'drawVote') game.vote(pid, Number(msg.i));
         else game.answer(pid, Number(msg.i));
         break;
       case 'drawing': game.submitDrawing(pid, msg.strokes); break;
-      case 'stake': game.stake(pid, msg.choice); break;
+      case 'stake': game.stake(pid, Number(msg.i)); break;
       case 'finale': game.chooseFinale(pid, String(msg.choice || '')); break;
       case 'vip': {
         if (game.vipId() !== pid) break;
@@ -133,20 +133,40 @@ export function startTV(root, { resume = null } = {}) {
     }
   });
 
-  // timers
+  // timers, plus the last-10-seconds hurry-up: faster music, a ticking clock, red edges, big final numbers
   let lastSec = null;
+  let hurriedPhase = null;
+  let hurryOn = false;
   setInterval(() => {
     game.speaking = SPEED >= 1 && isSpeaking();
     game.tick();
     const left = game.timeLeft();
+    const S = game.S;
+    const answering = ANSWER_PHASES.includes(S.phase) && !game.isPaused() && left != null;
+    const hurry = answering && left < 10000 && left > 0 && game.waitingOn().length > 0;
+    hurryOn = hurry;
+    const tv = root.querySelector('.tv');
+    tv?.classList.toggle('hurry', hurry);
     const el = root.querySelector('#timer');
+    const s = left == null ? '' : Math.ceil(left / 1000);
     if (el) {
-      const s = left == null ? '' : Math.ceil(left / 1000);
       el.textContent = game.isPaused() ? '⏸' : game.isNarrated() ? '' : s;
-      el.classList.toggle('urgent', left != null && left < 5000);
-      if (left != null && left < 5000 && s !== lastSec && !game.isPaused() && !game.isNarrated() && s > 0) sfx.tick();
-      lastSec = s;
+      el.classList.toggle('urgent', hurry);
     }
+    const big = root.querySelector('#final-count');
+    if (big) big.textContent = hurry && s <= 3 ? s : '';
+    if (hurry) {
+      if (hurriedPhase !== `${S.phase}:${S.deadline}`) {
+        hurriedPhase = `${S.phase}:${S.deadline}`;
+        setMusic('panic');
+        if (!isSpeaking()) say('Ten seconds!');
+      }
+      if (s !== lastSec && s > 0) (s <= 3 ? sfx.tick() : sfx.clock());
+    } else if (hurriedPhase && !answering) {
+      hurriedPhase = null;
+      setMusic(hurryOn ? 'panic' : (MUSIC[S.phase] || 'none'));
+    }
+    lastSec = s;
   }, 200);
   // keep phone timers in sync now and then
   setInterval(() => {
@@ -174,6 +194,7 @@ export function startTV(root, { resume = null } = {}) {
     const act = b.dataset.act;
     if (act === 'start') game.start();
     if (act === 'length') game.setLength(b.dataset.len);
+    if (act === 'timers') game.setTimers(b.dataset.t);
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
@@ -238,16 +259,16 @@ export function startTV(root, { resume = null } = {}) {
 
   function board(highlight = null) {
     const S = game.S;
-    const piles = S.piles.map((p, i) => {
-      const dark = S.event === 'outage';
-      const top = dark ? null : p.cards[p.cards.length - 1];
+    const piles = S.spots.map((sp, i) => {
+      const hidden = S.event === 'outage' && i !== highlight;
+      const c = CATEGORIES[sp.cat];
       const st = game.stakesNow(i);
-      const [x, y] = SPOTS[p.name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
-      return `<div class="spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
+      const [x, y] = SPOTS[sp.name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
+      return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
         ${st.haunted ? `<div class="lurker" title="${esc(S.monster.name)}">${S.monster.emoji}</div>` : ''}
-        <div class="stack" style="--depth:${Math.min(p.cards.length, 8)}">${card(top)}</div>
-        <div class="pile-name">${PILE_ICONS[p.name] || ''} ${esc(p.name)}</div>
-        <div class="depth">${p.cards.length} deep · <span class="win">+${st.win}</span> · <span class="risk">risk ${st.risk}</span></div>
+        <div class="cat-badge">${hidden ? '❓' : c.emoji}</div>
+        <div class="cat-name">${hidden ? 'Mystery' : esc(c.name)}</div>
+        <div class="pile-name">${PILE_ICONS[sp.name] || ''} ${esc(sp.name)}</div>
       </div>`;
     }).join('');
     return `<div class="map ${S.event === 'outage' ? 'outage' : ''}">
@@ -274,9 +295,38 @@ export function startTV(root, { resume = null } = {}) {
     </div>`;
   }
 
-  // face-down card shakes, then flips (timed with the drumroll)
-  function revealSlot(c) {
-    return `<div class="reveal-slot">${card(null, 'huge suspense')}${card(c, 'huge front')}</div>`;
+  // This or That: two big options; on reveal, each player's pick pops in one by one, then the right one lights up
+  function totBoard(q, order, answers, starId) {
+    const at = order ? revealAt(order.length) : 0;
+    const chips = (i) => !order ? '' : order.map((id, k) => {
+      if (answers[id] !== i) return '';
+      const p = game.player(id);
+      if (!p) return '';
+      return `<span class="pick-chip ${id === starId ? 'star' : ''}" style="animation-delay:${k * CHIP_MS}ms">${p.avatar} ${esc(p.name)}</span>`;
+    }).join('');
+    return `<h1 class="tot-q">${esc(q.q)}</h1>
+      <div class="tot">${q.opts.map((o, i) => `
+        <div class="tot-opt ${order ? (i === q.ans ? 'right-n' : 'wrong-n') : ''}" style="--at:${at}ms">
+          <span class="letter">${'AB'[i]}</span><span class="tot-text">${esc(o)}</span>
+          <div class="chips">${chips(i)}</div>
+        </div>${i === 0 ? '<div class="tot-or">or</div>' : ''}`).join('')}
+      </div>`;
+  }
+
+  function potMeter(w) {
+    return `<div class="pot-meter">🍯 Pot: <b>${w.pot}</b> · next right answer: <b class="win">+${game.potValue(w.streak)}</b></div>`;
+  }
+
+  // a quick full-screen title card when a category, minigame or finale begins
+  let lastSplash = null;
+  function splashFor(S) {
+    const card = (emoji, title, sub = '', cls = '') => `<div class="splash ${cls}"><div class="splash-in"><span class="sp-emoji">${emoji}</span><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>`;
+    if (S.phase === 'tot') { const c = CATEGORIES[S.watch.q.cat]; return card(c.emoji, c.name, S.watch.st?.haunted ? `${S.monster.emoji} haunted!` : '', `cat-${S.watch.q.cat}`); }
+    if (S.phase === 'stakesBet') { const c = CATEGORIES[S.mg.q.cat]; return card('🌅', `For ${STAKES.values[S.mg.round - 1]} honey`, `${c.emoji} ${c.name}`, 'sunrise'); }
+    if (S.phase === 'mgIntro') { const m = S.mg.finale ? FINALES[S.mg.type] : MINIGAMES[S.mg.type]; return card(m.emoji, m.name, S.mg.finale ? 'Finale · double honey' : 'Into the woods…', `mg-${S.mg.type}`); }
+    if (S.phase === 'finalePick') return card('🌅', '5 AM', 'Last light…', 'sunrise');
+    if (S.phase === 'decide') return card('🤔', 'Bank it… or keep going?', '', 'decide-sp');
+    return '';
   }
 
   function eventCard(big) {
@@ -313,6 +363,9 @@ export function startTV(root, { resume = null } = {}) {
           <div class="lobby-side">
             <h2>Campers (${S.players.length}/8)</h2>
             <div class="campers">${S.players.map(p => `<button class="camper ${p.connected ? '' : 'off'}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
+            <div class="lengths">Timers:
+              ${Object.keys(TIMERS).map(t => `<button data-act="timers" data-t="${t}" class="${S.timers === t ? 'sel' : ''}">${t}</button>`).join('')}
+            </div>
             <div class="lengths">Game length:
               ${Object.keys(LENGTHS).map(l => `<button data-act="length" data-len="${l}" class="${S.length === l ? 'sel' : ''}">${l}</button>`).join('')}
             </div>
@@ -332,72 +385,76 @@ export function startTV(root, { resume = null } = {}) {
           <div class="emoji-xl">🏚️🌲🐕🐕🌲</div>
           <h1>Five Nights at the Cabin</h1>
           <p>The family is holed up at the cabin on Lake Winnipesaukee, with Story Land, Funspot, Clark's and Santa's Village just up the road. Everything closed hours ago… but the animatronics didn't get the memo.</p>
-          <p>Each round one of you takes the <b>night shift</b>. Pick a spot, then everyone calls the next card <b>HIGH</b>, <b>LOW</b> or <b>SAME</b>.</p>
-          <p>Night shift: get <b>3 in a row</b> to make it to <b>6 AM</b>. A correct SAME is a 🍯 <b>Honey Pot</b> — straight to morning.</p>
-          <p>Miss, and you get <b>dragged off</b>. Everyone plays a game for honey while you play to escape.</p>
+          <p>Each round one of you takes the <b>night shift</b>: pick a category on the map and answer a <b>This or That</b>. Everyone else answers too, for side points.</p>
+          <p>Every right answer grows your 🍯 <b>pot</b>. Then choose: <b>🏠 bank it</b>, or <b>🔦 keep going</b> for more. Three in a row reaches <b>6 AM</b> and a bonus.</p>
+          <p>Miss, and you drop the pot and get <b>dragged off</b>. Everyone plays a game for honey while you play to escape.</p>
         </div>`;
       case 'turnStart':
         return `<div class="center">
           <div class="emoji-xl">🔦</div>
           <p class="muted big">NIGHT ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
           <h1>${avatar(watcher)} is on the night shift</h1>
-          <p class="big">12 AM. Get 3 in a row to make it to 6 AM.</p>
+          <p class="big">Pick a category · answer · bank it or keep going. 3 in a row = 6 AM.</p>
           ${eventCard(true)}
         </div>`;
       case 'pick':
         return `<div class="watch pick-layout">
           ${board(null)}
           <div class="pick-info">
-            <h2>${avatar(watcher)} is choosing where to look…</h2>
+            <h2>${avatar(watcher)} is picking a category…</h2>
             ${streakDots(w.streak)}
+            ${potMeter(w)}
             ${eventCard(false)}
-            <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> is lurking at ${esc(S.piles[S.monster.pile].name)}. Miss there = double stake. Call it right = <b class="win">+${BANISH} banish!</b></p>
-            <p class="muted">Make it to 6 AM: 3 right in a row.</p>
-            <p class="muted">Deeper piles pay more honey, but cost more if you get dragged off.</p>
+            <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> lurks at ${esc(S.spots[S.monster.spot].name)}: miss there = double stake, right = <b class="win">+${game.stakesNow(S.monster.spot).banish} banish!</b></p>
           </div>
         </div>`;
-      case 'guess': {
-        const pile = S.piles[w.pile];
+      case 'tot': case 'totReveal': {
+        const reveal = S.phase === 'totReveal';
+        const q = w.q;
+        const c = CATEGORIES[q.cat];
+        const mine = w.answers[w.watcherId];
+        const ok = reveal && w.results[w.watcherId];
+        const verdict = !reveal ? '' : w.saved ? '🐕 SAVED BY THE DOGS!' : w.banished ? `⚡ BANISHED ${S.monster.emoji}!` : ok ? (w.streak >= 3 ? '🌅 6 AM!' : '✅ RIGHT!') : '💀 WRONG!';
         return `<div class="watch">
-          <div class="watch-head"><h2>${avatar(watcher)} at the <b>${esc(pile.name)}</b></h2>${streakDots(w.streak)}</div>
-          <div class="medals">
-            <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${w.st.win}</span><span class="m-sub">🍯 if right</span></div>
-            <div class="medal same-m"><span class="m-icon">🍯</span><span class="m-big">+${w.st.same}</span><span class="m-sub">SAME = straight to 6 AM</span></div>
-            <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.st.risk}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: double stake` : 'miss = dragged off'}</span></div>
-            ${w.st.haunted ? `<div class="medal banish-m"><span class="m-icon">⚡</span><span class="m-big">+${BANISH}</span><span class="m-sub">banish ${S.monster.emoji}</span></div>` : ''}
-          </div>
-          <div class="side-note">Everyone else bets risk-free: right <b class="win">+${game.side().right}</b> · SAME <b class="win">+${game.side().same}</b> ${eventCard(false)}</div>
-          <div class="duel">
-            ${card(pile.cards[pile.cards.length - 1], 'huge')}
-            <div class="vs">next card is…<div class="hl-opts"><span>HIGH</span><span>LOW</span><span>SAME</span></div><p class="muted">Lock in on your phone!</p></div>
-            ${card(null, 'huge')}
-          </div>
-          ${waitingStrip()}
+          <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2>${streakDots(w.streak - (ok ? 1 : 0))}</div>
+          ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
+          ${reveal
+            ? `<div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}`
+            : `<div class="medals">
+                <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${w.st.win}</span><span class="m-sub">into the pot</span></div>
+                <div class="medal same-m"><span class="m-icon">🍯</span><span class="m-big">${w.pot}</span><span class="m-sub">pot so far</span></div>
+                <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.pot}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: dragged off, ${w.st.risk} at stake` : 'miss = drop the pot, dragged off'}</span></div>
+                ${w.st.haunted ? `<div class="medal banish-m"><span class="m-icon">⚡</span><span class="m-big">+${w.st.banish}</span><span class="m-sub">banish ${S.monster.emoji}</span></div>` : ''}
+              </div>
+              <div class="side-note">Everyone else: right answer <b class="win">+${game.sideRight()}</b> ${eventCard(false)}</div>
+              ${waitingStrip()}`}
         </div>`;
       }
-      case 'reveal': {
-        const pile = S.piles[w.pile];
-        const mine = w.guesses[w.watcherId];
-        const ok = w.results[w.watcherId];
-        const groups = ['HIGH', 'LOW', 'SAME'].map(ch => {
-          const who = Object.entries(w.guesses).filter(([, c]) => c === ch).map(([id]) => game.player(id)).filter(Boolean);
-          return `<div class="guess-col ${w.actual === ch ? 'right' : ''}"><h3>${ch}</h3>${who.map(p => `<div>${p.avatar} ${esc(p.name)} ${gainTag(p.id)}</div>`).join('')}</div>`;
-        }).join('');
-        return `<div class="watch">
-          <div class="watch-head"><h2>${avatar(watcher)} said <b>${mine}</b> at the ${esc(pile.name)}</h2><div class="late">${streakDots(w.streak)}</div></div>
-          <div class="duel">
-            ${card(w.top, 'huge')}
-            <div class="vs result late ${ok || w.saved ? 'ok' : 'bad'}">${w.saved ? '🐕 SAVED BY THE DOGS!' : w.banished ? `⚡ BANISHED ${game.S.monster.emoji}!` : w.coldTie ? '🧊 TIE = WIN!' : ok ? (mine === 'SAME' ? '🍯 HONEY POT!' : 'SAFE!') : w.tie ? 'TIE! The animatronics win ties.' : '💀 WRONG!'}</div>
-            ${revealSlot(w.drawn)}
+      case 'decide': case 'decideReveal': {
+        const reveal = S.phase === 'decideReveal';
+        const bank = w.decision === 'bank';
+        const preds = (choice) => Object.entries(w.preds).filter(([, p]) => p === choice).map(([id]) => game.player(id)).filter(Boolean);
+        return `<div class="center decide">
+          <h2>${avatar(watcher)} has <span class="pot-big">${w.pot} 🍯</span> in the pot</h2>
+          ${streakDots(w.streak)}
+          <div class="choice-cards">
+            <div class="choice-card bank ${reveal && bank ? 'chosen' : ''} ${reveal && !bank ? 'faded' : ''}">
+              <span class="emoji-xl">🏠</span><b>BANK IT</b><small>Keep ${w.pot} 🍯, end the shift safely</small>
+              ${reveal ? `<div class="pred">${preds('bank').map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</div>` : ''}
+            </div>
+            <div class="choice-card keep ${reveal && !bank ? 'chosen' : ''} ${reveal && bank ? 'faded' : ''}">
+              <span class="emoji-xl">🔦</span><b>KEEP GOING</b><small>Next right: +${game.potValue(w.streak)} · miss: lose it all</small>
+              ${reveal ? `<div class="pred">${preds('keep').map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</div>` : ''}
+            </div>
           </div>
-          <div class="guess-cols later">${groups}</div>
+          ${reveal ? `<p class="big">${bank ? `🏠 ${esc(watcher?.name)} banks it!` : `🔦 ${esc(watcher?.name)} keeps going!`}</p>` : `<p class="muted">Everyone else: predict what they'll do (+${game.sidePredict()})</p>${waitingStrip()}`}
         </div>`;
       }
       case 'safe':
         return `<div class="center">
           <div class="emoji-xl bounce">🌅🏠🐕🐕</div>
           <h1>6 AM! ${avatar(watcher)} survived the night shift!</h1>
-          <p class="big">+500 🍯 escape bonus</p>
+          <p class="big">${w.pot} 🍯 pot + ${SIX_AM} bonus</p>
         </div>`;
       case 'dragged':
         return `<div class="center dark">
@@ -433,9 +490,12 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz">
           <div class="quiz-head">${S.phase === 'finaleA' ? '🐻 Trivia Blitz' : '🐻 Bear Trivia'} <span class="muted">${mg.qi + 1}/${mg.questions.length}</span></div>
           <h1 class="q">${esc(q.q)}</h1>
-          <div class="answers reveal-q">${q.c.map((c, i) => {
-            const who = Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean);
-            return `<div class="ans ${i === q.a ? 'right' : 'dim'}"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span></div>`;
+          <div class="answers reveal-q2" style="--at:${revealAt((mg.order || []).length)}ms">${q.c.map((c, i) => {
+            const chips = (mg.order || []).map((id, k) => {
+              const p = game.player(id);
+              return p && mg.answers[id].i === i ? `<span class="pick-chip" style="animation-delay:${k * CHIP_MS}ms">${p.avatar}${gainTag(p.id)}</span>` : '';
+            }).join('');
+            return `<div class="ans ${i === q.a ? 'right-n' : 'wrong-n'}"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${chips}</span></div>`;
           }).join('')}</div>
         </div>`;
       }
@@ -446,10 +506,11 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz">
           <div class="quiz-head">📋 Cabin Census <span class="muted">${mg.qi + 1}/${mg.questions.length}</span></div>
           <h1 class="q">${esc(q.q)}</h1>
-          <div class="bars reveal-poll">${choices.map((c, i) => {
+          <div class="bars reveal-poll" style="--last:${choices.length}">${choices.map((c, i) => {
             const who = Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean);
             const top = q.top > 0 && q.counts[i] === q.top;
-            return `<div class="bar ${top ? 'right' : ''}" style="--i:${i}"><div class="fill" style="width:${(q.counts[i] / total) * 100}%"></div>
+            const rank = choices.map((_, j) => j).sort((a, b) => q.counts[a] - q.counts[b]).indexOf(i);
+            return `<div class="bar ${top ? 'right' : ''}" style="--i:${rank}"><div class="fill" style="width:${(q.counts[i] / total) * 100}%"></div>
               <span class="bl">${esc(c)}</span><span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span><span class="cnt">${q.counts[i]}</span></div>`;
           }).join('')}</div>
         </div>`;
@@ -466,17 +527,17 @@ export function startTV(root, { resume = null } = {}) {
         const artist = game.player(game.artistId());
         let side = '';
         if (S.phase === 'drawFib') {
-          side = `<h2>Write a fake title for this drawing</h2><p class="muted">Fool the others. Points for every vote your lie gets.</p>${waitingStrip()}`;
+          side = `<h2>What is this masterpiece? 🤔</h2><p class="big">Write a <b>fake title</b> on your phone.</p><p class="muted">Fool the others: points for every vote your lie gets.</p>${waitingStrip()}`;
         } else if (S.phase === 'drawVote') {
           side = `<h2>Which is the real title?</h2><div class="opts">${mg.options.map(o => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>${waitingStrip()}`;
         } else {
-          const order = mg.options.map((o, i) => [o, i]).sort((a, b) => (a[0].real ? 1 : 0) - (b[0].real ? 1 : 0));
+          const order = (mg.revealSeq || mg.options.map((_, i) => i)).map(i => [mg.options[i], i]);
           side = `<h2>The reveal</h2><div class="opts">${order.map(([o, i], k) => {
             const voters = Object.entries(mg.votes).filter(([, v]) => v === i).map(([id]) => game.player(id)).filter(Boolean);
             const owners = o.owners.map(id => game.player(id)).filter(Boolean);
             const by = o.real ? `the truth, drawn by ${artist?.avatar} ${esc(artist?.name)}` : o.house ? 'a house lie' : `lie by ${owners.map(p => `${p.avatar} ${esc(p.name)}`).join(', ')}`;
-            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${k * 1.3}s"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.map(p => p.avatar).join(' ') || '—'}</span></div>`;
-          }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
+            return `<div class="opt reveal ${o.real ? 'right' : ''}" style="animation-delay:${k * REVEAL_STEP}ms"><b>${esc(o.text)}</b><small>${by}</small><span class="voters">${voters.length ? `fooled: ${voters.map(p => p.avatar).join(' ')}` : '—'}</span></div>`;
+          }).join('')}</div>${Object.keys(S.gains).length ? `<div class="gains-line late-n" style="--at:${order.length * REVEAL_STEP}ms">${Object.keys(S.gains).map(id => `${game.player(id)?.avatar} ${gainTag(id)}`).join(' · ')}</div>` : ''}`;
         }
         return `<div class="drawful">
           <div class="art"><canvas id="art" width="640" height="640"></canvas><p>by ${avatar(artist)}${S.lost && artist?.id === S.lost.pid ? ' <span class="lost-tag">captured</span>' : ''}</p></div>
@@ -517,30 +578,22 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="center story">
           <div class="emoji-xl">🌅🎰🌅</div>
           <h1>Sunrise Stakes</h1>
-          <p>Five last cards before dawn. Everyone calls <b>HIGH</b>, <b>LOW</b> or <b>SAME</b>.</p>
-          <div class="ladder">${STAKES.values.map((v, i) => `<span class="${i === STAKES.values.length - 1 ? 'big-card' : ''}">🃏 ${v}</span>`).join('')}</div>
-          <p>Right = win the card's honey. Wrong = lose it. <b>SAME pays 4×.</b></p>
+          <p>Five last <b>This or That</b> questions before dawn, for everyone. Each one is worth more:</p>
+          <div class="ladder">${STAKES.values.map((v, i) => `<span class="${i === STAKES.values.length - 1 ? 'big-card' : ''}">🍯 ${v}</span>`).join('')}</div>
+          <p>Right = win it. Wrong = lose it.</p>
           ${boosted.length ? `<p>Comeback boost (1.5× on wins): ${boosted.map(p => avatar(p)).join(' ')}</p>` : ''}
           <p class="muted">Scores stay secret until sunrise.</p>
         </div>`;
       }
-      case 'stakesBet': case 'stakesShow': case 'stakesReveal': {
-        const pile = S.piles[mg.pile];
+      case 'stakesBet': case 'stakesReveal': {
         const reveal = S.phase === 'stakesReveal';
-        const top = reveal ? mg.top : pile.cards[pile.cards.length - 1];
-        const label = (b) => b.choice;
-        const bets = S.phase === 'stakesBet' ? waitingStrip() : `<div class="bets ${reveal ? 'later' : ''}">${S.players.filter(p => mg.bets[p.id]).map(p => {
-          const b = mg.bets[p.id];
-          return `<div class="bet ${reveal ? (b.won ? 'won' : 'lost') : ''} ${b.choice === 'SAME' ? 'allin' : ''}">${p.avatar} <b>${esc(p.name)}</b><span>${label(b)}</span>${reveal ? gainTag(p.id) : ''}</div>`;
-        }).join('') || '<p class="muted">Nobody bet!</p>'}</div>`;
+        const q = mg.q;
+        const c = CATEGORIES[q.cat];
+        const answers = Object.fromEntries(Object.entries(mg.bets).map(([id, b]) => [id, b.i]));
         return `<div class="watch">
-          <div class="watch-head"><h2>🌅 Sunrise Stakes · card ${mg.round} of ${mg.rounds} · <span class="win">±${STAKES.values[mg.round - 1]}</span> · ${PILE_ICONS[pile.name] || ''} ${esc(pile.name)}</h2></div>
-          <div class="duel">
-            ${card(top, 'huge')}
-            <div class="vs ${reveal ? 'result ok late' : ''}">${reveal ? `It's ${mg.actual}!` : S.phase === 'stakesShow' ? 'Bets are locked…' : 'Place your bets!<p class="muted">SAME pays 4×</p>'}</div>
-            ${reveal ? revealSlot(mg.drawn) : card(null, 'huge')}
-          </div>
-          ${bets}
+          <div class="watch-head"><h2>🌅 Sunrise Stakes · question ${mg.round} of ${mg.rounds} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2><div class="stake-val">±${STAKES.values[mg.round - 1]} 🍯</div></div>
+          ${totBoard(q, reveal ? mg.order : null, answers, null)}
+          ${reveal ? (q.note ? `<p class="fact late-n" style="--at:${revealAt(mg.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : '') : waitingStrip()}
         </div>`;
       }
       case 'end': {
@@ -558,10 +611,15 @@ export function startTV(root, { resume = null } = {}) {
 
   function render() {
     const S = game.S;
-    setMusic(MUSIC[S.phase] || 'none');
+    const splashKey = `${S.phase}:${S.turnIdx}:${S.watch?.streak}:${S.watch?.spot}:${S.mg?.type}:${S.mg?.round}:${S.mg?.qi}`;
+    const splash = splashKey !== lastSplash ? splashFor(S) : '';
+    if (splash) { lastSplash = splashKey; sfx.whoosh(); }
+    setMusic(hurryOn ? 'panic' : (MUSIC[S.phase] || 'none'));
     const showSide = !['lobby', 'end', 'scores', 'intro'].includes(S.phase);
     root.innerHTML = `
-      <div class="tv phase-${S.phase}">
+      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''}">
+        <div id="final-count" class="final-count"></div>
+        ${splash}
         <div class="tv-main">${stage()}</div>
         ${showSide ? `<div class="mini-code">${code}</div>` : ''}
         <div id="timer" class="timer"></div>

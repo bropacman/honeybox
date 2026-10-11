@@ -451,3 +451,67 @@ body.is-phone .moon { display: none; }
 .pick.haunted { border-color: var(--bad); box-shadow: 0 0 14px rgba(255, 60, 60, 0.5); }
 .lurk-ph { position: absolute; top: -10px; right: -6px; font-size: 1.6em; animation: lurk 2.4s ease-in-out infinite; }
 .phone .event-chip { margin: 4px 0; }
+
+/* ================= This or That ================= */
+.cat-spot { gap: 0.1em; }
+.cat-badge { font-size: 3em; line-height: 1; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.6)); transition: transform 0.2s; }
+.cat-name { font-size: 1em; font-weight: 900; color: var(--honey2); background: rgba(0,0,0,0.6); padding: 0.1em 0.6em; border-radius: 10px; white-space: nowrap; }
+.cat-spot .pile-name { font-size: 0.7em; }
+.spot.hl .cat-badge { transform: scale(1.3); }
+.spot.haunted .cat-badge { filter: drop-shadow(0 0 16px rgba(255, 60, 60, 0.9)); }
+.cat-chip { display: inline-block; padding: 0.05em 0.6em; border-radius: 999px; background: var(--bg2); border: 2px solid var(--honey); color: var(--honey); font-size: 0.8em; }
+.pot-meter { font-size: 1.1em; background: var(--panel); border: 2px solid var(--honey); border-radius: 14px; padding: 0.4em 0.8em; }
+.tot-q { text-align: center; font-size: 2.4em; margin: 0.4em 0 0.2em; }
+.tot { display: flex; align-items: stretch; justify-content: center; gap: 1.5vw; margin: 1vh 0 2vh; }
+.tot-opt { position: relative; flex: 1; max-width: 32vw; min-height: 22vh; background: var(--panel); border: 4px solid var(--line); border-radius: 22px; padding: 1em 1.2em 0.6em; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0.4em; }
+.tot-opt .letter { position: absolute; top: 0.5em; left: 0.6em; }
+.tot-text { font-size: 2em; font-weight: 900; line-height: 1.15; }
+.tot-or { align-self: center; font-family: 'Creepster', cursive; font-size: 2.6em; color: var(--honey); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.3em; justify-content: center; min-height: 1.8em; }
+.pick-chip { background: var(--bg2); border-radius: 999px; padding: 0.1em 0.6em; font-size: 0.85em; animation: chipIn 0.35s cubic-bezier(.2,1.6,.4,1) both; }
+.pick-chip.star { border: 2px solid var(--honey); }
+@keyframes chipIn { from { opacity: 0; transform: scale(0.2) translateY(14px); } to { opacity: 1; transform: none; } }
+.right-n { animation: rightOn 0.8s cubic-bezier(.2,1.6,.4,1) both; animation-delay: var(--at, 1.5s); }
+.wrong-n { animation: dimOut 0.6s ease both; animation-delay: var(--at, 1.5s); }
+.reveal-q2 .ans.right-n, .reveal-q2 .ans.wrong-n { animation-delay: var(--at); }
+.late-n { animation: verdict 0.7s cubic-bezier(.2,1.6,.4,1) both; animation-delay: var(--at, 2s); }
+.fact { text-align: center; font-size: 1.2em; color: var(--honey2); }
+.vs.result.late-n { text-align: center; }
+.stake-val { font-size: 1.8em; font-weight: 900; color: var(--honey); }
+/* bank or keep */
+.decide .pot-big { color: var(--honey); }
+.choice-cards { display: flex; gap: 3vw; margin: 2vh 0; }
+.choice-card { width: 26vw; padding: 1.2em; border-radius: 24px; background: var(--panel); border: 4px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 0.3em; font-size: 1.3em; }
+.choice-card b { font-size: 1.4em; }
+.choice-card small { color: var(--muted); }
+.choice-card.bank { border-color: var(--good); }
+.choice-card.keep { border-color: var(--bad); }
+.choice-card.chosen { animation: verdict 0.7s cubic-bezier(.2,1.6,.4,1) both; box-shadow: 0 0 40px rgba(242, 177, 52, 0.6); }
+.choice-card.faded { opacity: 0.35; }
+.choice-card .pred { min-height: 1.6em; }
+/* last 10 seconds */
+.tv.hurry::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(255, 40, 40, 0.45); animation: hurry 1s ease-in-out infinite; z-index: 4; }
+@keyframes hurry { 50% { box-shadow: inset 0 0 160px 50px rgba(255, 40, 40, 0.7); } }
+.final-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22em; font-weight: 900; color: rgba(255, 93, 79, 0.35); pointer-events: none; z-index: 6; }
+.final-count:empty { display: none; }
+/* title-card splash */
+.splash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 8; pointer-events: none; background: rgba(5, 12, 9, 0.85); animation: splashOut 1.6s ease both; }
+.splash-in { display: flex; flex-direction: column; align-items: center; gap: 0.2em; animation: splashIn 1.6s cubic-bezier(.2,1.4,.4,1) both; }
+.sp-emoji { font-size: 9em; line-height: 1; filter: drop-shadow(0 0 30px rgba(242, 177, 52, 0.6)); }
+.splash b { font-size: 3.4em; font-family: 'Creepster', 'Nunito', cursive; font-weight: 400; letter-spacing: 3px; color: var(--honey2); }
+.splash small { font-size: 1.4em; color: var(--ink); }
+.splash.sunrise { background: radial-gradient(circle at 50% 80%, rgba(242, 140, 52, 0.6), rgba(5, 12, 9, 0.9)); }
+.splash.mg-trivia .sp-emoji, .splash.mg-draw .sp-emoji, .splash.mg-poll .sp-emoji { animation: spinIn 1.2s ease both; }
+@keyframes splashIn { 0% { transform: scale(0.3) rotate(-8deg); opacity: 0; } 25% { transform: scale(1.1) rotate(2deg); opacity: 1; } 75% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes splashOut { 0%, 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+@keyframes spinIn { from { transform: rotate(-540deg) scale(0.2); } to { transform: none; } }
+/* phone */
+.tot-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.tot-btn { font-size: 1.35em; padding: 18px 14px; border-radius: 16px; border-width: 3px; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; }
+.tot-btn .letter { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); }
+.tot-btn small { font-size: 0.6em; color: var(--muted); }
+.tot-btn.sel { background: var(--honey); color: #2b1a00; opacity: 1; }
+.tot-btn.bank { border-color: var(--good); }
+.tot-btn.keep { border-color: var(--bad); }
+.tot-btns .or { text-align: center; color: var(--honey); font-family: 'Creepster', cursive; font-size: 1.4em; }
+.cat-em { font-size: 2em; line-height: 1; }

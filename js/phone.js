@@ -200,30 +200,45 @@ export function startPhone(root) {
           : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;
       case 'pick':
-        body = `<h2>Where do you look?</h2><p class="muted">Streak ${v.streak}/3 · deeper = more honey, bigger stakes</p>
+        body = `<h2>Pick a category</h2>
+          <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🍯</b> · next right answer <b class="win">+${v.win}</b></p>
           ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
-          <p class="small">${v.monster.emoji} lurks at <b>${esc(v.piles[v.monster.pile].name)}</b>: double risk, <b class="win">+300</b> if you call it right</p>
-          <div class="pick-grid">${v.piles.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}${cardHtml(p.top, 'sm')}<b>${esc(p.name)}</b><small>${p.depth} deep</small><small><span class="win">+${p.win}</span> · <span class="risk">risk ${p.risk}</span></small></button>`).join('')}</div>`;
+          <p class="small">${v.monster.emoji} lurks at <b>${esc(v.spots[v.monster.spot].name)}</b>: miss there = double stake, right = <b class="win">+${v.spots[v.monster.spot].banish}</b></p>
+          <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${esc(p.name)}</small></button>`).join('')}</div>`;
         break;
-      case 'guess':
-        body = `<p class="role">${v.watcher ? `🔦 You're on watch · streak ${v.streak}/3` : `Betting on ${esc(v.watcherName)}'s card`}</p>
-          ${v.event ? `<p class="center-sm"><span class="event-chip">${v.event.emoji} ${esc(v.event.name)}</span></p>` : ''}
-          ${v.watcher ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Miss = dragged off · <b>${v.risk} 🍯 at stake</b>${v.haunted ? ' · call it right for <b>+300</b>' : ''}</div>` : `<div class="safe-box">No risk for you · right <b>+${v.side.right}</b> · SAME <b>+${v.side.same}</b></div>`}
-          <div class="center-sm">${cardHtml(v.top)}<p>${esc(v.pileName)} · ${v.depth} deep · the next card is…</p></div>
-          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()} ${v.locked === c ? 'sel' : ''}" data-guess="${c}" ${v.locked ? 'disabled' : ''}>${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c} <small class="pay">+${v.watcher ? (c === 'SAME' ? v.same : v.win) : (c === 'SAME' ? v.side.same : v.side.right)}</small></button>`).join('')}</div>
-          ${v.locked ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
+      case 'tot':
+        body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>
+          ${v.watcher
+            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🍯)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''} · Miss = lose the pot & get dragged off</div>`
+            : `<div class="safe-box">No risk for you · right answer <b>+${v.side}</b></div>`}
+          <h2 class="q">${esc(v.q)}</h2>
+          <div class="tot-btns">${v.opts.map((o, i) => `<button class="tot-btn ${v.locked === i ? 'sel' : ''}" data-tot="${i}" ${v.locked != null ? 'disabled' : ''}><span class="letter">${'AB'[i]}</span>${esc(o)}</button>`).join('<div class="or">or</div>')}</div>
+          ${v.locked != null ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
+        break;
+      case 'decide':
+        body = v.watcher
+          ? `<p class="role">🔦 Your night shift · ${v.streak}/3</p><h2>You have ${v.pot} 🍯 in the pot</h2>
+            <div class="tot-btns">
+              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 Bank it<small>Keep ${v.pot} 🍯, end your shift</small></button>
+              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Next right: +${v.next}. Miss: lose it all</small></button>
+            </div>`
+          : `<p class="role">${esc(v.watcherName)} has ${v.pot} 🍯 in the pot</p><h2>What will they do?</h2><p class="muted">Guess right for +${v.predict}</p>
+            <div class="tot-btns">
+              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 They'll bank it</button>
+              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 They'll keep going</button>
+            </div>`;
         break;
       case 'finale':
         body = `<p class="role">🌅 You're in last place…</p><h2>Choose how the night ends!</h2>
           <div class="choices">${v.options.map(o => `<button class="choice finale-choice" data-finale="${o.key}"><span class="f-emoji">${o.emoji}</span><span><b>${esc(o.name)}</b><br><small>${esc(o.blurb)}</small></span></button>`).join('')}</div>`;
         break;
-      case 'stakes': {
-        body = `<p class="role">🌅 Sunrise Stakes · card ${v.round}${v.boosted ? ' · <span class="boost">1.5× boost</span>' : ''}</p>
-          <div class="center-sm">${cardHtml(v.top)}<p>${esc(v.pileName)} · this card is worth <b>${v.value} 🍯</b></p></div>
-          ${v.locked ? `<div class="center-sm"><h2>You said ${v.locked.choice}</h2><p>Watch the TV!</p></div>` : `
-          <div class="hls">${['HIGH', 'LOW', 'SAME'].map(c => `<button class="hl ${c.toLowerCase()}" data-stake="${c}">${c === 'HIGH' ? '⬆️' : c === 'LOW' ? '⬇️' : '🍯'} ${c} <small class="pay">±${c === 'SAME' ? v.same : v.value}</small></button>`).join('')}</div>`}`;
+      case 'stakes':
+        body = `<p class="role">🌅 Sunrise Stakes · ${v.round} · ${v.catEmoji} ${esc(v.catName)}${v.boosted ? ' · <span class="boost">1.5× boost</span>' : ''}</p>
+          <div class="safe-box">Right = <b>+${v.value}</b> · wrong = <b class="risk">−${v.value}</b></div>
+          <h2 class="q">${esc(v.q)}</h2>
+          <div class="tot-btns">${v.opts.map((o, i) => `<button class="tot-btn ${v.locked === i ? 'sel' : ''}" data-stake="${i}" ${v.locked != null ? 'disabled' : ''}><span class="letter">${'AB'[i]}</span>${esc(o)}</button>`).join('<div class="or">or</div>')}</div>
+          ${v.locked != null ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
         break;
-      }
       case 'choices':
         body = `<p class="role">${esc(v.title)} ${v.num ? `· ${v.num}` : ''}</p><h2 class="q">${esc(v.q)}</h2>${v.sub ? `<p class="muted">${esc(v.sub)}</p>` : ''}
           <div class="choices">${v.choices.map((c, i) => `<button class="choice ${v.locked === i ? 'sel' : ''}" data-answer="${i}" ${v.locked != null || c.disabled ? 'disabled' : ''}><span class="letter">${'ABCDEFGH'[i]}</span>${esc(c.text)}${c.disabled ? ' <small>(yours)</small>' : ''}</button>`).join('')}</div>
@@ -284,21 +299,19 @@ export function startPhone(root) {
       root.querySelectorAll('[data-pick]').forEach(x => { x.disabled = true; });
       send({ t: 'pick', i: Number(b.dataset.pick) });
     }));
-    root.querySelectorAll('[data-guess]').forEach(b => b.addEventListener('click', () => {
-      root.querySelectorAll('[data-guess]').forEach(x => { x.disabled = true; });
+    const once = (sel, send1) => root.querySelectorAll(sel).forEach(b => b.addEventListener('click', () => {
+      root.querySelectorAll(sel).forEach(x => { x.disabled = true; });
       b.classList.add('sel');
-      send({ t: 'guess', choice: b.dataset.guess });
+      send1(b);
     }));
+    once('[data-tot]', b => send({ t: 'answer', i: Number(b.dataset.tot) }));
+    once('[data-decide]', b => send({ t: 'decide', choice: b.dataset.decide }));
     root.querySelectorAll('[data-finale]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-finale]').forEach(x => { x.disabled = true; });
       b.classList.add('sel');
       send({ t: 'finale', choice: b.dataset.finale });
     }));
-    root.querySelectorAll('[data-stake]').forEach(b => b.addEventListener('click', () => {
-      root.querySelectorAll('[data-stake]').forEach(x => { x.disabled = true; });
-      b.classList.add('sel');
-      send({ t: 'stake', choice: b.dataset.stake });
-    }));
+    once('[data-stake]', b => send({ t: 'stake', i: Number(b.dataset.stake) }));
     root.querySelectorAll('[data-answer]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-answer]').forEach(x => { x.disabled = true; });
       b.classList.add('sel');
@@ -334,14 +347,14 @@ export function startPhone(root) {
 
   // ---------- test bot: plays randomly through the real UI ----------
   function botAct() {
-    const delay = 400 + Math.random() * 500;
+    const delay = (params.has('fastbot') ? 60 : 400) + Math.random() * (params.has('fastbot') ? 120 : 500);
     setTimeout(() => {
       const enabled = (sel) => [...root.querySelectorAll(sel)].filter(b => !b.disabled);
       const choose = (list) => list[Math.floor(Math.random() * list.length)];
       if (view.screen === 'draw' && pad) { pad.scribble(); root.querySelector('#submit')?.click(); return; }
       const lie = root.querySelector('#lie');
       if (lie) { lie.value = choose(['A moose doing karate', 'Grandpa at the beach', 'A haunted toaster', 'Dog vs vacuum']) + ' ' + Math.floor(Math.random() * 99); root.querySelector('#send').click(); return; }
-      const btns = enabled('[data-pick], [data-guess], [data-answer], [data-stake], [data-finale]');
+      const btns = enabled('[data-pick], [data-tot], [data-decide], [data-answer], [data-stake], [data-finale]');
       if (btns.length) choose(btns).click();
     }, delay);
   }

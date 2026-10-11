@@ -44,7 +44,9 @@ tv.on('console', m => { if (m.type() === 'error' && !/fonts\.g/.test(m.text())) 
 
 const base = 'http://127.0.0.1:5178/';
 const peer = 'peer=127.0.0.1:9000';
-await tv.goto(`${base}?host=1&${peer}&speed=0.1`);
+// TURBO=1: very fast timers and no screenshots (logic-only check)
+const TURBO = Boolean(process.env.TURBO);
+await tv.goto(`${base}?host=1&${peer}&speed=${TURBO ? 0.03 : 0.1}`);
 await tv.click('#open');
 await tv.waitForFunction(() => /^[A-Z]{4}$/.test(document.querySelector('.code')?.textContent || ''), null, { timeout: 20000 });
 const code = await tv.textContent('.code');
@@ -56,7 +58,7 @@ for (let i = 0; i < PHONES; i++) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
   const p = await ctx.newPage();
   p.on('pageerror', e => errors.push(`phone${i}: ${e.message}`));
-  await p.goto(`${base}?room=${code}&${peer}&bot=1`);
+  await p.goto(`${base}?room=${code}&${peer}&bot=1${TURBO ? '&fastbot=1' : ''}`);
   phones.push(p);
 }
 await tv.waitForFunction(n => document.querySelectorAll('.camper').length === n, PHONES, { timeout: 30000 });
@@ -96,7 +98,7 @@ for (let g = 0; g < GAMES; g++) {
       last = tag;
       seen.push(tag);
       if (st.mg && st.mg !== 'finale') minigames.add(st.mg);
-      if (!seenAll.has(tag)) {
+      if (!seenAll.has(tag) && !TURBO) {
         seenAll.add(tag);
         const settle = ['stakesReveal', 'reveal', 'drawReveal'].includes(st.phase);
         if (settle) { await tv.evaluate(() => window.__honeybox.togglePause()); await tv.waitForTimeout(1200); await tv.evaluate(() => document.querySelector('.paused')?.remove()); }
@@ -112,7 +114,7 @@ for (let g = 0; g < GAMES; g++) {
         if (settle) await tv.evaluate(() => window.__honeybox.togglePause());
       }
       // one screenshot per distinct phone screen, before the bot acts on it
-      for (const p of phones) {
+      for (const p of TURBO ? [] : phones) {
         const screen = await p.evaluate(() => document.querySelector('.phone')?.className.match(/screen-(\w+)/)?.[1] || null);
         if (screen && !phoneScreens.has(screen)) {
           phoneScreens.add(screen);
