@@ -412,10 +412,12 @@ export function startTV(root, { resume = null } = {}) {
             <div class="lengths">Game length:
               ${Object.keys(LENGTHS).map(l => `<button data-act="length" data-len="${l}" class="${S.length === l ? 'sel' : ''}">${l}</button>`).join('')}
             </div>
-            <div class="voice-row">Narrator:
+            <div class="voice-row"><b>Narrator</b> <span class="muted">reads the game out loud.</span> Voice:
               <select id="voice">${voiceOptions().map(v => `<option value="${esc(v.name)}" ${v.name === voiceSettings().voice ? 'selected' : ''}>${esc(v.label)}</option>`).join('') || '<option>Default</option>'}</select>
+              <button data-act="testvoice">▶ Hear it</button>
+            </div>
+            <div class="voice-row">Style:
               ${Object.keys(STYLES).map(k => `<button data-act="style" data-style="${k}" class="${voiceSettings().style === k ? 'sel' : ''}">${STYLES[k].label}</button>`).join('')}
-              <button data-act="testvoice">▶ Test</button>
             </div>
             <button class="big-btn" data-act="start" ${S.players.length >= MIN_PLAYERS ? '' : 'disabled'}>Start the night 🔥</button>
             <p class="muted small">Best with 3–8 players. ${S.players[0] ? `⭐ VIP ${esc(game.player(game.vipId())?.name || '')} can also start, pause and skip from their phone.` : 'The first player to join becomes the ⭐ VIP.'}</p>
@@ -484,12 +486,13 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="center decide">
           <h2>${avatar(watcher)} has <span class="pot-big">${w.pot} 🍯</span> in the pot</h2>
           ${streakDots(w.streak)}
+          <p class="risk-line">${w.streak} of 3 right · ${3 - w.streak} more to 6 AM · <b class="bad-t">risking ${w.pot} 🍯</b></p>
           <div class="choice-cards">
-            <div class="choice-card bank ${reveal && bank ? 'chosen' : ''} ${reveal && !bank ? 'faded' : ''}">
-              <span class="emoji-xl">🏠</span><b>BANK IT</b><small>Keep ${w.pot} 🍯, end the shift safely</small>
-            </div>
             <div class="choice-card keep ${reveal && !bank ? 'chosen' : ''} ${reveal && bank ? 'faded' : ''}">
               <span class="emoji-xl">🔦</span><b>KEEP GOING</b><small>Next right: +${game.potValue(w.streak)} · miss: lose it all</small>
+            </div>
+            <div class="choice-card bank ${reveal && bank ? 'chosen' : ''} ${reveal && !bank ? 'faded' : ''}">
+              <span class="emoji-xl">🏠</span><b>BANK IT</b><small>Keep ${w.pot} 🍯, end the shift safely</small>
             </div>
           </div>
           ${reveal ? `<p class="big">${bank ? `🏠 ${esc(watcher?.name)} banks it!` : `🔦 ${esc(watcher?.name)} keeps going!`}</p>` : `<p class="muted">${esc(watcher?.name)} is deciding…</p>`}

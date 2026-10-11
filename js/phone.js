@@ -218,10 +218,13 @@ export function startPhone(root) {
           ${v.locked != null ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
         break;
       case 'decide':
-        body = `<p class="role">🔦 Your night shift · ${v.streak}/3</p><h2>You have ${v.pot} 🍯 in the pot</h2>
+        body = `<p class="role">🔦 Your night shift</p>
+            <div class="shift-dots">${[0, 1, 2].map(i => `<i class="${i < v.streak ? 'on' : ''}">${i < v.streak ? '✅' : '⬜'}</i>`).join('')}</div>
+            <p class="center-sm">${v.streak} of 3 right · ${3 - v.streak} more to reach 6 AM</p>
+            <h2>Your pot: ${v.pot} 🍯</h2>
             <div class="tot-btns">
-              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 Bank it<small>Keep ${v.pot} 🍯, end your shift</small></button>
-              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Next right: +${v.next}. Miss: lose it all</small></button>
+              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Right: pot grows to ${v.pot + v.next} 🍯${v.sixAm ? ` + ${v.sixAm} 6 AM bonus` : ''}<br>Miss: lose all ${v.pot} 🍯 and get dragged off</small></button>
+              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 Bank it<small>Take ${v.pot} 🍯 home safe. Ends your shift.</small></button>
             </div>`;
         break;
       case 'finale':

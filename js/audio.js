@@ -309,7 +309,7 @@ export function characterSound(avatar, mood = 'happy', delayMs = 0) {
 // Browser voices only (free, offline). Quality depends on the laptop:
 // Edge has very natural "Online (Natural)" voices; Chrome has "Google" voices; Macs have Siri-like ones.
 export const STYLES = {
-  narrator: { label: '🎙️ Narrator', rate: 1.0, pitch: 0.95, sample: 'Welcome to the cabin. Survive until 6 A M.' },
+  narrator: { label: '🎙️ Normal', rate: 1.0, pitch: 0.95, sample: 'Welcome to the cabin. Survive until 6 A M.' },
   creepy: { label: '👻 Creepy', rate: 0.82, pitch: 0.35, sample: 'Story Land is closed. But we are still… awake.' },
   counselor: { label: '🏕️ Camp Counselor', rate: 1.15, pitch: 1.25, sample: 'Okay campers! Who is ready for some s’mores and screaming?' },
   animatronic: { label: '🤖 Animatronic', rate: 0.75, pitch: 0.1, sample: 'Hello. Friend. Please. Stay. Forever.' },
@@ -337,11 +337,13 @@ function englishVoices() {
   return all.filter(v => /^en/i.test(v.lang)).sort((a, b) => voiceRank(b) - voiceRank(a));
 }
 
+// short, readable voice names: "Microsoft Emma Multilingual Online (Natural) - English (United States)" -> "Emma (en-US)"
 export function voiceOptions() {
-  return englishVoices().map(v => ({
-    name: v.name,
-    label: `${voiceRank(v) >= 80 ? '⭐ ' : ''}${v.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*\(.*?\)\s*/g, ' ').trim()} (${v.lang})`
-  }));
+  return englishVoices().map(v => {
+    const short = v.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*\(.*?\)/g, '').replace(/\s+-\s+.*$/, '')
+      .replace(/\b(Online|Multilingual|Natural)\b/g, '').replace(/\s+/g, ' ').trim() || v.name;
+    return { name: v.name, label: `${voiceRank(v) >= 80 ? '⭐ ' : ''}${short} (${v.lang})` };
+  });
 }
 
 export function voiceSettings() {

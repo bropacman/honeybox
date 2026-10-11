@@ -544,7 +544,7 @@ export class Game {
         return this.go('safe', TIMES.safe);
       }
       w.decision = null;
-      this.emit('say', `${name}: bank ${w.pot} honey and go back to the cabin… or keep going for ${this.potValue(w.streak)} more?`);
+      this.emit('say', `${name}, you're risking ${w.pot} honey. Keep going for ${this.potValue(w.streak)} more… or bank it and run back to the cabin?`);
       return this.go('decide', TIMES.decide);
     }
     S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot };
@@ -1103,7 +1103,7 @@ export class Game {
         if (w.watcherId !== pid) return wait(`${watcher?.name} has ${w.pot} 🍯`, 'Bank it… or keep going?', '🤔');
         return {
           ...base, screen: 'decide', watcher: w.watcherId === pid, watcherName: watcher?.name, pot: w.pot, next: this.potValue(w.streak),
-          streak: w.streak, risk: STAKE, locked: w.decision
+          streak: w.streak, risk: STAKE, locked: w.decision, sixAm: w.streak + 1 >= 3 ? SIX_AM : 0
         };
       case 'decideReveal': {
         const bank = w.decision === 'bank';

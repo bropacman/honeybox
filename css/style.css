@@ -548,3 +548,9 @@ body.is-phone .moon { display: none; }
 .phone .spin-ph { animation: spinPh 3.8s linear both; }
 @keyframes spinPh { 0% { transform: rotate(0); opacity: 1; } 95% { transform: rotate(1440deg); opacity: 1; } 100% { opacity: 0; height: 0; } }
 .phone .spin-late { animation-delay: 3.8s; }
+
+/* bank-or-keep progress */
+.risk-line { font-size: 1.2em; margin: 0.2em 0 0; }
+.bad-t { color: var(--bad); }
+.shift-dots { display: flex; justify-content: center; gap: 0.4em; font-size: 1.8em; font-style: normal; }
+.shift-dots i { font-style: normal; }
