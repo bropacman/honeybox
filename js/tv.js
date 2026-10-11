@@ -385,13 +385,17 @@ export function startTV(root, { resume = null } = {}) {
         </div>`;
       }
       case 'intro':
-        return `<div class="center story">
-          <div class="emoji-xl">🏚️🌲🐕🐕🌲</div>
-          <h1>Five Nights at the Cabin</h1>
-          <p>The family is holed up at the cabin on Lake Winnipesaukee, with Story Land, Funspot, Clark's and Santa's Village just up the road. Everything closed hours ago… but the animatronics didn't get the memo.</p>
-          <p>Each round one of you takes the <b>night shift</b>: pick a category on the map and answer a <b>This or That</b>. Everyone else answers too, for side points.</p>
-          <p>Every right answer grows your 🍯 <b>pot</b>. Then choose: <b>🏠 bank it</b>, or <b>🔦 keep going</b> for more. Three in a row reaches <b>6 AM</b> and a bonus.</p>
-          <p>Miss, and you drop the pot and get <b>dragged off</b>. Everyone plays a game for honey while you play to escape.</p>
+        return `<div class="center howto">
+          <h1>How to Play</h1>
+          <p class="muted">The cabin is surrounded. The animatronics are awake. Survive until sunrise with the most 🍯 honey.</p>
+          <ol class="steps">
+            <li><span>🔦</span><div><b>Take turns on the night shift.</b> Each round, one player is up.</div></li>
+            <li><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
+            <li><span>🍯</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🏠 bank it</b> and end your turn safely, or <b>🔦 keep going</b>. Everyone else guesses which you'll pick.</div></li>
+            <li><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
+            <li><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
+            <li><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most honey wins!</div></li>
+          </ol>
         </div>`;
       case 'turnStart':
         return `<div class="center">

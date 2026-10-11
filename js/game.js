@@ -7,7 +7,7 @@ export const CLOCK = ['12 AM', '2 AM', '4 AM', '6 AM'];
 
 export const SEC = 1000;
 export const TIMES = {
-  intro: 22, turnStart: 9, pick: 12, tot: 20, totReveal: 7, decide: 15, decideReveal: 6, safe: 6, dragged: 7,
+  intro: 26, turnStart: 9, pick: 12, tot: 20, totReveal: 7, decide: 15, decideReveal: 6, safe: 6, dragged: 7,
   mgIntro: 8, triviaQ: 20, triviaA: 8, pollQ: 20, pollA: 9,
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 5,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
@@ -287,7 +287,7 @@ export class Game {
     S.event = null;
     S.lastEvent = null;
     this.spawnMonster();
-    this.emit('say', 'Welcome to the cabin on Lake Winnipesaukee. Story Land, Funspot and Santa\'s Village closed hours ago. But the animatronics are still moving. Survive until 6 A M.');
+    this.emit('say', 'Welcome to the cabin. The animatronics are awake, so here\'s how to survive. Each round, one of you takes the night shift. Pick a category and answer This or That. Everyone else answers too, risk free. Every right answer fills your pot. Then bank it, or keep going. Three in a row gets you to 6 A M and a bonus. Miss, and you drop the pot and get dragged into a mini game. Most honey at sunrise wins.');
     this.go('intro', TIMES.intro);
   }
 
@@ -1037,7 +1037,7 @@ export class Game {
 
     switch (S.phase) {
       case 'lobby': return { ...base, screen: 'lobby', length: S.length, count: S.players.length, taken: S.players.filter(p => p.id !== pid).map(p => p.avatar) };
-      case 'intro': return wait('Look at the TV', 'The night is starting…', '🌲');
+      case 'intro': return wait('How to play', 'The rules are on the TV. Listen up!', '📖');
       case 'turnStart': {
         const ev = EVENTS[S.event] || EVENTS.calm;
         return w.watcherId === pid ? wait(`You're on the night shift! ${ev.emoji} ${ev.name}`, ev.text, '🔦')

@@ -520,3 +520,12 @@ body.is-phone .moon { display: none; }
 .cat-toggles button { padding: 4px 10px; }
 .cat-toggles button.sel { border-color: var(--honey); color: var(--honey); }
 .cat-toggles button.off { opacity: 0.4; text-decoration: line-through; }
+
+/* how to play */
+.howto h1 { margin-bottom: 0.1em; }
+.steps { list-style: none; padding: 0; margin: 0.8em 0 0; display: flex; flex-direction: column; gap: 0.55em; max-width: 52em; text-align: left; }
+.steps li { display: flex; gap: 0.8em; align-items: center; background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 0.5em 1em; font-size: 1.05em; font-weight: 600; animation: lateIn 0.5s ease-out both; }
+.steps li:nth-child(1) { animation-delay: 0.3s; } .steps li:nth-child(2) { animation-delay: 1.2s; } .steps li:nth-child(3) { animation-delay: 3.5s; }
+.steps li:nth-child(4) { animation-delay: 6.5s; } .steps li:nth-child(5) { animation-delay: 8s; } .steps li:nth-child(6) { animation-delay: 10.5s; }
+.steps li span { font-size: 1.8em; }
+.steps b { color: var(--honey2); }
