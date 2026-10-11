@@ -296,7 +296,16 @@ export class Game {
     S.event = null;
     S.lastEvent = null;
     this.spawnMonster();
-    this.emit('say', 'Welcome to the cabin. The animatronics are awake, so here\'s how to survive. Each round, one of you takes the night shift. Pick a category and answer This or That. Everyone else answers too, risk free. Every right answer fills your pot. Then bank it, or keep going. Three in a row gets you to 6 A M and a bonus. Miss, and you drop the pot and get dragged into a mini game. Most honey at sunrise wins.');
+    // one line per How to Play step; the TV reveals each step as its line starts
+    this.emit('say', [
+      'Welcome to the cabin. The animatronics are awake. Survive until sunrise with the most honey.',
+      'Take turns on the night shift. Each round, one player is up.',
+      'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
+      'Right answers fill your pot. After each one, bank it and end your turn safely, or keep going.',
+      'Three in a row gets you to 6 A M, and a bonus.',
+      'Miss, and you drop the pot and get dragged into a mini game. Do well to escape.',
+      'At sunrise, last place picks the finale. Most honey wins!'
+    ]);
     this.go('intro', TIMES.intro);
   }
 

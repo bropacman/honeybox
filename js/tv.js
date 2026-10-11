@@ -117,13 +117,31 @@ export function startTV(root, { resume = null } = {}) {
     }
   }
 
+  let introShown = 99;
+  // still = re-render: steps already showing appear without replaying their entrance
+  function showIntroSteps(still = false) {
+    document.querySelectorAll('.howto [data-step]').forEach(el => {
+      const on = Number(el.dataset.step) < introShown;
+      if (on && !el.classList.contains('shown') && still) el.classList.add('still');
+      el.classList.toggle('shown', on);
+    });
+  }
+
   game.on((type, data) => {
     if (type === 'change') {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify({ at: Date.now(), S: game.S })); } catch (e) { /* full */ }
       render();
       sendViews();
     } else if (type === 'sfx') sfx[data]?.();
-    else if (type === 'say') say(data);
+    else if (type === 'say') {
+      if (Array.isArray(data)) {
+        // reveal each How to Play step as the narrator reaches it (all at once if there's no voice)
+        introShown = 0;
+        const cue = (i) => { introShown = Math.max(introShown, i + 1); showIntroSteps(); };
+        if (!say(data, cue)) introShown = 99;
+        showIntroSteps();
+      } else say(data);
+    }
     else if (type === 'mood') {
       const p = game.player(data.pid);
       if (!p) return;
@@ -199,7 +217,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
-    if (act === 'mute') { setMuted(!isMuted()); render(); }
+    if (act === 'mute') { setMuted(!isMuted()); if (isMuted()) introShown = 99; render(); }
     if (act === 'again') game.restart();
     if (act === 'style') { setStyle(b.dataset.style); stopSpeaking(); say(STYLES[b.dataset.style].sample); render(); }
     if (act === 'testvoice') { stopSpeaking(); say(STYLES[voiceSettings().style].sample); }
@@ -408,14 +426,14 @@ export function startTV(root, { resume = null } = {}) {
       case 'intro':
         return `<div class="center howto">
           <h1>How to Play</h1>
-          <p class="muted">The cabin is surrounded. The animatronics are awake. Survive until sunrise with the most 🍯 honey.</p>
+          <p class="muted" data-step="0">The cabin is surrounded. The animatronics are awake. Survive until sunrise with the most 🍯 honey.</p>
           <ol class="steps">
-            <li><span>🔦</span><div><b>Take turns on the night shift.</b> Each round, one player is up.</div></li>
-            <li><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
-            <li><span>🍯</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🏠 bank it</b> and end your turn safely, or <b>🔦 keep going</b>. Everyone else guesses which you'll pick.</div></li>
-            <li><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
-            <li><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
-            <li><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most honey wins!</div></li>
+            <li data-step="1"><span>🔦</span><div><b>Take turns on the night shift.</b> Each round, one player is up.</div></li>
+            <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
+            <li data-step="3"><span>🍯</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🏠 bank it</b> and end your turn safely, or <b>🔦 keep going</b>. Everyone else guesses which you'll pick.</div></li>
+            <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
+            <li data-step="5"><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
+            <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most honey wins!</div></li>
           </ol>
         </div>`;
       case 'turnStart':
@@ -659,6 +677,7 @@ export function startTV(root, { resume = null } = {}) {
         </div>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
       </div>`;
+    if (S.phase === 'intro') showIntroSteps(true);
 
     if (S.phase === 'lobby') {
       const el = root.querySelector('#qr');

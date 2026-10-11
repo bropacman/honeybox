@@ -372,15 +372,20 @@ function chunks(text) {
   return out;
 }
 
-export function say(text) {
-  if (muted || !window.speechSynthesis || !text) return;
-  queue.push(...chunks(text));
+// text can be a string or a list of lines; onLine(i) fires as line i starts being spoken
+export function say(text, onLine) {
+  if (muted || !window.speechSynthesis || !text) return false;
+  (Array.isArray(text) ? text : [text]).forEach((line, i) => {
+    chunks(line).forEach((t, j) => queue.push({ text: t, cue: j === 0 && onLine ? () => onLine(i) : null }));
+  });
   if (!current) speakNext();
+  return true;
 }
 
 function speakNext() {
-  const text = queue.shift();
-  if (!text || muted) { current = null; return; }
+  const item = queue.shift();
+  if (!item || muted) { current = null; return; }
+  const { text, cue } = item;
   const u = new SpeechSynthesisUtterance(text);
   const name = voiceSettings().voice;
   const v = englishVoices().find(x => x.name === name);
@@ -406,4 +411,5 @@ function speakNext() {
   };
   setTimeout(watchdog, est);
   window.speechSynthesis.speak(u);
+  cue?.();
 }
