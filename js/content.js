@@ -106,7 +106,7 @@ export const TRIVIA = [
   { q: 'Which large cruise ship sails on Lake Winnipesaukee?', c: ['The Lady of the Lake', 'The M/S Mount Washington', 'The Granite Queen', 'The Loon Express'], a: 1 },
   { q: 'Weirs Beach is on which lake?', c: ['Squam Lake', 'Lake Sunapee', 'Lake Winnipesaukee', 'Ossipee Lake'], a: 2 },
   { q: 'The Kancamagus Highway connects Conway to which town?', c: ['Lincoln', 'Laconia', 'Littleton', 'Plymouth'], a: 0 },
-  { q: 'Cathedral Ledge, a famous climbing cliff, is in which town?', c: ['Franconia', 'North Conway', 'Gorham', 'Jackson'], a: 1 },
+  { q: 'Cathedral Ledge, a famous climbing cliff, overlooks which New Hampshire village?', c: ['North Conway', 'Franconia', 'Gorham', 'Jackson'], a: 0 },
   { q: 'Santa\'s Village theme park is in which NH town?', c: ['Glen', 'Jefferson', 'Bartlett', 'Lincoln'], a: 1 },
   { q: 'In "Five Nights at Freddy\'s," what time does each night end?', c: ['4 AM', '5 AM', '6 AM', 'Midnight'], a: 2 },
   { q: 'What is the name of the restaurant in "Five Nights at Freddy\'s"?', c: ["Chuck E.'s Arcade", "Freddy Fazbear's Pizza", "Bonnie's Burger Barn", "Foxy's Fun House"], a: 1 },

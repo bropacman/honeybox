@@ -52,8 +52,8 @@ export const NATURE_2 = [
   X(3, 'Which is the more abundant gas in the air?', 'Argon', 'Carbon dioxide', 'About 0.93% vs about 0.04%'),
   X(3, 'Which is closer to Earth on average?', 'Mercury', 'Venus', 'Mercury is the closest planet to Earth on average, believe it or not'),
   X(3, 'Which is taller?', 'Olympus Mons (on Mars)', 'Mount Everest', 'About 72,000 ft vs 29,032 ft'),
-  X(3, 'Which is the hottest chili pepper?', 'Carolina Reaper', 'Habanero', 'Over 1.5 million vs about 300,000 Scoville units'),
-  X(3, 'Which is a bigger part of your brain by weight?', 'Fat', 'Muscle', 'The brain is about 60% fat; it has no muscle'),
+  X(3, 'Which chili pepper is hotter?', 'Carolina Reaper', 'Habanero', 'Carolina Reaper averages over 1.5 million Scoville units; habanero is roughly 100,000-350,000'),
+  X(3, 'Which is a bigger part of your brain by weight?', 'Fat', 'Muscle', 'The brain is about 60% fat by dry weight; it has no muscle'),
   X(3, 'Which is a better conductor of heat?', 'Silver', 'Gold', 'Silver is the best metal conductor'),
   X(3, 'Which moon is bigger?', 'Ganymede (Jupiter)', 'Titan (Saturn)', 'Ganymede is the largest moon in the solar system')
 ];

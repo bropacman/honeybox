@@ -71,7 +71,7 @@ export const ANIMALS = [
   X(3, 'Which is the closer relative of the T. rex?', 'A chicken', 'A crocodile', 'Birds are living dinosaurs'),
   X(3, 'Which runs faster?', 'A pronghorn', 'A lion', 'Pronghorns hit about 55 mph; lions about 50'),
   X(3, 'Which is taller at the shoulder?', 'A bull moose', 'A typical horse', 'Bull moose reach about 6.5 ft at the shoulder; horses about 5 ft'),
-  X(3, 'Which has fingerprints most like a human\'s?', 'A koala', 'A gorilla', 'Koala prints are nearly impossible to tell apart from ours'),
+  X(3, 'Which has fingerprints nearly identical to a human\'s?', 'A koala', 'A dog', 'Koala prints are nearly impossible to tell apart from ours'),
   X(3, 'Which sleeps more per day?', 'A koala', 'A sloth', 'Koalas sleep up to about 20 hours'),
   X(3, 'Which can live longer?', 'A Greenland shark', 'A bowhead whale', 'Greenland sharks may live 250-500 years'),
   X(3, 'Which has the stronger bite?', 'A hippo', 'A lion', 'Hippo bites are among the strongest of any land animal'),

@@ -126,7 +126,7 @@ export default [
   T('What color do you get by mixing blue and yellow?', 'Green', 'Purple', 'Orange', 'Brown'),
   T('What color do you get by mixing red and white?', 'Pink', 'Purple', 'Orange', 'Peach'),
   T('How many colors are in a rainbow?', '7', '5', '6', '8'),
-  T('What is the highest card in a standard poker hand ranking?', 'Royal flush', 'Four of a kind', 'Full house', 'Straight flush'),
+  T('What is the highest-ranking hand in standard poker?', 'Royal flush', 'Four of a kind', 'Full house', 'Three of a kind'),
   T('In the card game, what does "Go Fish" have you collect?', 'Sets of four', 'Pairs of jokers', 'All the aces', 'Suits in order'),
   T('In chess, which piece can only move diagonally?', 'Bishop', 'Rook', 'Knight', 'King'),
   T('In chess, which piece moves in an L shape?', 'Knight', 'Bishop', 'Queen', 'Pawn'),
