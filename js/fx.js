@@ -11,12 +11,18 @@ const el = (cls, html = '') => {
 // eyes that blink open in the dark corners while the lights are low
 const EYES = [[6, 14], [92, 10], [4, 78], [95, 70], [50, 96], [80, 92]];
 
+export const FX_LEVELS = ['off', 'subtle', 'normal', 'intense'];
+
 export function startFx() {
   const dark = el('fx-dark', EYES.map(([x, y], i) => `<i class="fx-eyes" style="left:${x}%;top:${y}%;animation-delay:${i * 1.7}s"></i>`).join(''));
   const grain = el('fx-grain');
   const flash = el('fx-flash');
   const confetti = el('fx-confetti');
   document.body.append(dark, grain, flash, confetti);
+  // effects intensity: off / subtle / normal / intense (CSS variables on <html> do the scaling)
+  let level = 'subtle';
+  try { level = localStorage.getItem('honeybox_fx') || 'subtle'; } catch (e) { /* default */ }
+  document.documentElement.dataset.fx = level;
   let retro = true;
   try { retro = localStorage.getItem('honeybox_retro') !== 'off'; } catch (e) { /* default on */ }
   grain.classList.toggle('on', retro);
@@ -51,6 +57,14 @@ export function startFx() {
         setTimeout(() => c.remove(), 4000);
       }
     },
+    get level() { return level; },
+    setLevel(l) {
+      level = FX_LEVELS.includes(l) ? l : 'subtle';
+      document.documentElement.dataset.fx = level;
+      try { localStorage.setItem('honeybox_fx', level); } catch (e) { /* ignore */ }
+    },
+    // how many drifting background particles to use at this level
+    get density() { return { off: 0, subtle: 0.45, normal: 0.75, intense: 1 }[level]; },
     get retro() { return retro; },
     toggleRetro() {
       retro = !retro;

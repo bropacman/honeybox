@@ -491,7 +491,7 @@ body.is-phone .moon { display: none; }
 .choice-card.faded { opacity: 0.35; }
 .choice-card .pred { min-height: 1.6em; }
 /* last 10 seconds */
-.tv.hurry::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(255, 40, 40, 0.45); animation: hurry 1s ease-in-out infinite; z-index: 4; }
+.tv.hurry-flash::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(255, 40, 40, 0.3); animation: hurry 1s ease-in-out 5; z-index: 4; opacity: calc(0.4 + var(--fx-vig) * 0.6); }
 @keyframes hurry { 50% { box-shadow: inset 0 0 160px 50px rgba(255, 40, 40, 0.7); } }
 .final-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22em; font-weight: 900; color: rgba(255, 93, 79, 0.35); pointer-events: none; z-index: 6; }
 .final-count:empty { display: none; }
@@ -580,14 +580,14 @@ body.is-phone .moon { display: none; }
 .medal.golden-m { border-color: #ffd34d; box-shadow: 0 0 30px rgba(255, 210, 80, 0.6); }
 
 /* round event effects: a layer of drifting emoji over the TV for the whole turn */
-#ev-fx { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+#ev-fx { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; opacity: var(--fx-layer); }
 #ev-fx i { position: absolute; font-style: normal; font-size: var(--sz, 2.2em); opacity: 0.55; left: var(--x); top: -10%; animation: evFall var(--dur, 9s) linear var(--d) infinite; }
 #ev-fx.rise i { top: auto; bottom: -10%; animation-name: evRise; }
 #ev-fx.blow i { top: var(--y); left: -10%; animation-name: evBlow; animation-duration: calc(var(--dur, 9s) * 0.5); }
 #ev-fx.walk i { top: auto; bottom: 4%; left: -6%; animation-name: evBlow; animation-timing-function: steps(14); opacity: 0.35; }
-#ev-fx.twinkle i { top: var(--y); animation-name: evTwinkle; animation-duration: 3s; }
-#ev-fx.pulse { box-shadow: inset 0 0 160px rgba(255, 40, 40, 0.35); animation: evPulse 1.2s ease-in-out infinite; }
-#ev-fx.pulse i, #ev-fx.lock i { top: var(--y); animation-name: evTwinkle; animation-duration: 2.4s; }
+#ev-fx.twinkle i { top: var(--y); animation-name: evDrift; }
+#ev-fx.pulse { box-shadow: inset 0 0 160px rgba(255, 40, 40, 0.2); animation: evPulse 1.2s ease-in-out 4; }
+#ev-fx.pulse i, #ev-fx.lock i { top: var(--y); animation-name: evDrift; }
 #ev-fx.dark { background: radial-gradient(circle at 50% 45%, transparent 25%, rgba(0, 0, 0, 0.55) 75%); }
 #ev-fx.dark i { top: var(--y); animation-name: evFlash; animation-duration: 5s; }
 #ev-fx.frost { box-shadow: inset 0 0 120px rgba(170, 220, 255, 0.45); }
@@ -597,6 +597,7 @@ body.is-phone .moon { display: none; }
 @keyframes evFall { from { transform: translateY(0) rotate(0); } to { transform: translateY(125vh) rotate(360deg); } }
 @keyframes evRise { from { transform: translateY(0); } to { transform: translateY(-125vh); } }
 @keyframes evBlow { from { transform: translateX(0) rotate(0); } to { transform: translateX(125vw) rotate(720deg); } }
+@keyframes evDrift { 0% { opacity: 0; transform: translate(0, 0) scale(0.8); } 50% { opacity: 0.7; transform: translate(3vw, -5vh) scale(1); } 100% { opacity: 0; transform: translate(6vw, -10vh) scale(0.85); } }
 @keyframes evTwinkle { 0%, 100% { opacity: 0; transform: scale(0.6); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes evPulse { 50% { box-shadow: inset 0 0 220px rgba(255, 40, 40, 0.55); } }
 @keyframes evFlash { 0%, 88%, 100% { opacity: 0; } 90%, 94% { opacity: 0.9; } 92% { opacity: 0.1; } }
@@ -672,8 +673,8 @@ body.is-phone .moon { display: none; }
 /* flashlight: everything outside the beam is dark; the beam narrows as the battery drains */
 .fx-dark { position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: 0; transition: opacity 0.8s;
   --x: 50%; --y: 52%; --r: 70vmax;
-  background: radial-gradient(circle var(--r) at var(--x) var(--y), transparent 0, transparent 48%, rgba(4, 7, 6, 0.5) 72%, rgba(2, 4, 3, 0.92) 100%); }
-.fx-dark.on { opacity: 1; }
+  background: radial-gradient(circle var(--r) at var(--x) var(--y), transparent 0, transparent 52%, rgba(4, 7, 6, 0.4) 76%, rgba(2, 4, 3, 0.85) 100%); }
+.fx-dark.on { opacity: var(--fx-dark); }
 .fx-dark.sweep { animation: beamSweep 7s ease-in-out infinite alternate; }
 .fx-dark.low { animation: beamFlicker 1.3s steps(1) infinite; }
 @keyframes beamSweep { 0% { --x: 22%; --y: 40%; } 50% { --x: 70%; --y: 65%; } 100% { --x: 55%; --y: 30%; } }
@@ -686,13 +687,13 @@ body.is-phone .moon { display: none; }
 @keyframes eyesBlink { 0%, 60%, 100% { opacity: 0; } 66%, 80% { opacity: 0.85; } 72% { opacity: 0; } 73% { opacity: 0.85; } }
 
 /* film grain + faint scanlines + vignette (toggle with the 📺 button) */
-.fx-grain { position: fixed; inset: -50%; pointer-events: none; z-index: 60; display: none; opacity: 0.09; mix-blend-mode: overlay;
+.fx-grain { position: fixed; inset: -50%; pointer-events: none; z-index: 60; display: none; opacity: var(--fx-grain); mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   animation: grain 0.8s steps(4) infinite; }
 .fx-grain.on { display: block; }
 .fx-grain.on::after { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.5) 0 1px, transparent 1px 3px); opacity: 0.6; }
 @keyframes grain { 0% { transform: translate(0, 0); } 25% { transform: translate(-6%, 4%); } 50% { transform: translate(5%, -7%); } 75% { transform: translate(-3%, 8%); } }
-body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 19; box-shadow: inset 0 0 18vmin rgba(0, 0, 0, 0.65); }
+body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 19; box-shadow: inset 0 0 18vmin rgba(0, 0, 0, 0.65); opacity: var(--fx-vig); }
 
 /* hits and scares */
 .fx-flash { position: fixed; inset: 0; pointer-events: none; z-index: 70; opacity: 0; }
@@ -741,3 +742,10 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 .avpick[data-style="classic"] .av-anime, .avpick[data-style="anime"] .av-classic { display: none; }
 .avpick[data-style="classic"] [data-avstyle="classic"], .avpick[data-style="anime"] [data-avstyle="anime"] { border-color: var(--honey); color: var(--honey); }
 .avatars .av img.px { width: 1.6em; height: 1.6em; }
+
+/* Effects intensity (TV setting): scales background event effects, flashlight darkness, grain and vignette */
+:root { --fx-layer: 0.35; --fx-dark: 0.5; --fx-grain: 0.05; --fx-vig: 0.4; }
+:root[data-fx="normal"] { --fx-layer: 0.65; --fx-dark: 0.75; --fx-grain: 0.08; --fx-vig: 0.7; }
+:root[data-fx="intense"] { --fx-layer: 1; --fx-dark: 1; --fx-grain: 0.12; --fx-vig: 1; }
+:root[data-fx="off"] { --fx-layer: 0; --fx-dark: 0; --fx-grain: 0; --fx-vig: 0.25; }
+.fx-levels button.sel { border-color: var(--honey); color: var(--honey); }

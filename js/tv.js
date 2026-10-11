@@ -4,7 +4,7 @@ import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASE
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
-import { startFx } from './fx.js';
+import { startFx, FX_LEVELS } from './fx.js';
 import { spritify, spriteImg } from './sprites.js';
 import { PILE_ICONS } from './content.js';
 
@@ -246,6 +246,8 @@ export function startTV(root, { resume = null } = {}) {
     hurryOn = hurry;
     const tv = root.querySelector('.tv');
     tv?.classList.toggle('hurry', hurry);
+    // the red flashing edges only run for the final 5 seconds
+    tv?.classList.toggle('hurry-flash', hurry && left <= 5000);
     const el = root.querySelector('#timer');
     const s = left == null ? '' : Math.ceil(left / 1000);
     // the timer is the flashlight battery: five cells drain as time runs out
@@ -307,6 +309,8 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'players') { playersOpen = !playersOpen; render(); }
     if (act === 'retro') { fx.toggleRetro(); render(); }
+    if (act === 'fxlevel') { fx.setLevel(FX_LEVELS[(FX_LEVELS.indexOf(fx.level) + 1) % FX_LEVELS.length]); render(); }
+    if (act === 'fxset') { fx.setLevel(b.dataset.l); render(); }
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
     if (act === 'mute') { setMuted(!isMuted()); if (isMuted()) stepShown = 99; render(); }
@@ -504,6 +508,9 @@ export function startTV(root, { resume = null } = {}) {
             </div>
             <div class="lengths">Game length:
               ${Object.keys(LENGTHS).map(l => `<button data-act="length" data-len="${l}" class="${S.length === l ? 'sel' : ''}">${l}</button>`).join('')}
+            </div>
+            <div class="voice-row fx-levels"><b>Effects</b> <span class="muted">background effects, darkness and grain:</span>
+              ${FX_LEVELS.map(l => `<button data-act="fxset" data-l="${l}" class="${fx.level === l ? 'sel' : ''}">${l}</button>`).join('')}
             </div>
             <div class="voice-row"><b>Narrator</b> <span class="muted">reads the game out loud.</span> Voice:
               <select id="voice">${voiceOptions().map(v => `<option value="${esc(v.name)}" ${v.name === voiceSettings().voice ? 'selected' : ''}>${esc(v.label)}</option>`).join('') || '<option>Default</option>'}</select>
@@ -849,6 +856,7 @@ export function startTV(root, { resume = null } = {}) {
   }
 
   // Each round event gets its own effect layer for the whole turn (kept outside the re-rendered DOM)
+  const fxLayer = { get level() { return fx.level; }, get density() { return fx.density; } };
   const EV_FX = {
     calm: ['twinkle', '✨', 10], outage: ['dark', '⚡', 4], dogs: ['walk', '🐾', 10], jackpot: ['fall', '🎟️', 16],
     fever: ['rise fever', '🎈', 12], wind: ['blow', '🍂', 16], witching: ['pulse', '🕛', 6], moon: ['moon', '🦇', 7],
@@ -860,12 +868,13 @@ export function startTV(root, { resume = null } = {}) {
     let layer = document.getElementById('ev-fx');
     if (!layer) { layer = document.createElement('div'); layer.id = 'ev-fx'; document.body.appendChild(layer); }
     const fx = TURN_PHASES.includes(S.phase) && EV_FX[S.event];
-    const key = fx ? `${S.turnIdx}:${S.event}` : null;
+    const key = fx ? `${S.turnIdx}:${S.event}:${fxLayer.level}` : null;
     if (key === evKey) return;
     evKey = key;
     layer.className = fx ? fx[0] : '';
     if (!fx) { layer.innerHTML = ''; return; }
-    const [, emoji, n] = fx;
+    const [, emoji, full] = fx;
+    const n = Math.round(full * fxLayer.density);
     layer.innerHTML = Array.from({ length: n }, (_, i) => {
       const r = (k) => ((i * 7919 + k * 104729) % 1000) / 1000;
       return `<i style="--x:${Math.round(r(1) * 100)}%;--y:${Math.round(r(2) * 90)}%;--d:-${(r(3) * 9).toFixed(1)}s;--dur:${(7 + r(4) * 6).toFixed(1)}s;--sz:${(1.6 + r(5) * 1.6).toFixed(1)}em">${emoji}</i>`;
@@ -934,6 +943,7 @@ export function startTV(root, { resume = null } = {}) {
         <div class="host-ctl">
           <button data-act="mute" title="Sound">${isMuted() ? '🔇' : '🔊'}</button>
           <button data-act="retro" title="Film grain">${fx.retro ? '📺' : '🖥️'}</button>
+          <button data-act="fxlevel" title="Effects: ${fx.level}">✨ ${fx.level}</button>
           ${S.phase !== 'lobby' ? '<button data-act="players" title="Players">👥</button>' : ''}
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
         </div>
