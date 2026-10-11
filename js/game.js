@@ -106,7 +106,10 @@ export const NARRATED = ['intro', 'turnStart', 'safe', 'dragged', 'mgIntro', 'mg
 export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
 
 // Sunrise Stakes: 5 This or That questions for everyone, each worth more
-export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [1, 2, 2, 3, 3], boost: 1.5 };
+export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [2, 2, 3, 3, 3], boost: 1.5 };
+// This or That difficulty for questions 1, 2, 3 of a night shift. The easiest tier (1) only shows up
+// if a category runs out of harder ones.
+export const TOT_DIFF = [2, 3, 3];
 
 // reveal pacing: each player's answer pops in, then the right answer lights up
 export const CHIP_MS = 550;
@@ -477,7 +480,7 @@ export class Game {
       S.used.tot = S.used.tot.filter(k => !cats.includes(k.split(':')[0]));
       pool = all;
     }
-    for (const dd of [d, d - 1, d + 1, d - 2, d + 2]) {
+    for (const dd of [d, d + 1, d - 1, d + 2, d - 2]) {
       const m = pool.filter(x => x.q.d === dd);
       if (m.length) { pool = m; break; }
     }
@@ -496,7 +499,7 @@ export class Game {
     if (S.phase !== 'pick' || pid !== w.watcherId || !S.spots[i]) return;
     w.spot = i;
     w.st = this.stakesNow(i);
-    w.q = this.takeTot(S.spots[i].cat, S.event === 'freeze' ? 3 : w.streak + 1);
+    w.q = this.takeTot(S.spots[i].cat, S.event === 'freeze' ? 3 : TOT_DIFF[Math.min(w.streak, TOT_DIFF.length - 1)]);
     w.answers = {};
     w.results = null;
     w.saved = false;

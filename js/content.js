@@ -212,6 +212,7 @@ import { MUSIC_2, FOOD_2 } from './packs/tot-6.js';
 import FUN_1 from './packs/tot-fun-1.js';
 import FUN_2 from './packs/tot-fun-2.js';
 import SUBCATS from './packs/subcats.js';
+import REDIFF from './packs/difficulty.js';
 
 // merge packs per category, dropping exact duplicates (same question and same pair)
 const totKey = (x) => `${x.q}|${[x.right, x.wrong].sort().join('|')}`.toLowerCase();
@@ -233,6 +234,8 @@ const NOT_SPORTS = new Set(['A guitar', 'A grand piano', 'A violin', 'Michael Ja
 const isSports = (x) => !NOT_SPORTS.has(x.right) && (SPORTS_RE.test(`${x.q} ${x.right} ${x.wrong} ${x.note || ''}`) || x.right === 'Yao Ming');
 TOT.sports = TOT.music.filter(isSports);
 TOT.music = TOT.music.filter(x => !isSports(x));
+
+for (const list of Object.values(TOT)) for (const x of list) { const d = REDIFF[totKey(x)]; if (d) x.d = d; }
 
 // The old two-in-one lists (Nature & Science, Movies & Cartoons, ...) split by a hand-made label map.
 for (const sub of new Set(Object.values(SUBCATS))) TOT[sub] = [];
