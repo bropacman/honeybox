@@ -515,3 +515,8 @@ body.is-phone .moon { display: none; }
 .tot-btn.keep { border-color: var(--bad); }
 .tot-btns .or { text-align: center; color: var(--honey); font-family: 'Creepster', cursive; font-size: 1.4em; }
 .cat-em { font-size: 2em; line-height: 1; }
+
+.cat-toggles { display: flex; flex-wrap: wrap; gap: 0.35em; align-items: center; margin-bottom: 1em; font-size: 0.8em; }
+.cat-toggles button { padding: 4px 10px; }
+.cat-toggles button.sel { border-color: var(--honey); color: var(--honey); }
+.cat-toggles button.off { opacity: 0.4; text-decoration: line-through; }

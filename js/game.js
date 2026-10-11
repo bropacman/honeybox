@@ -110,6 +110,7 @@ export class Game {
       players: [],
       length: 'normal',
       timers: 'medium',
+      offCats: [],
       turnOrder: [],
       turnIdx: -1,
       piles: [],
@@ -248,6 +249,19 @@ export class Game {
     if (LENGTHS[len] && this.S.phase === 'lobby') { this.S.length = len; this.changed(); }
   }
 
+  // turn This or That categories on/off in the lobby (at least 2 stay on)
+  toggleCategory(cat) {
+    const S = this.S;
+    if (S.phase !== 'lobby' || !TOT[cat]) return;
+    const off = new Set(S.offCats || []);
+    if (off.has(cat)) off.delete(cat);
+    else if (Object.keys(TOT).filter(c => !off.has(c)).length > 2) off.add(cat);
+    S.offCats = [...off];
+    this.changed();
+  }
+
+  activeCats() { return Object.keys(TOT).filter(c => !(this.S.offCats || []).includes(c)); }
+
   setTimers(t) {
     if (TIMERS[t] && this.S.phase === 'lobby') { this.S.timers = t; this.changed(); }
   }
@@ -265,7 +279,8 @@ export class Game {
       S.turnOrder.push(...order);
     }
     S.turnIdx = -1;
-    S.spots = PILE_NAMES.map(name => ({ name, cat: SPOT_CATEGORIES[name] || 'wild' }));
+    const on = this.activeCats();
+    S.spots = PILE_NAMES.map(name => { const c = SPOT_CATEGORIES[name] || 'wild'; return { name, cat: on.includes(c) ? c : 'wild' }; });
     S.bag = [];
     S.players.forEach(p => { p.score = 0; });
     S.board = {};
@@ -381,7 +396,7 @@ export class Game {
   takeTot(cat, d) {
     const S = this.S;
     S.used.tot = S.used.tot || [];
-    const cats = TOT[cat] ? [cat] : Object.keys(TOT);
+    const cats = TOT[cat] && this.activeCats().includes(cat) ? [cat] : this.activeCats();
     const all = [];
     for (const c of cats) TOT[c].forEach((q, i) => all.push({ c, i, q }));
     let pool = all.filter(x => !S.used.tot.includes(`${x.c}:${x.i}`));

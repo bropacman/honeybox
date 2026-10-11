@@ -195,6 +195,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'start') game.start();
     if (act === 'length') game.setLength(b.dataset.len);
     if (act === 'timers') game.setTimers(b.dataset.t);
+    if (act === 'cat') game.toggleCategory(b.dataset.cat);
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'pause') game.togglePause();
     if (act === 'skip') { stopSpeaking(); game.skip(); }
@@ -363,6 +364,9 @@ export function startTV(root, { resume = null } = {}) {
           <div class="lobby-side">
             <h2>Campers (${S.players.length}/8)</h2>
             <div class="campers">${S.players.map(p => `<button class="camper ${p.connected ? '' : 'off'}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
+            <div class="cat-toggles">Categories:
+              ${Object.keys(CATEGORIES).filter(c => c !== 'wild').map(c => `<button data-act="cat" data-cat="${c}" class="${(S.offCats || []).includes(c) ? 'off' : 'sel'}">${CATEGORIES[c].emoji} ${CATEGORIES[c].name}</button>`).join('')}
+            </div>
             <div class="lengths">Timers:
               ${Object.keys(TIMERS).map(t => `<button data-act="timers" data-t="${t}" class="${S.timers === t ? 'sel' : ''}">${t}</button>`).join('')}
             </div>
