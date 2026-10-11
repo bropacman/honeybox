@@ -1,18 +1,16 @@
 // All the words in Honeybox. Edit freely: add questions, prompts and polls here.
 
 export const PILE_NAMES = [
-  'Santa\'s Village', 'Mt Washington', 'Flume Gorge',
-  'Clark\'s Bears', 'The Kanc', 'Story Land',
-  'Funspot', 'Weirs Beach', 'Lake Dock',
-  'Loudon Speedway'
+  'Cog Railway', 'Mt Washington', 'Santa\'s Village', 'Discovery Center', 'Story Land',
+  'Flume Gorge', 'Clark\'s Bears', 'The Kanc', 'Castle in the Clouds', 'Settlers Green',
+  'Funspot', 'Weirs Drive-In', 'Lake Dock', 'Meadowbrook', 'Loudon Speedway'
 ];
 
 // Little sign icon for each spot on the map
 export const PILE_ICONS = {
-  'Santa\'s Village': '🎅', 'Mt Washington': '🏔️', 'Flume Gorge': '🏞️',
-  'Clark\'s Bears': '🐻', 'The Kanc': '🛣️', 'Story Land': '🏰',
-  'Funspot': '🕹️', 'Weirs Beach': '🏖️', 'Lake Dock': '🏚️',
-  'Loudon Speedway': '🏁'
+  'Cog Railway': '🚂', 'Mt Washington': '🏔️', 'Santa\'s Village': '🎅', 'Discovery Center': '🚀', 'Story Land': '🏰',
+  'Flume Gorge': '🏞️', 'Clark\'s Bears': '🐻', 'The Kanc': '🛣️', 'Castle in the Clouds': '🏯', 'Settlers Green': '🛍️',
+  'Funspot': '🕹️', 'Weirs Drive-In': '🎞️', 'Lake Dock': '🏚️', 'Meadowbrook': '🎸', 'Loudon Speedway': '🏁'
 };
 
 // After closing time, the Story Land animatronics wake up...
@@ -213,6 +211,7 @@ import { MOVIES_2, GAMES_2 } from './packs/tot-5.js';
 import { MUSIC_2, FOOD_2 } from './packs/tot-6.js';
 import FUN_1 from './packs/tot-fun-1.js';
 import FUN_2 from './packs/tot-fun-2.js';
+import SUBCATS from './packs/subcats.js';
 
 // merge packs per category, dropping exact duplicates (same question and same pair)
 const totKey = (x) => `${x.q}|${[x.right, x.wrong].sort().join('|')}`.toLowerCase();
@@ -234,6 +233,12 @@ const NOT_SPORTS = new Set(['A guitar', 'A grand piano', 'A violin', 'Michael Ja
 const isSports = (x) => !NOT_SPORTS.has(x.right) && (SPORTS_RE.test(`${x.q} ${x.right} ${x.wrong} ${x.note || ''}`) || x.right === 'Yao Ming');
 TOT.sports = TOT.music.filter(isSports);
 TOT.music = TOT.music.filter(x => !isSports(x));
+
+// The old two-in-one lists (Nature & Science, Movies & Cartoons, ...) split by a hand-made label map.
+for (const sub of new Set(Object.values(SUBCATS))) TOT[sub] = [];
+for (const parent of ['nature', 'movies', 'games', 'food']) {
+  TOT[parent] = TOT[parent].filter(x => { const sub = SUBCATS[totKey(x)]; if (sub) { TOT[sub].push(x); return false; } return true; });
+}
 
 // Boston / New England specific content gets shown rarely (it's too local for most of the table)
 const LOCAL_RE = /\b(Boston|Bostonian|Massachusetts|Mass\b|Masshole|New England|Fenway|Red Sox|Patriots|Bruins|Celtics|the Pike|Big Dig|rotary|rotaries|packie|frappe|jimmies|ayuh|wicked|Dunkin|Munchkin|Friendly's|Fribble|Papa Gino|Howard Johnson|HoJo|Cape Cod|Sagamore|Martha's Vineyard|Nantucket|Hyannis|Provincetown|Gloucester|Salem|Walden|Thoreau|Dixville|Piscataqua|Laconia|Concord|Manchester|Nashua|Portsmouth|Dartmouth|Hanover|Montpelier|Augusta|Rhode Island|Lovecraft|Aerosmith|New Kids|Dropkick|Dirty Water|Sweet Caroline|North End|Haahvahd|duck boat|Make Way for Ducklings|Esplanade|Freedom Trail|Vermont|Maine|Connecticut|Kennedy|Weirs|Motorcycle Week|purple finch|Merrimack)\b/i;

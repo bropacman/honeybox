@@ -34,21 +34,26 @@ export const FINALES = {
 
 // This or That categories. Each map spot is one category.
 export const CATEGORIES = {
-  nature: { name: 'Nature & Science', emoji: '🔬' },
+  nature: { name: 'Nature', emoji: '🌿' },
+  science: { name: 'Science & Space', emoji: '🔬' },
   animals: { name: 'Animals', emoji: '🐾' },
   geo: { name: 'Geography', emoji: '🌍' },
   history: { name: 'History', emoji: '📜' },
-  movies: { name: 'Movies & Cartoons', emoji: '🎬' },
-  games: { name: 'Games, TV & Tech', emoji: '🕹️' },
+  movies: { name: 'Movies', emoji: '🎬' },
+  cartoons: { name: 'Cartoons', emoji: '🐭' },
+  tv: { name: 'TV', emoji: '📺' },
+  games: { name: 'Games & Toys', emoji: '🕹️' },
+  tech: { name: 'Tech', emoji: '💻' },
   music: { name: 'Music', emoji: '🎵' },
   sports: { name: 'Sports', emoji: '🏆' },
-  food: { name: 'Food & Brands', emoji: '🍔' },
+  food: { name: 'Food', emoji: '🍔' },
+  brands: { name: 'Brands', emoji: '🏷️' },
   wild: { name: 'Wild Card', emoji: '🎲' }
 };
 export const SPOT_CATEGORIES = {
-  'Mt Washington': 'nature', "Clark's Bears": 'animals', 'Flume Gorge': 'geo', 'The Kanc': 'history', 'Story Land': 'movies',
-  'Funspot': 'games', 'Weirs Beach': 'music', "Santa's Village": 'food', 'Lake Dock': 'wild',
-  'Loudon Speedway': 'sports'
+  'Mt Washington': 'nature', 'Discovery Center': 'science', "Clark's Bears": 'animals', 'Flume Gorge': 'geo', 'The Kanc': 'history',
+  'Weirs Drive-In': 'movies', 'Story Land': 'cartoons', 'Castle in the Clouds': 'tv', 'Funspot': 'games', 'Cog Railway': 'tech',
+  'Meadowbrook': 'music', 'Loudon Speedway': 'sports', "Santa's Village": 'food', 'Settlers Green': 'brands', 'Lake Dock': 'wild'
 };
 
 // The night shift: each right answer adds to the pot (question 1, 2, 3). Bank it any time; 3 in a row = 6 AM bonus.
@@ -283,7 +288,8 @@ export class Game {
     }
     S.turnIdx = -1;
     const on = this.activeCats();
-    S.spots = PILE_NAMES.map(name => { const c = SPOT_CATEGORIES[name] || 'wild'; return { name, cat: on.includes(c) ? c : 'wild' }; });
+    // only the categories that are on get a spot on the map, plus the Wild Card
+    S.spots = PILE_NAMES.map(name => ({ name, cat: SPOT_CATEGORIES[name] || 'wild' })).filter(sp => sp.cat === 'wild' || on.includes(sp.cat));
     S.bag = [];
     S.players.forEach(p => { p.score = 0; });
     S.board = {};

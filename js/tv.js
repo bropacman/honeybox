@@ -253,10 +253,9 @@ export function startTV(root, { resume = null } = {}) {
 
   // Where each pile sits on the TV map (percent of the map box). Roughly NH geography.
   const SPOTS = {
-    "Santa's Village": [36, 12], 'Mt Washington': [60, 18], 'Flume Gorge': [12, 22],
-    "Clark's Bears": [22, 48], 'The Kanc': [46, 48], 'Story Land': [80, 34],
-    'Funspot': [14, 76], 'Weirs Beach': [36, 82], 'Lake Dock': [62, 80],
-    'Loudon Speedway': [86, 64]
+    'Cog Railway': [11, 15], 'Mt Washington': [30, 13], "Santa's Village": [50, 15], 'Discovery Center': [70, 13], 'Story Land': [89, 15],
+    'Flume Gorge': [11, 46], "Clark's Bears": [30, 44], 'The Kanc': [50, 46], 'Castle in the Clouds': [70, 44], 'Settlers Green': [89, 46],
+    'Funspot': [11, 77], 'Weirs Drive-In': [30, 75], 'Lake Dock': [50, 77], 'Meadowbrook': [70, 75], 'Loudon Speedway': [89, 77]
   };
 
   function board(highlight = null) {
@@ -290,9 +289,7 @@ export function startTV(root, { resume = null } = {}) {
       <div class="deco" style="left:88%;top:12%">🌲</div><div class="deco" style="left:4%;top:92%">🌲</div>
       <div class="map-label" style="left:40%;top:95%">Lake Winnipesaukee</div>
       <div class="map-label" style="left:44%;top:30%">White Mountains</div>
-      <div class="map-label" style="left:88%;top:54%">Conway · Rt 16</div>
       <div class="map-label" style="left:2%;top:54%">Lincoln</div>
-      <div class="map-label" style="left:56%;top:42%">Kancamagus Hwy →</div>
       ${piles}
     </div>`;
   }
