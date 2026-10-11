@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, revealAt } from './game.js';
+import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, revealAt } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -330,6 +330,29 @@ export function startTV(root, { resume = null } = {}) {
     return '';
   }
 
+  // the turn wheel: spins once per turn (re-renders show it already stopped)
+  let spunFor = null;
+  function wheel(wh, winnerId) {
+    const ids = (wh?.ids?.length ? wh.ids : [winnerId]).filter(id => game.player(id));
+    const n = ids.length;
+    const seg = 360 / n;
+    const win = Math.max(0, ids.indexOf(winnerId));
+    const jitter = ((wh?.spin ?? 0.5) - 0.5) * seg * 0.6;
+    const end = 360 * 6 - (win * seg + seg / 2) + jitter;
+    const key = `${game.S.turnIdx}`;
+    const fresh = spunFor !== key;
+    spunFor = key;
+    const colors = ['#2e5c43', '#6b4a24', '#24425c', '#5c2e45', '#4a5c24', '#5c4a24', '#2e3f5c', '#5c3a24'];
+    const stops = ids.map((_, i) => `${colors[i % colors.length]} ${i * seg}deg ${(i + 1) * seg}deg`).join(', ');
+    const labels = ids.map((id, i) => {
+      const p = game.player(id);
+      return `<div class="wl" style="transform: rotate(${i * seg + seg / 2}deg) translateY(-34vh)"><span style="transform: rotate(${-(i * seg + seg / 2)}deg)">${p.avatar}<small>${esc(p.name)}</small></span></div>`;
+    }).join('');
+    return `<div class="wheel-wrap"><div class="wheel-pointer">▼</div>
+      <div class="wheel ${fresh ? 'spinning' : ''}" style="--end:${end}deg; transform: rotate(${end}deg); background: conic-gradient(${stops})">${labels}<div class="wheel-hub">🍯</div></div>
+    </div>`;
+  }
+
   function eventCard(big) {
     const ev = EVENTS[game.S.event];
     if (!ev) return '';
@@ -398,12 +421,13 @@ export function startTV(root, { resume = null } = {}) {
           </ol>
         </div>`;
       case 'turnStart':
-        return `<div class="center">
-          <div class="emoji-xl">🔦</div>
+        return `<div class="center turn-start">
           <p class="muted big">NIGHT ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
-          <h1>${avatar(watcher)} is on the night shift</h1>
-          <p class="big">Pick a category · answer · bank it or keep going. 3 in a row = 6 AM.</p>
-          ${eventCard(true)}
+          ${wheel(S.wheel, w.watcherId)}
+          <div class="late-n" style="--at:${SPIN_MS}ms">
+            <h1>${avatar(watcher)} is on the night shift!</h1>
+            ${eventCard(true)}
+          </div>
         </div>`;
       case 'pick':
         return `<div class="watch pick-layout">

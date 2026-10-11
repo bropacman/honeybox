@@ -7,7 +7,7 @@ export const CLOCK = ['12 AM', '2 AM', '4 AM', '6 AM'];
 
 export const SEC = 1000;
 export const TIMES = {
-  intro: 26, turnStart: 9, pick: 12, tot: 20, totReveal: 7, decide: 15, decideReveal: 6, safe: 6, dragged: 7,
+  intro: 26, turnStart: 11, pick: 12, tot: 20, totReveal: 7, decide: 15, decideReveal: 6, safe: 6, dragged: 7,
   mgIntro: 8, triviaQ: 20, triviaA: 8, pollQ: 20, pollA: 9,
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 5,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
@@ -82,6 +82,7 @@ export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [1, 2, 2, 3, 3
 
 // reveal pacing: each player's answer pops in, then the right answer lights up
 export const CHIP_MS = 550;
+export const SPIN_MS = 3800; // the turn wheel's spin
 export const REVEAL_STEP = 3600; // Sketchy Woods: time per answer in the reveal
 export const revealAt = (n) => 900 + n * CHIP_MS;
 
@@ -355,7 +356,18 @@ export class Game {
       S.spots.forEach((sp, i) => { sp.cat = cats[i]; });
     }
     const ev = EVENTS[S.event];
-    this.emit('say', `${w.name}, you're on the night shift. Pick a category, answer This or That, and bank your honey before it's too late. Tonight: ${ev.name}. ${ev.text}`);
+    // the TV spins a wheel of everyone still waiting for a turn this round; it lands on the next player in the fair order
+    const n = new Set(S.turnOrder).size || 1;
+    const roundStart = Math.floor(S.turnIdx / n) * n;
+    const round = S.turnOrder.slice(roundStart, roundStart + n).filter(id => this.player(id));
+    const left = S.turnOrder.slice(S.turnIdx, roundStart + n).filter(id => this.player(id));
+    S.wheel = { ids: left.length > 1 ? left : round, spin: Math.random() };
+    const k = Math.min(1, this.speed * 4);
+    this.emit('sfx', 'spin');
+    setTimeout(() => {
+      this.emit('sfx', 'great');
+      this.emit('say', `${w.name}, you're on the night shift! Tonight: ${ev.name}. ${ev.text}`);
+    }, SPIN_MS * k);
     this.go('turnStart', TIMES.turnStart);
   }
 
@@ -1040,8 +1052,9 @@ export class Game {
       case 'intro': return wait('How to play', 'The rules are on the TV. Listen up!', '📖');
       case 'turnStart': {
         const ev = EVENTS[S.event] || EVENTS.calm;
-        return w.watcherId === pid ? wait(`You're on the night shift! ${ev.emoji} ${ev.name}`, ev.text, '🔦')
+        const v = w.watcherId === pid ? wait(`You're on the night shift! ${ev.emoji} ${ev.name}`, ev.text, '🔦')
           : wait(`${watcher?.name} is on the night shift`, `${ev.emoji} ${ev.name}: ${ev.text}`, '🔦');
+        return { ...v, spin: true };
       }
       case 'pick':
         if (w.watcherId === pid) {

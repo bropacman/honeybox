@@ -68,6 +68,16 @@ export const sfx = {
     src.connect(f).connect(g).connect(ctx.destination);
     src.start();
   },
+  // wheel spin: clicks that slow down over ~3.8 seconds
+  spin() {
+    if (!ctx || muted) return;
+    let t = 0;
+    for (let i = 0; i < 34; i++) {
+      t += 0.03 + Math.pow(i / 34, 2.6) * 0.32;
+      if (t > 3.8) break;
+      tone(i % 2 ? 1300 : 1100, 0.03, { type: 'square', vol: 0.06, delay: t });
+    }
+  },
   // last-10-seconds clock: alternating tick… tock…
   clock() {
     clockFlip = !clockFlip;

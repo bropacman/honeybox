@@ -195,7 +195,9 @@ export function startPhone(root) {
           <button class="link" id="leave">Leave room</button></div>`;
         break;
       case 'wait':
-        body = v.suspense
+        body = v.spin
+          ? `<div class="center"><div class="suspense-ph spin-ph">🎡</div><div class="late spin-late"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
+          : v.suspense
           ? `<div class="center"><div class="suspense-ph">🥁</div><div class="late"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
           : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;

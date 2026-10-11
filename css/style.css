@@ -529,3 +529,20 @@ body.is-phone .moon { display: none; }
 .steps li:nth-child(4) { animation-delay: 6.5s; } .steps li:nth-child(5) { animation-delay: 8s; } .steps li:nth-child(6) { animation-delay: 10.5s; }
 .steps li span { font-size: 1.8em; }
 .steps b { color: var(--honey2); }
+
+/* turn wheel */
+.turn-start { gap: 0.4em; }
+.wheel-wrap { position: relative; width: 76vh; height: 76vh; margin: -2vh 0 0; transform: scale(0.82); }
+.wheel { position: absolute; inset: 0; border-radius: 50%; border: 8px solid var(--honey); box-shadow: 0 0 60px rgba(242, 177, 52, 0.35), inset 0 0 40px rgba(0,0,0,0.5); }
+.wheel.spinning { animation: wheelSpin 3.8s cubic-bezier(.12,.7,.18,1) both; }
+@keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(var(--end)); } }
+.wl { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.wl span { position: absolute; transform-origin: center; display: flex; flex-direction: column; align-items: center; font-size: 3.4em; translate: -50% -50%; white-space: nowrap; }
+.wl small { font-size: 0.28em; font-weight: 900; color: var(--ink); background: rgba(0,0,0,0.5); padding: 0 0.5em; border-radius: 8px; }
+.wheel-hub { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 14%; height: 14%; border-radius: 50%; background: var(--bg2); border: 5px solid var(--honey); display: flex; align-items: center; justify-content: center; font-size: 2.6em; }
+.wheel-pointer { position: absolute; left: 50%; top: -3.2vh; translate: -50% 0; font-size: 3.4em; color: var(--honey2); z-index: 2; filter: drop-shadow(0 4px 6px #000); }
+.turn-start .late-n h1 { margin: 0; }
+.turn-start .event-card { margin-top: 0.4em; }
+.phone .spin-ph { animation: spinPh 3.8s linear both; }
+@keyframes spinPh { 0% { transform: rotate(0); opacity: 1; } 95% { transform: rotate(1440deg); opacity: 1; } 100% { opacity: 0; height: 0; } }
+.phone .spin-late { animation-delay: 3.8s; }
