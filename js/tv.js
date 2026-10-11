@@ -857,13 +857,53 @@ export function startTV(root, { resume = null } = {}) {
     if (key === evKey) return;
     evKey = key;
     layer.className = fx ? fx[0] : '';
-    if (!fx) { layer.innerHTML = ''; return; }
+    if (!fx) { bounceRun++; layer.innerHTML = ''; return; }
     const [, emoji, full] = fx;
     const n = Math.round(full * fxLayer.density);
     layer.innerHTML = Array.from({ length: n }, (_, i) => {
       const r = (k) => ((i * 7919 + k * 104729) % 1000) / 1000;
       return `<i style="--x:${Math.round(r(1) * 100)}%;--y:${Math.round(r(2) * 90)}%;--d:-${(r(3) * 9).toFixed(1)}s;--dur:${(7 + r(4) * 6).toFixed(1)}s;--sz:${(1.6 + r(5) * 1.6).toFixed(1)}em">${emoji}</i>`;
     }).join('');
+    spritify(layer);
+    if (BOUNCE_MODES.some(m => layer.classList.contains(m))) startBounce(layer);
+  }
+
+  // DVD-logo style: icons start at random spots, drift in random directions, bounce off the edges
+  // and slowly fade in and out, each on its own clock.
+  const BOUNCE_MODES = ['twinkle', 'lock', 'pulse', 'dark', 'moon'];
+  let bounceRun = 0;
+  function startBounce(layer) {
+    const run = ++bounceRun;
+    const W = () => window.innerWidth;
+    const H = () => window.innerHeight;
+    const bits = [...layer.querySelectorAll('i')].map(el => ({
+      el,
+      x: Math.random() * W() * 0.9,
+      y: Math.random() * H() * 0.85,
+      vx: (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 45),
+      vy: (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 40),
+      period: 6 + Math.random() * 6,
+      phase: Math.random() * Math.PI * 2
+    }));
+    let last = performance.now();
+    const step = (now) => {
+      if (run !== bounceRun || !layer.isConnected) return;
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      for (const b of bits) {
+        const w = b.el.offsetWidth || 40;
+        const h = b.el.offsetHeight || 40;
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        if (b.x < 0 || b.x > W() - w) { b.vx *= -1; b.x = Math.max(0, Math.min(W() - w, b.x)); }
+        if (b.y < 0 || b.y > H() - h) { b.vy *= -1; b.y = Math.max(0, Math.min(H() - h, b.y)); }
+        const fade = 0.5 - 0.5 * Math.cos((now / 1000) * (2 * Math.PI / b.period) + b.phase);
+        b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
+        b.el.style.opacity = (0.7 * fade).toFixed(3);
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   // While a mini-game decides their fate, the caught player is shown struggling in the villain's grasp,

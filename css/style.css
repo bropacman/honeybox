@@ -763,3 +763,7 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 .lobby-summary { color: var(--muted); display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; text-transform: capitalize; }
 .settings-panel { width: min(80vw, 1100px); gap: 0.7em; }
 .settings-panel .big-btn { align-self: center; }
+
+/* bouncing event icons (positions driven from js/tv.js) */
+#ev-fx.twinkle i, #ev-fx.lock i, #ev-fx.pulse i, #ev-fx.dark i, #ev-fx.moon i { left: 0; top: 0; animation: none; opacity: 0; will-change: transform, opacity; }
+#ev-fx i img.px { width: 1.15em; height: 1.15em; }
