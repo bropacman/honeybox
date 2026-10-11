@@ -177,7 +177,7 @@ export function startTV(root, { resume = null } = {}) {
   }, 3000);
 
   root.addEventListener('change', (e) => {
-    if (e.target.id === 'voice') { setVoice(e.target.value); say(STYLES[voiceSettings().style].sample); }
+    if (e.target.id === 'voice') { setVoice(e.target.value); stopSpeaking(); say(STYLES[voiceSettings().style].sample); }
   });
   window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (game.S.phase === 'lobby') render(); });
 
@@ -201,8 +201,8 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'skip') { stopSpeaking(); game.skip(); }
     if (act === 'mute') { setMuted(!isMuted()); render(); }
     if (act === 'again') game.restart();
-    if (act === 'style') { setStyle(b.dataset.style); say(STYLES[b.dataset.style].sample); render(); }
-    if (act === 'testvoice') say(STYLES[voiceSettings().style].sample);
+    if (act === 'style') { setStyle(b.dataset.style); stopSpeaking(); say(STYLES[b.dataset.style].sample); render(); }
+    if (act === 'testvoice') { stopSpeaking(); say(STYLES[voiceSettings().style].sample); }
     if (act === 'new') { localStorage.removeItem(SAVE_KEY); location.href = location.pathname + location.search.replace(/[?&]host=1/, ''); }
   });
 

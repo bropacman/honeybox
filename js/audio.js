@@ -12,7 +12,7 @@ export function unlockAudio() {
 
 export function setMuted(m) {
   muted = m;
-  if (m) { window.speechSynthesis?.cancel(); setMusic('none'); }
+  if (m) { stopSpeaking(); setMusic('none'); }
 }
 export const isMuted = () => muted;
 
@@ -354,14 +354,33 @@ function persist() { try { localStorage.setItem(VOICE_KEY, JSON.stringify(settin
 export function setVoice(name) { settings.voice = name; persist(); }
 export function setStyle(style) { if (STYLES[style]) { settings.style = style; persist(); } }
 
-let speaking = false;
+// The narrator queues lines instead of cutting itself off, and speaks one sentence-sized chunk
+// at a time (Chrome silently stops utterances that run longer than ~15 seconds).
+let queue = [];
 let current = null;
-export const isSpeaking = () => speaking && !muted;
-export function stopSpeaking() { speaking = false; window.speechSynthesis?.cancel(); }
+export const isSpeaking = () => !muted && (!!current || queue.length > 0);
+export function stopSpeaking() { queue = []; current = null; window.speechSynthesis?.cancel(); }
+
+function chunks(text) {
+  const out = [];
+  for (const part of String(text).split(/(?<=[.!?…]['")]*)\s+/)) {
+    const t = part.trim();
+    if (!t) continue;
+    if (out.length && out[out.length - 1].length + t.length < 110) out[out.length - 1] += ` ${t}`;
+    else out.push(t);
+  }
+  return out;
+}
 
 export function say(text) {
   if (muted || !window.speechSynthesis || !text) return;
-  window.speechSynthesis.cancel();
+  queue.push(...chunks(text));
+  if (!current) speakNext();
+}
+
+function speakNext() {
+  const text = queue.shift();
+  if (!text || muted) { current = null; return; }
   const u = new SpeechSynthesisUtterance(text);
   const name = voiceSettings().voice;
   const v = englishVoices().find(x => x.name === name);
@@ -369,12 +388,22 @@ export function say(text) {
   const st = STYLES[settings.style];
   u.rate = st.rate;
   u.pitch = st.pitch;
-  speaking = true;
-  const done = () => { if (current === u) speaking = false; };
   current = u;
+  const started = Date.now();
+  const est = ((text.length / 14) / st.rate + 1.5) * 1000;
+  const done = () => {
+    if (current !== u) return;
+    current = null;
+    setTimeout(() => { if (!current) speakNext(); }, 150);
+  };
   u.onend = done;
   u.onerror = done;
-  // some browsers never fire onend; fall back to an estimate of the speaking time
-  setTimeout(done, ((text.length / 14) / st.rate + 1.5) * 1000);
+  // some browsers never fire onend: once the estimate passes, finish when the engine goes quiet (or after a hard cap)
+  const watchdog = () => {
+    if (current !== u) return;
+    if (window.speechSynthesis.speaking && Date.now() - started < est * 2 + 4000) setTimeout(watchdog, 500);
+    else done();
+  };
+  setTimeout(watchdog, est);
   window.speechSynthesis.speak(u);
 }
