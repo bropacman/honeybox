@@ -2,7 +2,7 @@
 
 import { spritify } from './sprites.js';
 import { startClient } from './net.js';
-import { AVATARS } from './content.js';
+import { AVATARS, ANIME_AVATARS, ANIME_MARK } from './content.js';
 import { drawingPad, INK } from './draw.js';
 import { unlockAudio, characterSound } from './audio.js';
 
@@ -40,6 +40,22 @@ export function startPhone(root) {
   let pad = null;
   let status = 'idle';
 
+  // ---------- character picker: Classic / Anime tabs over two grids ----------
+  let avStyle = 'classic';
+  function avatarPicker(selected, attr, taken = []) {
+    if (selected) avStyle = String(selected).includes(ANIME_MARK) ? 'anime' : 'classic';
+    const grid = (list, style) => `<div class="avatars av-${style}">${list.map(a => `<button class="av ${a === selected ? 'sel' : ''}" ${attr}="${a}" ${taken.includes(a) && a !== selected ? 'disabled' : ''}>${a}</button>`).join('')}</div>`;
+    return `<div class="avpick" data-style="${avStyle}">
+      <div class="av-tabs"><button data-avstyle="classic">Classic</button><button data-avstyle="anime">Anime</button></div>
+      ${grid(AVATARS, 'classic')}${grid(ANIME_AVATARS, 'anime')}</div>`;
+  }
+  function wirePicker() {
+    root.querySelectorAll('[data-avstyle]').forEach(b => b.addEventListener('click', () => {
+      avStyle = b.dataset.avstyle;
+      root.querySelector('.avpick').dataset.style = avStyle;
+    }));
+  }
+
   // ---------- join ----------
   function showJoin(error = '') {
     const prev = savedSession() || {};
@@ -51,10 +67,12 @@ export function startPhone(root) {
         ${error ? `<p class="error">${esc(error)}</p>` : ''}
         <label>Room code<input id="code" maxlength="4" autocapitalize="characters" autocomplete="off" value="${esc(code)}" placeholder="ABCD"></label>
         <label>Your name<input id="name" maxlength="14" autocomplete="off" value="${esc(prev.name || '')}" placeholder="Name"></label>
-        <div class="avatars">${AVATARS.map(a => `<button class="av ${a === chosen ? 'sel' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
+        ${avatarPicker(chosen, 'data-av')}
         <button class="big-btn" id="go">Enter the cabin</button>
         <p class="muted small">Hosting on the TV? <a href="?host=1${params.get('peer') ? `&peer=${esc(params.get('peer'))}` : ''}">Open the host screen</a></p>
       </div>`;
+    spritify(root);
+    wirePicker();
     root.querySelectorAll('[data-av]').forEach(b => b.addEventListener('click', () => {
       unlockAudio();
       chosen = b.dataset.av;
@@ -207,7 +225,7 @@ export function startPhone(root) {
             <button class="big-btn" data-vip="start" ${v.count >= 2 ? '' : 'disabled'}>Start the night 🔥</button>
             ${v.count >= 2 ? '' : '<p class="muted small">Need at least 2 players.</p>'}</div>` : '<p>Waiting for everyone. The ⭐ VIP starts the game.</p>'}
           <p class="muted">Change your character:</p>
-          <div class="avatars">${AVATARS.map(a => `<button class="av ${a === v.me.avatar ? 'sel' : ''}" data-switch="${a}" ${(v.taken || []).includes(a) ? 'disabled' : ''}>${a}</button>`).join('')}</div>
+          ${avatarPicker(v.me.avatar, 'data-switch', v.taken || [])}
           <button class="link" id="leave">Leave room</button></div>`;
         break;
       case 'wait':
@@ -303,6 +321,7 @@ export function startPhone(root) {
   }
 
   function wire() {
+    wirePicker();
     root.querySelector('#leave')?.addEventListener('click', leave);
     root.querySelectorAll('[data-vip]').forEach(b => b.addEventListener('click', () => {
       const a = b.dataset.vip;

@@ -734,3 +734,10 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 @keyframes capLoom { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.06) rotate(2deg); } }
 @keyframes sweat { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, 14px); } }
 .fx-bit img.px { width: 1.6em; height: 1.6em; }
+
+/* character picker: Classic / Anime */
+.av-tabs { display: flex; gap: 6px; justify-content: center; margin: 4px 0 6px; }
+.av-tabs button { padding: 4px 14px; }
+.avpick[data-style="classic"] .av-anime, .avpick[data-style="anime"] .av-classic { display: none; }
+.avpick[data-style="classic"] [data-avstyle="classic"], .avpick[data-style="anime"] [data-avstyle="anime"] { border-color: var(--honey); color: var(--honey); }
+.avatars .av img.px { width: 1.6em; height: 1.6em; }

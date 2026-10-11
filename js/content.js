@@ -41,6 +41,14 @@ export const AVATARS = [
   '🐸', '🐵', '🦉', '🐧', '🦆', '🐢', '🦄', '🐝', '🦌', '🫎', '🐿️', '🦔'
 ];
 
+// Anime-style characters: same emoji plus a hidden marker (text variation selector) so they get their own sprites
+export const ANIME_MARK = '\uFE0E';
+export const ANIME_AVATARS = [
+  '🐱', '🐕', '🐰', '🦊', '🐼', '🐧', '🦦', '🦥', '🐹', '🦭', '🐮', '🐑',
+  '🐯', '🦁', '🐨', '🦝', '🦌', '🐻', '🐸', '🦉', '🐲', '🦄', '🐙', '🦎'
+].map(e => e + ANIME_MARK);
+export const ALL_AVATARS = [...AVATARS, ...ANIME_AVATARS];
+
 // a = index of the correct choice
 export const TRIVIA = [
   { q: "What is New Hampshire's state motto?", c: ['Live Free or Die', "Don't Tread on Me", 'Ever Upward', 'The Way Life Should Be'], a: 0 },

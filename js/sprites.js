@@ -5,10 +5,15 @@ import AVATARS_A from './sprites/avatars-a.js';
 import AVATARS_B from './sprites/avatars-b.js';
 import ITEMS from './sprites/items.js';
 import PLACES from './sprites/places.js';
+import ANIME_A from './sprites/anime-a.js';
+import ANIME_B from './sprites/anime-b.js';
+import { ANIME_MARK } from './content.js';
 
 const VS = /\uFE0F/g;
 const GRIDS = {};
 for (const set of [PLACES, ITEMS, AVATARS_A, AVATARS_B]) for (const [k, v] of Object.entries(set)) GRIDS[k.replace(VS, '')] = v;
+// anime avatars are keyed by emoji + the anime marker
+for (const set of [ANIME_A, ANIME_B]) for (const [k, v] of Object.entries(set)) GRIDS[k.replace(VS, '') + ANIME_MARK] = v;
 
 const urls = {};
 function url(key) {

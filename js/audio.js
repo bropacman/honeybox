@@ -276,7 +276,10 @@ const CHARACTER = {
   '🐨': ['growl', 1.7], '🦊': ['yip', 1.0], '🦝': ['chitter', 0.9], '🐷': ['oink', 1.0],
   '🐸': ['ribbit', 1.0], '🐵': ['ooh', 1.0], '🦉': ['hoot', 1.0], '🐧': ['quack', 1.3],
   '🦆': ['quack', 1.0], '🐢': ['blip', 0.9], '🦄': ['neigh', 1.15], '🐝': ['buzz', 1.0],
-  '🦌': ['bleat', 1.0], '🫎': ['bellow', 1.0], '🐿️': ['chitter', 1.3], '🦔': ['squeak', 1.35]
+  '🦌': ['bleat', 1.0], '🫎': ['bellow', 1.0], '🐿️': ['chitter', 1.3], '🦔': ['squeak', 1.35],
+  // anime set additions
+  '🦦': ['chitter', 1.1], '🦥': ['ooh', 0.7], '🐹': ['squeak', 1.6], '🦭': ['bark', 1.3], '🐮': ['bellow', 1.3], '🐑': ['bleat', 1.25],
+  '🐯': ['growl', 1.25], '🦁': ['growl', 0.9], '🐲': ['bellow', 1.6], '🐙': ['blip', 1.2], '🦎': ['squeak', 1.1]
 };
 
 function voiceTone(freq, dur, delay, spec) {
@@ -335,7 +338,7 @@ function call(spec, freq, delay, lenMul, slideSign) {
 
 export function characterSound(avatar, mood = 'happy', delayMs = 0) {
   if (!ctx || muted) return;
-  const [kind, mul] = CHARACTER[avatar] || ['blip', 1];
+  const [kind, mul] = CHARACTER[String(avatar).replace(/\uFE0E/g, '')] || ['blip', 1];
   const spec = CALLS[kind];
   const f = spec.base * mul;
   const d = delayMs / 1000;

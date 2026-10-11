@@ -1,7 +1,7 @@
 // Honeybox game rules. Runs on the TV (host). No DOM here.
 // State lives in this.S (plain JSON, so it can be saved and resumed).
 
-import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS, AVATARS, TOT, GUESSES, HIDE_SETS, isLocal } from './content.js';
+import { PILE_NAMES, DANGERS, TRIVIA, DRAW_PROMPTS, POLLS, AVATARS, ALL_AVATARS, TOT, GUESSES, HIDE_SETS, isLocal } from './content.js';
 import ZOOM from './packs/zoom.js';
 
 export const CLOCK = ['12 AM', '2 AM', '4 AM', '6 AM'];
@@ -188,7 +188,7 @@ export class Game {
 
   // one character per player
   avatarFree(avatar, id) {
-    return AVATARS.includes(avatar) && !this.S.players.some(p => p.id !== id && p.avatar === avatar);
+    return ALL_AVATARS.includes(avatar) && !this.S.players.some(p => p.id !== id && p.avatar === avatar);
   }
 
   join(id, name, avatar) {
