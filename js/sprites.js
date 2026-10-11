@@ -1,5 +1,5 @@
 // Pixel sprites: every emoji that has a sprite gets swapped for crisp pixel art after each render.
-// Sprites are 16x16 (icons) or 32x32 (characters) text grids (see js/sprites/*.js), drawn once to a canvas and cached as data URLs.
+// Sprites are 16x16 (icons) or 24x24 (characters) text grids (see js/sprites/*.js), drawn once to a canvas and cached as data URLs.
 import PAL from './sprites/palette.js';
 import AVATARS_A from './sprites/avatars-a.js';
 import AVATARS_B from './sprites/avatars-b.js';
