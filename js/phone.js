@@ -203,7 +203,7 @@ export function startPhone(root) {
         break;
       case 'pick':
         body = `<h2>Pick a category</h2>
-          <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🍯</b> · next right answer <b class="win">+${v.win}</b></p>
+          <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🎟️</b> · next right answer <b class="win">+${v.win}</b></p>
           ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
           <p class="small">${v.monster.emoji} lurks at <b>${esc(v.spots[v.monster.spot].name)}</b>: miss there = double stake, right = <b class="win">+${v.spots[v.monster.spot].banish}</b></p>
           <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${esc(p.name)}</small></button>`).join('')}</div>`;
@@ -211,7 +211,7 @@ export function startPhone(root) {
       case 'tot':
         body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>
           ${v.watcher
-            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🍯)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''} · Miss = lose the pot & get dragged off</div>`
+            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🎟️)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''} · Miss = lose the pot & get dragged off</div>`
             : `<div class="safe-box">No risk for you · right answer <b>+${v.side}</b></div>`}
           <h2 class="q">${esc(v.q)}</h2>
           <div class="tot-btns">${v.opts.map((o, i) => `<button class="tot-btn ${v.locked === i ? 'sel' : ''}" data-tot="${i}" ${v.locked != null ? 'disabled' : ''}><span class="letter">${'AB'[i]}</span>${esc(o)}</button>`).join('<div class="or">or</div>')}</div>
@@ -221,10 +221,10 @@ export function startPhone(root) {
         body = `<p class="role">🔦 Your night shift</p>
             <div class="shift-dots">${[0, 1, 2].map(i => `<i class="${i < v.streak ? 'on' : ''}">${i < v.streak ? '✅' : '⬜'}</i>`).join('')}</div>
             <p class="center-sm">${v.streak} of 3 right · ${3 - v.streak} more to reach 6 AM</p>
-            <h2>Your pot: ${v.pot} 🍯</h2>
+            <h2>Your pot: ${v.pot} 🎟️</h2>
             <div class="tot-btns">
-              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Right: pot grows to ${v.pot + v.next} 🍯${v.sixAm ? ` + ${v.sixAm} 6 AM bonus` : ''}<br>Miss: lose all ${v.pot} 🍯 and get dragged off</small></button>
-              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🛏️ Hide till morning<small>Keep your ${v.pot} 🍯 safe. Ends your shift.</small></button>
+              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Right: pot grows to ${v.pot + v.next} 🎟️${v.sixAm ? ` + ${v.sixAm} 6 AM bonus` : ''}<br>Miss: lose all ${v.pot} 🎟️ and get dragged off</small></button>
+              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🛏️ Hide till morning<small>Keep your ${v.pot} 🎟️ safe. Ends your shift.</small></button>
             </div>`;
         break;
       case 'finale':
@@ -265,7 +265,7 @@ export function startPhone(root) {
         }
         break;
       case 'end':
-        body = `<div class="center"><div class="emoji-xl">${v.rank === 1 ? '🏆' : v.rank === v.total ? '💀' : '🌄'}</div><h2>You finished #${v.rank} of ${v.total}</h2><p>${v.me.score} 🍯</p>${v.vip ? '<button class="big-btn" data-vip="again">Play again 🔁</button>' : '<p class="muted">The VIP can start another round.</p>'}</div>`;
+        body = `<div class="center"><div class="emoji-xl">${v.rank === 1 ? '🏆' : v.rank === v.total ? '💀' : '🌄'}</div><h2>You finished #${v.rank} of ${v.total}</h2><p>${v.me.score} 🎟️</p>${v.vip ? '<button class="big-btn" data-vip="again">Play again 🔁</button>' : '<p class="muted">The VIP can start another round.</p>'}</div>`;
         break;
       default:
         body = '<div class="center"><p>Look at the TV</p></div>';

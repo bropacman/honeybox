@@ -27,9 +27,9 @@ export const TIMERS = { short: 0.7, medium: 1, long: 1.4 };
 // Finale choices for last place
 export const FINALES = {
   stakes: { name: 'Sunrise Stakes', emoji: '🌅', blurb: '5 This or That questions for everyone, worth 200 up to 1,000. Right wins it, wrong loses it.' },
-  trivia: { name: 'Trivia Blitz', emoji: '🐻', blurb: '5 questions, double honey.' },
-  draw: { name: 'Sketchy Woods', emoji: '🖍️', blurb: 'Everyone draws a secret prompt, then fib and guess. Double honey.' },
-  poll: { name: 'Cabin Census', emoji: '📋', blurb: 'Pick what most people will pick. Double honey.' }
+  trivia: { name: 'Trivia Blitz', emoji: '🐻', blurb: '5 questions, double tickets.' },
+  draw: { name: 'Sketchy Woods', emoji: '🖍️', blurb: 'Everyone draws a secret prompt, then fib and guess. Double tickets.' },
+  poll: { name: 'Cabin Census', emoji: '📋', blurb: 'Pick what most people will pick. Double tickets.' }
 };
 
 // This or That categories. Each map spot is one category.
@@ -199,7 +199,7 @@ export class Game {
   }
 
   addScore(id, n) {
-    if (n > 0 && this.S.mg?.finale) n *= 2; // finale minigames pay double honey
+    if (n > 0 && this.S.mg?.finale) n *= 2; // finale minigames pay double tickets
     const p = this.player(id);
     if (!p || !n) return;
     p.score = Math.max(0, p.score + n);
@@ -298,13 +298,13 @@ export class Game {
     this.spawnMonster();
     // one line per How to Play step; the TV reveals each step as its line starts
     this.emit('say', [
-      'Welcome to the cabin. The animatronics are awake. Survive until sunrise with the most honey.',
+      'Welcome to the cabin. The animatronics are awake. Survive until sunrise with the most tickets.',
       'Take turns on the night shift. Each round, one player is up.',
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
       'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have.',
       'Three in a row gets you to 6 A M, and a bonus.',
       'Miss, and you drop the pot and get dragged into a mini game. Do well to escape.',
-      'At sunrise, last place picks the finale. Most honey wins!'
+      'At sunrise, last place picks the finale. Most tickets win!'
     ]);
     this.go('intro', TIMES.intro);
   }
@@ -539,18 +539,18 @@ export class Game {
       if (w.streak >= 3) {
         this.addScore(w.watcherId, w.pot + SIX_AM);
         this.emit('sfx', 'great');
-        this.emit('say', `6 A M! ${name} survived the night shift with ${w.pot + SIX_AM} honey. The dogs are thrilled.`);
+        this.emit('say', `6 A M! ${name} survived the night shift with ${w.pot + SIX_AM} tickets. The dogs are thrilled.`);
         this.emit('mood', { pid: w.watcherId, mood: 'happy', tv: true, delay: 600 });
         return this.go('safe', TIMES.safe);
       }
       w.decision = null;
-      this.emit('say', `${name}, you're risking ${w.pot} honey. Keep going for ${this.potValue(w.streak)} more… or hide till morning?`);
+      this.emit('say', `${name}, you're risking ${w.pot} tickets. Keep going for ${this.potValue(w.streak)} more… or hide till morning?`);
       return this.go('decide', TIMES.decide);
     }
     S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot };
     S.danger = w.st.haunted ? { name: lurker.name, emoji: lurker.emoji } : pick(DANGERS);
     this.emit('sfx', 'scare');
-    this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}${w.pot ? `, and dropped ${w.pot} honey` : ''}.`);
+    this.emit('say', `Oh no. ${name} was dragged off by ${S.danger.name}${w.pot ? `, and dropped ${w.pot} tickets` : ''}.`);
     this.emit('mood', { pid: w.watcherId, mood: 'sad', tv: true, delay: 1300 });
     return this.go('dragged', TIMES.dragged);
   }
@@ -574,7 +574,7 @@ export class Game {
     if (w.decision === 'bank') {
       this.addScore(w.watcherId, w.pot);
       this.emit('sfx', 'good');
-      this.emit('say', `${name} hides till morning with ${w.pot} honey!`);
+      this.emit('say', `${name} hides till morning with ${w.pot} tickets!`);
     } else {
       this.emit('sfx', 'drumroll');
       this.emit('say', `${name} keeps going! Brave… or foolish.`);
@@ -904,7 +904,7 @@ export class Game {
     else this.addScore(lost.pid, -lost.stake);
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
-    this.emit('say', ok ? `${name} escaped the animatronics!` : `${name} is still captured, and lost some honey.`);
+    this.emit('say', ok ? `${name} escaped the animatronics!` : `${name} is still captured, and lost some tickets.`);
     this.emit('mood', { pid: lost.pid, mood: ok ? 'happy' : 'sad', tv: true, delay: 400 });
     this.go('mgResult', TIMES.mgResult);
   }
@@ -941,7 +941,7 @@ export class Game {
       S.mg = { type: 'finale', questions: this.takeTrivia(5), qi: -1, chosenBy: picker?.id };
       return this.go('finaleIntro', TIMES.finaleIntro);
     }
-    // a regular minigame, but nobody is captured and all honey is doubled
+    // a regular minigame, but nobody is captured and all tickets are doubled
     S.mg = { type: kind, lostOk: false, finale: true, chosenBy: picker?.id };
     this.emit('say', `${FINALES[kind].name}. ${FINALES[kind].blurb}`);
     return this.go('mgIntro', TIMES.mgIntro);
@@ -969,7 +969,7 @@ export class Game {
     mg.bets = {};
     mg.q = this.takeTot('wild', STAKES.diff[mg.round - 1]);
     S.gains = {};
-    this.emit('say', `${mg.round === mg.rounds ? 'Final question, for one thousand honey! ' : `For ${this.cardValue()} honey. `}${this.totLine(mg.q)}`);
+    this.emit('say', `${mg.round === mg.rounds ? 'Final question, for one thousand tickets! ' : `For ${this.cardValue()} tickets. `}${this.totLine(mg.q)}`);
     this.go('stakesBet', TIMES.stakesBet);
   }
 
@@ -1005,7 +1005,7 @@ export class Game {
     const S = this.S;
     S.gains = {};
     const ranked = this.ranked();
-    if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most honey. Archie and Honey approve.`);
+    if (ranked[0]) this.emit('say', `6 A M. The animatronics power down. ${ranked[0].name} survived with the most tickets. Archie and Honey approve.`);
     if (ranked[0]) this.emit('mood', { pid: ranked[0].id, mood: 'happy', tv: true, delay: 1200 });
     if (ranked.length > 1) this.emit('mood', { pid: ranked[ranked.length - 1].id, mood: 'sad', tv: true, delay: 2200 });
     this.emit('sfx', 'great');
@@ -1081,7 +1081,7 @@ export class Game {
             })
           };
         }
-        return wait(`${watcher?.name} is picking a category…`, `It's ${CLOCK[w.streak]} · pot ${w.pot} 🍯`, '👀');
+        return wait(`${watcher?.name} is picking a category…`, `It's ${CLOCK[w.streak]} · pot ${w.pot} 🎟️`, '👀');
       case 'tot': {
         const c = CATEGORIES[w.q.cat];
         return {
@@ -1095,22 +1095,22 @@ export class Game {
         const right = w.q.opts[w.q.ans];
         if (mine == null) return { ...wait(`It's ${right}`, 'You didn\'t answer this one.', '🤷'), suspense: true };
         if (pid === w.watcherId && w.saved) return { ...wait('Saved by the dogs!', `It was ${right}. Archie & Honey chased it off.`, '🐕'), suspense: true };
-        if (pid === w.watcherId && w.banished) return { ...wait('You banished it!', `+${w.st.banish} bonus · pot ${w.pot} 🍯`, '⚡'), suspense: true };
-        if (pid === w.watcherId && w.results[pid]) return { ...wait('Correct!', `Pot: ${w.pot} 🍯`, '✅'), suspense: true };
+        if (pid === w.watcherId && w.banished) return { ...wait('You banished it!', `+${w.st.banish} bonus · pot ${w.pot} 🎟️`, '⚡'), suspense: true };
+        if (pid === w.watcherId && w.results[pid]) return { ...wait('Correct!', `Pot: ${w.pot} 🎟️`, '✅'), suspense: true };
         return { ...wait(w.results[pid] ? 'Correct!' : 'Wrong!', `It's ${right}.`, w.results[pid] ? '✅' : '❌'), suspense: true };
       }
       case 'decide':
-        if (w.watcherId !== pid) return wait(`${watcher?.name} has ${w.pot} 🍯`, 'Keep going… or hide till morning?', '🤔');
+        if (w.watcherId !== pid) return wait(`${watcher?.name} has ${w.pot} 🎟️`, 'Keep going… or hide till morning?', '🤔');
         return {
           ...base, screen: 'decide', watcher: w.watcherId === pid, watcherName: watcher?.name, pot: w.pot, next: this.potValue(w.streak),
           streak: w.streak, risk: STAKE, locked: w.decision, sixAm: w.streak + 1 >= 3 ? SIX_AM : 0
         };
       case 'decideReveal': {
         const bank = w.decision === 'bank';
-        if (pid === w.watcherId) return bank ? wait(`You're hiding with ${w.pot} 🍯!`, 'Safe till morning.', '🛏️') : wait('You kept going!', 'Pick your next category…', '🔦');
+        if (pid === w.watcherId) return bank ? wait(`You're hiding with ${w.pot} 🎟️!`, 'Safe till morning.', '🛏️') : wait('You kept going!', 'Pick your next category…', '🔦');
         return wait(bank ? `${watcher?.name} is hiding till morning!` : `${watcher?.name} kept going!`, '', bank ? '🛏️' : '🔦');
       }
-      case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, `${w.pot} 🍯 + ${SIX_AM} bonus`, '🌅');
+      case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, `${w.pot} 🎟️ + ${SIX_AM} bonus`, '🌅');
       case 'dragged': return wait(isLost ? "You got dragged off!" : `${lostName} got dragged off!`, `By ${S.danger.name}.`, S.danger.emoji);
       case 'mgIntro': {
         const m = MINIGAMES[mg.type];
@@ -1154,18 +1154,18 @@ export class Game {
         };
       case 'drawReveal': return wait('Look at the TV', 'Who got fooled?', '😈');
       case 'drawGallery': return wait('The gallery', 'Bonus masterpieces on the TV', '🖼️');
-      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost honey to the animatronics`, '', mg.result ? '🏠' : '💀');
+      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost tickets to the animatronics`, '', mg.result ? '🏠' : '💀');
       case 'scores': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
-        return wait(`You're #${rank}`, `${me.score} 🍯`, '📊');
+        return wait(`You're #${rank}`, `${me.score} 🎟️`, '📊');
       }
-      case 'finaleIntro': return wait('Trivia Blitz', 'Five questions. Double honey.', '🐻');
+      case 'finaleIntro': return wait('Trivia Blitz', 'Five questions. Double tickets.', '🐻');
       case 'finalePick': {
         if (pid === mg.picker) return { ...base, screen: 'finale', options: mg.options.map(k => ({ key: k, ...FINALES[k] })) };
         return wait(`${this.player(mg.picker)?.name} is choosing the finale…`, "Last place picks how the night ends.", '🌅');
       }
       case 'stakesIntro':
-        return wait('Sunrise Stakes', mg.boosted.includes(pid) ? 'You get a 1.5× comeback boost on wins!' : 'Bet your honey on the last 5 cards.', '🌅');
+        return wait('Sunrise Stakes', mg.boosted.includes(pid) ? 'You get a 1.5× comeback boost on wins!' : 'Bet your tickets on the last 5 cards.', '🌅');
       case 'stakesBet': {
         const c = CATEGORIES[mg.q.cat];
         return {
