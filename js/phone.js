@@ -226,7 +226,7 @@ export function startPhone(root) {
       case 'tot':
         body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>
           ${v.watcher
-            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🎟️)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''}${v.golden ? ` + <b>${v.golden}</b> golden ticket` : ''} · Miss = lose the pot & get dragged off</div>`
+            ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🎟️)${v.haunted ? ` + <b>${v.banish}</b> banish` : ''}${v.golden ? ` + <b>${v.golden}</b> golden ticket` : ''} · Miss = lose the pot & get caught</div>`
             : `<div class="safe-box">No risk for you · right answer <b>+${v.side}</b></div>`}
           <h2 class="q">${esc(v.q)}</h2>
           <div class="tot-btns">${v.opts.map((o, i) => `<button class="tot-btn ${v.locked === i ? 'sel' : ''}" data-tot="${i}" ${v.locked != null ? 'disabled' : ''}><span class="letter">${'AB'[i]}</span>${esc(o)}</button>`).join('<div class="or">or</div>')}</div>
@@ -238,7 +238,7 @@ export function startPhone(root) {
             <p class="center-sm">${v.streak} of 3 right · ${3 - v.streak} more to reach 6 AM</p>
             <h2>Your pot: ${v.pot} 🎟️</h2>
             <div class="tot-btns">
-              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Right: pot grows to ${v.pot + v.next} 🎟️${v.sixAm ? ` + ${v.sixAm} 6 AM bonus` : ''}<br>Miss: lose all ${v.pot} 🎟️ and get dragged off</small></button>
+              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Right: pot grows to ${v.pot + v.next} 🎟️${v.sixAm ? ` + ${v.sixAm} 6 AM bonus` : ''}<br>Miss: lose all ${v.pot} 🎟️ and get caught</small></button>
               <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🛏️ Hide till morning<small>Keep your ${v.pot} 🎟️ safe. Ends your shift.</small></button>
             </div>`;
         break;
