@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, revealAt } from './game.js';
+import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, revealAt } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -15,7 +15,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
   dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
-  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
+  triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
 
@@ -654,6 +654,29 @@ export function startTV(root, { resume = null } = {}) {
           ${reveal ? '' : '<p class="muted">The animatronic checks the most crowded spot first, then one more. Unfound = +200</p>'}
           <div class="hide-grid">${cards}</div>
           ${exposed.length ? `<p class="muted">Caught in the open: ${exposed.map(p => p.avatar).join(' ')}</p>` : ''}
+          ${reveal ? '' : waitingStrip()}
+        </div>`;
+      }
+      case 'doorQ': case 'doorA': {
+        // three doors; on the reveal everyone's pick shows, then the doors swing open one at a time
+        const reveal = S.phase === 'doorA';
+        const doors = mg.rounds[mg.qi].map((d, i) => {
+          const pickers = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
+          const b = reveal ? mg.behind[i] : null;
+          const at = reveal ? 1000 + mg.openOrder.indexOf(i) * DOOR_STEP : 0;
+          return `<div class="door-wrap ${b ? `opens ${b.kind}` : ''}" style="--at:${at}ms">
+            <div class="door-inside">${b ? (b.kind === 'monster' ? `<span class="behind">${mg.seeker}</span><b>CAUGHT</b>` : `<span class="behind">${b.emoji}</span><b>+${b.tickets}</b>`) : ''}</div>
+            <div class="door-panel"><span class="door-knob"></span><span class="door-label">${esc(d)}</span></div>
+            <div class="door-who">${pickers.map(p => p.avatar).join(' ')}</div>
+          </div>`;
+        }).join('');
+        const froze = reveal ? game.connected().filter(p => !mg.answers[p.id]) : [];
+        return `<div class="quiz door-game">
+          <div class="quiz-head">🚪 Pick a Door <span class="muted">${mg.qi + 1}/${mg.rounds.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
+          <h1 class="q">${reveal ? 'Let\'s open them up…' : 'Which door?'}</h1>
+          ${reveal ? '' : '<p class="muted">🎁 +300 · 🍬 +100 · one hides an animatronic</p>'}
+          <div class="doors">${doors}</div>
+          ${froze.length ? `<p class="muted">Froze and didn't pick: ${froze.map(p => p.avatar).join(' ')}</p>` : ''}
           ${reveal ? '' : waitingStrip()}
         </div>`;
       }

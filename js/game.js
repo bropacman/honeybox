@@ -12,7 +12,7 @@ export const TIMES = {
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 5,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
   stakesIntro: 14, stakesBet: 20, stakesReveal: 7,
-  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6
+  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4
 };
 
 export const MINIGAMES = {
@@ -20,8 +20,19 @@ export const MINIGAMES = {
   draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The captured player needs someone to guess theirs.' },
   poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Dragged off? Match the crowd 2 of 3 times to escape.' },
   hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Dragged off? Stay hidden 2 of 3 times to escape.' },
-  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Dragged off? Beat at least one other camper 2 of 3 times to escape.' }
+  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Dragged off? Beat at least one other camper 2 of 3 times to escape.' },
+  door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and an animatronic. Pick one. Dragged off? Dodge the animatronic 2 of 3 times to escape.' }
 };
+// Pick a Door: what's behind the three doors, and the door sets for each round
+export const DOOR_PRIZES = [{ kind: 'big', tickets: 300, emoji: '🎁' }, { kind: 'small', tickets: 100, emoji: '🍬' }, { kind: 'monster', tickets: 0, emoji: '' }];
+export const DOOR_SETS = [
+  ['🚪 Cabin door', '🚪 Shed door', '🚪 Cellar door'],
+  ['🎪 Red curtain', '🎪 Blue curtain', '🎪 Gold curtain'],
+  ['🌲 Left trail', '🌲 Middle trail', '🌲 Right trail'],
+  ['🎠 Funhouse door', '🎟️ Prize room', '🕹️ Back room'],
+  ['🛖 Outhouse', '⛺ Tent', '🛶 Boathouse']
+];
+export const DOOR_STEP = 2400;
 // Hide and Seek: time between the animatronic's searches; Closest Guess: time between guesses popping in
 export const SEARCH_MS = 2600;
 export const GUESS_STEP = 1100;
@@ -103,7 +114,7 @@ export const DRAW_JUDGED = 4;
 export const NARRATED = ['intro', 'turnStart', 'safe', 'dragged', 'mgIntro', 'mgResult', 'finaleIntro', 'stakesIntro'];
 
 // phases where players are answering on their phones (the last-10-seconds hurry-up applies)
-export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
+export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
 
 // Sunrise Stakes: 5 This or That questions for everyone, each worth more
 export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [2, 2, 3, 3, 3], boost: 1.5 };
@@ -385,6 +396,8 @@ export class Game {
       case 'hideA': return this.nextHide();
       case 'guessQ': return this.revealGuess();
       case 'guessA': return this.nextGuess();
+      case 'doorQ': return this.revealDoor();
+      case 'doorA': return this.nextDoor();
       case 'drawDraw': return this.startFibs();
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
@@ -519,10 +532,10 @@ export class Game {
       S.watch.answers[pid] = i;
     } else if (S.phase === 'stakesBet') {
       return this.stake(pid, i);
-    } else if (['triviaQ', 'finaleQ', 'pollQ', 'hideQ'].includes(S.phase)) {
+    } else if (['triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'doorQ'].includes(S.phase)) {
       const mg = S.mg;
-      const q = S.phase === 'hideQ' ? null : mg.questions[mg.qi];
-      const max = S.phase === 'hideQ' ? mg.rounds[mg.qi].length : S.phase === 'pollQ' ? this.pollChoices(q).length : q.c.length;
+      const q = ['hideQ', 'doorQ'].includes(S.phase) ? null : mg.questions[mg.qi];
+      const max = ['hideQ', 'doorQ'].includes(S.phase) ? mg.rounds[mg.qi].length : S.phase === 'pollQ' ? this.pollChoices(q).length : q.c.length;
       if (mg.answers[pid] || !(i >= 0 && i < max)) return;
       mg.answers[pid] = { i, at: Date.now() };
     } else {
@@ -691,6 +704,12 @@ export class Game {
       mg.qi = -1;
       mg.safe = {};
       return this.askHide();
+    }
+    if (mg.type === 'door') {
+      mg.rounds = shuffle(DOOR_SETS.slice()).slice(0, 3);
+      mg.qi = -1;
+      mg.dodged = {};
+      return this.askDoor();
     }
     if (mg.type === 'guess') {
       mg.questions = this.takeGuesses(3);
@@ -871,7 +890,8 @@ export class Game {
       this.addScore(id, 200);
       mg.safe[id] = (mg.safe[id] || 0) + 1;
     }
-    const names = (i) => Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => this.player(id)?.name).filter(Boolean);
+    const picks = { ...mg.answers };
+    const names = (i) => Object.entries(picks).filter(([, a]) => a.i === i).map(([id]) => this.player(id)?.name).filter(Boolean);
     const line = (i) => { const n = names(i); return `${spots[i].replace(/^\S+\s/, '')}… ${n.length ? `found ${n.join(' and ')}!` : 'nobody there.'}`; };
     this.emit('sfx', 'drumroll');
     this.emit('say', 'Ready or not, here I come!');
@@ -889,6 +909,61 @@ export class Game {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.rounds.length) return this.askHide();
     return this.finishMinigame((mg.safe[this.S.lost.pid] || 0) >= 2);
+  }
+
+  // ---------- Pick a Door ----------
+  askDoor() {
+    const mg = this.S.mg;
+    mg.qi++;
+    mg.answers = {};
+    mg.behind = null;
+    this.S.gains = {};
+    this.emit('say', mg.qi === 0 ? 'Pick a door. One hides a prize, one a little prize, and one… an animatronic.' : `Round ${mg.qi + 1}. Pick a door!`);
+    this.go('doorQ', TIMES.doorQ);
+  }
+
+  // Doors open little prize first, then the last two together-ish: prize or monster?
+  revealDoor() {
+    const S = this.S;
+    const mg = S.mg;
+    const k = Math.min(1, this.speed * 4);
+    mg.behind = shuffle(DOOR_PRIZES.slice());
+    mg.seeker = S.danger?.emoji || S.monster?.emoji || '🤖';
+    const small = mg.behind.findIndex(b => b.kind === 'small');
+    mg.openOrder = [small, ...shuffle(mg.behind.map((_, i) => i).filter(i => i !== small))];
+    S.gains = {};
+    const ids = this.connected().map(p => p.id);
+    mg.caught = [];
+    for (const id of ids) {
+      const a = mg.answers[id];
+      const b = a ? mg.behind[a.i] : null;
+      if (!b || b.kind === 'monster') { mg.caught.push(id); continue; }
+      this.addScore(id, b.tickets);
+      mg.dodged[id] = (mg.dodged[id] || 0) + 1;
+    }
+    const doors = mg.rounds[mg.qi].map(d => d.replace(/^\S+\s/, ''));
+    this.emit('sfx', 'drumroll');
+    const behind = mg.behind;
+    const picks = { ...mg.answers };
+    const who = (i) => Object.entries(picks).filter(([, a]) => a.i === i).map(([id]) => this.player(id)?.name).filter(Boolean);
+    mg.openOrder.forEach((i, n) => setTimeout(() => {
+      const b = behind[i];
+      const names = who(i);
+      this.emit('sfx', b.kind === 'monster' ? 'scare' : b.kind === 'big' ? 'great' : 'good');
+      this.emit('say', b.kind === 'monster'
+        ? `The ${doors[i]}… it's the animatronic!${names.length ? ` Sorry, ${names.join(' and ')}.` : ''}`
+        : b.kind === 'big' ? `The ${doors[i]}: the big prize!` : `The ${doors[i]}: a little prize.`);
+    }, (1000 + n * DOOR_STEP) * k));
+    const end = 1000 + 3 * DOOR_STEP;
+    mg.revealMs = end;
+    for (const id of ids) this.emit('mood', { pid: id, mood: mg.caught.includes(id) ? 'sad' : 'happy', tv: false, delay: end });
+    this.go('doorA', TIMES.doorA + end / 1000);
+  }
+
+  nextDoor() {
+    const mg = this.S.mg;
+    if (mg.qi + 1 < mg.rounds.length) return this.askDoor();
+    return this.finishMinigame((mg.dodged[this.S.lost.pid] || 0) >= 2);
   }
 
   // ---------- Closest Guess ----------
@@ -1280,7 +1355,7 @@ export class Game {
       case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
       case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
-      case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': return ids.filter(id => !mg.answers[id]);
+      case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': case 'doorQ': return ids.filter(id => !mg.answers[id]);
       case 'stakesBet': return ids.filter(id => !mg.bets[id]);
       case 'finalePick': return [mg.picker].filter(id => this.player(id)?.connected);
       case 'drawDraw': return ids.filter(id => mg.prompts[id] && !mg.drawings[id]);
@@ -1291,7 +1366,7 @@ export class Game {
   }
 
   checkAllDone() {
-    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
+    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
     if (!phases.includes(this.S.phase)) return;
     if (this.waitingOn().length === 0 && this.S.pausedLeft == null) {
       // a short beat so the last lock-in is visible
@@ -1401,6 +1476,18 @@ export class Game {
       case 'hideA': {
         const caught = (mg.caught || []).includes(pid);
         return { ...wait(caught ? 'Found you!' : 'You stayed hidden!', caught ? '' : '+200 🎟️', caught ? '😱' : '🙈'), suspense: true, revealMs: mg.revealMs };
+      }
+      case 'doorQ':
+        return {
+          ...base, screen: 'choices', title: 'Pick a Door', num: `${mg.qi + 1}/${mg.rounds.length}`,
+          q: 'Which door?', sub: '🎁 +300 · 🍬 +100 · one hides an animatronic',
+          choices: mg.rounds[mg.qi].map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null
+        };
+      case 'doorA': {
+        const a = mg.answers[pid];
+        const b = a ? mg.behind[a.i] : null;
+        if (!b) return { ...wait('You froze!', 'No door, no escape.', '😱'), suspense: true, revealMs: mg.revealMs };
+        return { ...wait(b.kind === 'monster' ? 'The animatronic!' : b.kind === 'big' ? 'The big prize!' : 'A little prize', b.tickets ? `+${b.tickets} 🎟️` : '', b.kind === 'monster' ? mg.seeker : b.emoji), suspense: true, revealMs: mg.revealMs };
       }
       case 'guessQ': {
         const q = mg.questions[mg.qi];

@@ -636,3 +636,20 @@ body.is-phone .moon { display: none; }
 .num-row { display: flex; align-items: center; gap: 0.5em; margin: 1em 0; }
 .num-row input { flex: 1; font: inherit; font-size: 1.8em; padding: 0.4em; border-radius: 14px; border: 2px solid var(--line); background: var(--bg2); color: var(--ink); text-align: center; min-width: 0; }
 .num-row .unit { color: var(--muted); font-size: 1.1em; }
+
+/* Pick a Door */
+.doors { display: flex; gap: 3vw; justify-content: center; margin: 1em 0; perspective: 1200px; }
+.door-wrap { position: relative; width: 18vw; max-width: 260px; height: 46vh; display: flex; flex-direction: column; align-items: center; }
+.door-inside { position: absolute; inset: 0 0 3em; border-radius: 16px 16px 4px 4px; background: #0a0a0a; border: 4px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3em; }
+.door-inside .behind { font-size: 5em; }
+.door-inside b { font-size: 1.6em; }
+.door-wrap.monster .door-inside { border-color: var(--bad); box-shadow: inset 0 0 60px rgba(255, 40, 40, 0.5); }
+.door-wrap.monster .door-inside b { color: var(--bad); }
+.door-wrap.big .door-inside { border-color: var(--honey); box-shadow: inset 0 0 60px rgba(242, 177, 52, 0.5); }
+.door-wrap.big .door-inside b { color: var(--honey2); }
+.door-panel { position: absolute; inset: 0 0 3em; border-radius: 16px 16px 4px 4px; background: linear-gradient(160deg, #6b4423, #3e2512); border: 4px solid #2a170a; transform-origin: left center; display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: inset 0 0 0 10px rgba(0,0,0,0.15); }
+.door-knob { position: absolute; right: 12%; top: 50%; width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--honey); }
+.door-label { font-size: 1.3em; font-weight: 800; text-align: center; padding: 0 0.4em; color: var(--ink); }
+.door-wrap.opens .door-panel { animation: doorOpen 0.9s ease-in var(--at) both; }
+@keyframes doorOpen { to { transform: rotateY(-105deg); opacity: 0.15; } }
+.door-who { position: absolute; bottom: 0; font-size: 2em; min-height: 1.3em; }
