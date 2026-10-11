@@ -22,7 +22,7 @@ errs = []
 for n, name in enumerate(names):
     grid = sprites[name]
     x0, y0 = (n % cols) * (N * S + 20) + 10, (n // cols) * (N * S + 34) + 6
-    if len(grid) not in (16, 24) or any(len(r) != len(grid) for r in grid): errs.append(f'{name}: must be 16x16 or 24x24 (got {len(grid)} rows)')
+    if len(grid) not in (16, 24, 32) or any(len(r) != len(grid) for r in grid): errs.append(f'{name}: must be 16x16, 24x24 or 32x32 (got {len(grid)} rows)')
     for y, row in enumerate(grid):
         for x, ch in enumerate(row):
             if ch == '.': continue
