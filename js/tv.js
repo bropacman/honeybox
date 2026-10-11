@@ -430,7 +430,7 @@ export function startTV(root, { resume = null } = {}) {
           <ol class="steps">
             <li data-step="1"><span>🔦</span><div><b>Take turns on the night shift.</b> Each round, one player is up.</div></li>
             <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
-            <li data-step="3"><span>🍯</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🏠 bank it</b> and end your turn safely, or <b>🔦 keep going</b>. Everyone else guesses which you'll pick.</div></li>
+            <li data-step="3"><span>🍯</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🏠 bank it</b> and end your turn safely, or <b>🔦 keep going</b>.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
             <li data-step="5"><span>💀</span><div><b>Miss and you drop the pot</b> and get dragged off. Everyone plays a mini-game; you have to do well in it to escape.</div></li>
             <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most honey wins!</div></li>
@@ -481,21 +481,18 @@ export function startTV(root, { resume = null } = {}) {
       case 'decide': case 'decideReveal': {
         const reveal = S.phase === 'decideReveal';
         const bank = w.decision === 'bank';
-        const preds = (choice) => Object.entries(w.preds).filter(([, p]) => p === choice).map(([id]) => game.player(id)).filter(Boolean);
         return `<div class="center decide">
           <h2>${avatar(watcher)} has <span class="pot-big">${w.pot} 🍯</span> in the pot</h2>
           ${streakDots(w.streak)}
           <div class="choice-cards">
             <div class="choice-card bank ${reveal && bank ? 'chosen' : ''} ${reveal && !bank ? 'faded' : ''}">
               <span class="emoji-xl">🏠</span><b>BANK IT</b><small>Keep ${w.pot} 🍯, end the shift safely</small>
-              ${reveal ? `<div class="pred">${preds('bank').map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</div>` : ''}
             </div>
             <div class="choice-card keep ${reveal && !bank ? 'chosen' : ''} ${reveal && bank ? 'faded' : ''}">
               <span class="emoji-xl">🔦</span><b>KEEP GOING</b><small>Next right: +${game.potValue(w.streak)} · miss: lose it all</small>
-              ${reveal ? `<div class="pred">${preds('keep').map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</div>` : ''}
             </div>
           </div>
-          ${reveal ? `<p class="big">${bank ? `🏠 ${esc(watcher?.name)} banks it!` : `🔦 ${esc(watcher?.name)} keeps going!`}</p>` : `<p class="muted">Everyone else: predict what they'll do (+${game.sidePredict()})</p>${waitingStrip()}`}
+          ${reveal ? `<p class="big">${bank ? `🏠 ${esc(watcher?.name)} banks it!` : `🔦 ${esc(watcher?.name)} keeps going!`}</p>` : `<p class="muted">${esc(watcher?.name)} is deciding…</p>`}
         </div>`;
       }
       case 'safe':

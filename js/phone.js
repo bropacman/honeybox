@@ -218,16 +218,10 @@ export function startPhone(root) {
           ${v.locked != null ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
         break;
       case 'decide':
-        body = v.watcher
-          ? `<p class="role">🔦 Your night shift · ${v.streak}/3</p><h2>You have ${v.pot} 🍯 in the pot</h2>
+        body = `<p class="role">🔦 Your night shift · ${v.streak}/3</p><h2>You have ${v.pot} 🍯 in the pot</h2>
             <div class="tot-btns">
               <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 Bank it<small>Keep ${v.pot} 🍯, end your shift</small></button>
               <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 Keep going<small>Next right: +${v.next}. Miss: lose it all</small></button>
-            </div>`
-          : `<p class="role">${esc(v.watcherName)} has ${v.pot} 🍯 in the pot</p><h2>What will they do?</h2><p class="muted">Guess right for +${v.predict}</p>
-            <div class="tot-btns">
-              <button class="tot-btn bank ${v.locked === 'bank' ? 'sel' : ''}" data-decide="bank" ${v.locked ? 'disabled' : ''}>🏠 They'll bank it</button>
-              <button class="tot-btn keep ${v.locked === 'keep' ? 'sel' : ''}" data-decide="keep" ${v.locked ? 'disabled' : ''}>🔦 They'll keep going</button>
             </div>`;
         break;
       case 'finale':

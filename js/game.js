@@ -60,7 +60,7 @@ export const SPOT_CATEGORIES = {
 export const POT = [200, 300, 500];
 export const SIX_AM = 500;
 export const STAKE = 300;                    // lost if you stay captured; doubled on the animatronic's spot
-export const SIDE = { right: 100, predict: 100 };
+export const SIDE = { right: 100 };
 export const BANISH = 300;                   // bonus for a right answer on the animatronic's spot
 
 // Night events: one is drawn at the start of each night shift and lasts for that shift
@@ -69,7 +69,7 @@ export const EVENTS = {
   outage: { name: 'Power Outage', emoji: '🔦', text: 'The map goes dark: categories stay hidden until you pick a spot.' },
   dogs: { name: 'Archie & Honey on Patrol', emoji: '🐕', text: 'The dogs will save the night shift from one miss.' },
   jackpot: { name: 'Jackpot Night', emoji: '🎰', text: 'The pot is doubled tonight.' },
-  fever: { name: 'Funspot Fever', emoji: '🎪', text: 'Everyone else\'s side bets pay double tonight.' },
+  fever: { name: 'Funspot Fever', emoji: '🎪', text: 'Everyone else\'s right answers pay double tonight.' },
   wind: { name: 'Mount Washington Wind', emoji: '🌪️', text: 'The categories blew around the map!' },
   witching: { name: 'Witching Hour', emoji: '🕛', text: 'Only 10 seconds to answer tonight.' },
   moon: { name: 'Full Moon', emoji: '🌕', text: 'Banishing the animatronic pays triple tonight.' }
@@ -364,7 +364,7 @@ export class Game {
     while (S.turnIdx < S.turnOrder.length && !this.player(S.turnOrder[S.turnIdx])) S.turnIdx++;
     if (S.turnIdx >= S.turnOrder.length) return this.startFinale();
     const w = this.player(S.turnOrder[S.turnIdx]);
-    S.watch = { watcherId: w.id, streak: 0, pot: 0, spot: null, q: null, answers: {}, results: null, preds: {}, decision: null, dogsUsed: false };
+    S.watch = { watcherId: w.id, streak: 0, pot: 0, spot: null, q: null, answers: {}, results: null, decision: null, dogsUsed: false };
     const keys = Object.keys(EVENTS).filter(k => k !== S.lastEvent);
     S.event = pick(keys);
     S.lastEvent = S.event;
@@ -405,7 +405,6 @@ export class Game {
   potValue(streak) { return POT[Math.min(streak, POT.length - 1)] * (this.S.event === 'jackpot' ? 2 : 1); }
   banishValue() { return BANISH * (this.S.event === 'moon' ? 3 : 1); }
   sideRight() { return SIDE.right * (this.S.event === 'fever' ? 2 : 1); }
-  sidePredict() { return SIDE.predict * (this.S.event === 'fever' ? 2 : 1); }
 
   // what's on the line for the watcher at a given spot right now
   stakesNow(spot) {
@@ -545,7 +544,6 @@ export class Game {
         return this.go('safe', TIMES.safe);
       }
       w.decision = null;
-      w.preds = {};
       this.emit('say', `${name}: bank ${w.pot} honey and go back to the cabin… or keep going for ${this.potValue(w.streak)} more?`);
       return this.go('decide', TIMES.decide);
     }
@@ -560,9 +558,8 @@ export class Game {
   decide(pid, choice) {
     const S = this.S;
     const w = S.watch;
-    if (S.phase !== 'decide' || !['bank', 'keep'].includes(choice) || !this.player(pid)) return;
-    if (pid === w.watcherId) { if (w.decision) return; w.decision = choice; }
-    else { if (w.preds[pid]) return; w.preds[pid] = choice; }
+    if (S.phase !== 'decide' || !['bank', 'keep'].includes(choice) || pid !== w.watcherId || w.decision) return;
+    w.decision = choice;
     this.emit('sfx', 'lock');
     this.changed();
     this.checkAllDone();
@@ -574,7 +571,6 @@ export class Game {
     const name = this.player(w.watcherId)?.name || 'Someone';
     if (!w.decision) w.decision = 'bank';
     S.gains = {};
-    for (const [pid, p] of Object.entries(w.preds)) if (p === w.decision) this.addScore(pid, this.sidePredict());
     if (w.decision === 'bank') {
       this.addScore(w.watcherId, w.pot);
       this.emit('sfx', 'good');
@@ -1031,7 +1027,7 @@ export class Game {
     switch (S.phase) {
       case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
-      case 'decide': return ids.filter(id => (id === S.watch.watcherId ? !S.watch.decision : !S.watch.preds[id]));
+      case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
       case 'triviaQ': case 'finaleQ': case 'pollQ': return ids.filter(id => !mg.answers[id]);
       case 'stakesBet': return ids.filter(id => !mg.bets[id]);
       case 'finalePick': return [mg.picker].filter(id => this.player(id)?.connected);
@@ -1104,16 +1100,15 @@ export class Game {
         return { ...wait(w.results[pid] ? 'Correct!' : 'Wrong!', `It's ${right}.`, w.results[pid] ? '✅' : '❌'), suspense: true };
       }
       case 'decide':
+        if (w.watcherId !== pid) return wait(`${watcher?.name} has ${w.pot} 🍯`, 'Bank it… or keep going?', '🤔');
         return {
           ...base, screen: 'decide', watcher: w.watcherId === pid, watcherName: watcher?.name, pot: w.pot, next: this.potValue(w.streak),
-          streak: w.streak, risk: STAKE, predict: this.sidePredict(),
-          locked: w.watcherId === pid ? w.decision : (w.preds[pid] || null)
+          streak: w.streak, risk: STAKE, locked: w.decision
         };
       case 'decideReveal': {
         const bank = w.decision === 'bank';
         if (pid === w.watcherId) return bank ? wait(`You banked ${w.pot} 🍯!`, 'Safe in the cabin.', '🏠') : wait('You kept going!', 'Pick your next category…', '🔦');
-        const p = w.preds[pid];
-        return wait(bank ? `${watcher?.name} banked it!` : `${watcher?.name} kept going!`, p ? (p === w.decision ? `You called it! +${this.sidePredict()}` : 'You guessed wrong.') : '', bank ? '🏠' : '🔦');
+        return wait(bank ? `${watcher?.name} banked it!` : `${watcher?.name} kept going!`, '', bank ? '🏠' : '🔦');
       }
       case 'safe': return wait(w.watcherId === pid ? 'You made it to 6 AM!' : `${watcher?.name} made it to 6 AM!`, `${w.pot} 🍯 + ${SIX_AM} bonus`, '🌅');
       case 'dragged': return wait(isLost ? "You got dragged off!" : `${lostName} got dragged off!`, `By ${S.danger.name}.`, S.danger.emoji);
