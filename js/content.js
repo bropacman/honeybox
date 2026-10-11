@@ -209,6 +209,7 @@ import { NATURE_2, ANIMALS_2 } from './packs/tot-3.js';
 import { GEO_2, HISTORY_2 } from './packs/tot-4.js';
 import { MOVIES_2, GAMES_2 } from './packs/tot-5.js';
 import { MUSIC_2, FOOD_2 } from './packs/tot-6.js';
+import FUN_1 from './packs/tot-fun-1.js';
 
 // merge packs per category, dropping exact duplicates (same question and same pair)
 const totKey = (x) => `${x.q}|${[x.right, x.wrong].sort().join('|')}`.toLowerCase();
@@ -221,6 +222,8 @@ export const TOT = {
   history: mergeTot(HISTORY, HISTORY_2), movies: mergeTot(MOVIES, MOVIES_2), games: mergeTot(GAMES, GAMES_2),
   music: mergeTot(MUSIC, MUSIC_2), food: mergeTot(FOOD, FOOD_2)
 };
+// researched "believe it or not" packs, sorted into their categories
+for (const x of [...FUN_1]) if (TOT[x.cat]) TOT[x.cat] = mergeTot(TOT[x.cat], [x]);
 
 // Boston / New England specific content gets shown rarely (it's too local for most of the table)
 const LOCAL_RE = /\b(Boston|Bostonian|Massachusetts|Mass\b|Masshole|New England|Fenway|Red Sox|Patriots|Bruins|Celtics|the Pike|Big Dig|rotary|rotaries|packie|frappe|jimmies|ayuh|wicked|Dunkin|Munchkin|Friendly's|Fribble|Papa Gino|Howard Johnson|HoJo|Cape Cod|Sagamore|Martha's Vineyard|Nantucket|Hyannis|Provincetown|Gloucester|Salem|Walden|Thoreau|Dixville|Piscataqua|Laconia|Concord|Manchester|Nashua|Portsmouth|Dartmouth|Hanover|Montpelier|Augusta|Rhode Island|Lovecraft|Aerosmith|New Kids|Dropkick|Dirty Water|Sweet Caroline|North End|Haahvahd|duck boat|Make Way for Ducklings|Esplanade|Freedom Trail|Vermont|Maine|Connecticut|Kennedy|Weirs|Motorcycle Week|purple finch|Merrimack)\b/i;
