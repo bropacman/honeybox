@@ -7,6 +7,7 @@ import { drawStrokes } from './draw.js';
 import { startFx, FX_LEVELS } from './fx.js';
 import { spritify, spriteImg } from './sprites.js';
 import { PILE_ICONS } from './content.js';
+import ZOOM from './packs/zoom.js';
 
 const SAVE_KEY = 'honeybox_host_save';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -198,6 +199,15 @@ export function startTV(root, { resume = null } = {}) {
   }
 
   const fx = startFx();
+  // Zoom In: check which photos actually load, and only offer the mini-game if 8+ do.
+  // (They stay in the browser cache, so the game itself shows them instantly.)
+  let zoomChecked = 0;
+  ZOOM.forEach((z, i) => {
+    const img = new Image();
+    img.onload = () => { zoomChecked++; game.setZoomAvailable([...(game.S.zoomOk || []), i]); };
+    img.onerror = () => { zoomChecked++; render(); };
+    img.src = z.url || z.file;
+  });
   // phases where the night shift is out in the dark (the flashlight narrows as the timer runs down)
   const DARK_PHASES = ['pick', 'tot', 'decide'];
   game.on((type, data) => {
@@ -952,6 +962,7 @@ export function startTV(root, { resume = null } = {}) {
             <div class="voice-row">Style:
               ${Object.keys(STYLES).map(k => `<button data-act="style" data-style="${k}" class="${voiceSettings().style === k ? 'sel' : ''}">${STYLES[k].label}</button>`).join('')}
             </div>
+      <p class="muted small">🔍 Zoom In photos: ${(S.zoomOk || []).length} of ${ZOOM.length} loaded${(S.zoomOk || []).length >= 8 ? ' · in the rotation' : ' · needs 8 to play'}${zoomChecked < ZOOM.length ? ' (still checking…)' : ''}</p>
       <button class="big-btn" data-act="settings">Done</button></div>`;
   }
 
