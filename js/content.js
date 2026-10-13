@@ -13,26 +13,26 @@ export const PILE_ICONS = {
   'Funspot': '🕹️', 'Weirs Drive-In': '🎞️', 'Lake Dock': '🏚️', 'Meadowbrook': '🎸', 'Loudon Speedway': '🏁'
 };
 
-// After closing time, the Story Land animatronics wake up...
+// After closing time, the Story Land animatronics wake up... (short: how lines like "Cinderella checks the closet" name them)
 export const DANGERS = [
-  { name: 'Humpty Dumpty, cracked and grinning', emoji: '🥚' },
-  { name: 'the Pumpkin Coach (no horses, still moving)', emoji: '🎃' },
-  { name: 'Cinderella, missing a slipper and VERY upset about it', emoji: '👸' },
-  { name: 'a swan boat that paddles itself across Winnipesaukee', emoji: '🦢' },
-  { name: 'the Roar-O-Saurus, eyes glowing red', emoji: '🦖' },
-  { name: 'the Old Woman who lives in a Shoe (and all her kids)', emoji: '👢' },
-  { name: 'an animatronic bear that will not stop singing', emoji: '🐻' },
-  { name: 'a moose standing in the middle of Route 16', emoji: '🫎' },
-  { name: 'the thing that lives under the Lake Dock', emoji: '🐙' },
-  { name: 'a carousel horse that got loose', emoji: '🐴' },
-  { name: 'the Winnipesaukee lake monster', emoji: '🐍' },
-  { name: 'a clown who missed the last tram', emoji: '🤡' },
-  { name: 'a possessed Skee-Ball machine from Funspot', emoji: '🕹️' },
-  { name: 'an animatronic elf from Santa\'s Village, off-season and angry', emoji: '🧝' },
-  { name: 'the Cog Railway train, running with no conductor', emoji: '🚂' },
-  { name: 'a 231 mph gust off Mount Washington', emoji: '🌪️' },
-  { name: 'one of Clark\'s bears, done performing for the night', emoji: '🐻' },
-  { name: 'whatever lives at the bottom of the Flume', emoji: '👁️' }
+  { name: 'Humpty Dumpty, cracked and grinning', short: 'Humpty Dumpty', emoji: '🥚' },
+  { name: 'the Pumpkin Coach (no horses, still moving)', short: 'the Pumpkin Coach', emoji: '🎃' },
+  { name: 'Cinderella, missing a slipper and VERY upset about it', short: 'Cinderella', emoji: '👸' },
+  { name: 'a swan boat that paddles itself across Winnipesaukee', short: 'the swan boat', emoji: '🦢' },
+  { name: 'the Roar-O-Saurus, eyes glowing red', short: 'the Roar-O-Saurus', emoji: '🦖' },
+  { name: 'the Old Woman who lives in a Shoe (and all her kids)', short: 'the Old Woman in the Shoe', emoji: '👢' },
+  { name: 'an animatronic bear that will not stop singing', short: 'the singing bear', emoji: '🐻' },
+  { name: 'a moose standing in the middle of Route 16', short: 'the Route 16 moose', emoji: '🫎' },
+  { name: 'the thing that lives under the Lake Dock', short: 'the thing under the dock', emoji: '🐙' },
+  { name: 'a carousel horse that got loose', short: 'the carousel horse', emoji: '🐴' },
+  { name: 'the Winnipesaukee lake monster', short: 'the lake monster', emoji: '🐍' },
+  { name: 'a clown who missed the last tram', short: 'the clown', emoji: '🤡' },
+  { name: 'a possessed Skee-Ball machine from Funspot', short: 'the Skee-Ball machine', emoji: '🕹️' },
+  { name: 'an animatronic elf from Santa\'s Village, off-season and angry', short: 'the angry elf', emoji: '🧝' },
+  { name: 'the Cog Railway train, running with no conductor', short: 'the Cog Railway train', emoji: '🚂' },
+  { name: 'a 231 mph gust off Mount Washington', short: 'the Mount Washington wind', emoji: '🌪️' },
+  { name: 'one of Clark\'s bears, done performing for the night', short: "Clark's bear", emoji: '🐻' },
+  { name: 'whatever lives at the bottom of the Flume', short: 'the thing in the Flume', emoji: '👁️' }
 ];
 
 // Players stay cute.

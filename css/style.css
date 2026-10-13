@@ -442,10 +442,24 @@ body.is-phone .moon { display: none; }
 .event-chip { display: inline-block; padding: 0.15em 0.7em; border-radius: 999px; background: var(--bg2); border: 2px solid var(--honey); color: var(--honey); font-size: 0.85em; margin-left: 0.4em; }
 .lurk-note { font-size: 0.9em; }
 .spot.haunted .stack .card { box-shadow: 0 0 0 4px var(--bad), 0 0 30px rgba(255, 60, 60, 0.7); }
-.lurker { position: absolute; top: -1.6em; right: -1.4em; font-size: 2.6em; z-index: 3; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); animation: lurk 2.4s ease-in-out infinite; }
+/* the killer patrols above its spot, and walks the map when it moves (timing vars set in tv.js) */
+.prowler { position: absolute; left: var(--x1); top: var(--y1); z-index: 4; font-size: 2.6em; line-height: 1; transform: translate(-50%, -185%); pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); }
+.prowler.travel { animation: prowlTravel 2.6s ease-in-out var(--travel) both; }
+.prowl-pace { animation: prowlPace 9s linear var(--pace) infinite; }
+.prowl-face { transform: scaleX(var(--dir)); animation: prowlFace 9s step-end var(--pace) infinite; }
+.prowl-bob { display: inline-block; animation: prowlBob 0.6s ease-in-out infinite; }
+@keyframes prowlTravel { from { left: var(--x0); top: var(--y0); } to { left: var(--x1); top: var(--y1); } }
+@keyframes prowlPace { 0% { transform: translateX(0); } 20%, 27% { transform: translateX(1.1em); } 63%, 70% { transform: translateX(-1.1em); } 100% { transform: translateX(0); } }
+@keyframes prowlFace { 0% { transform: scaleX(-1); } 24% { transform: scaleX(1); } 67% { transform: scaleX(-1); } }
+@keyframes prowlBob { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-0.08em) rotate(5deg); } }
+/* picked the haunted spot: the killer leans in from the edge of the screen while they answer */
+.peeker { position: fixed; right: 0; top: 37vh; z-index: 5; font-size: 7em; line-height: 1; pointer-events: none; filter: drop-shadow(0 0 30px rgba(255, 40, 40, 0.8)); transform-origin: bottom right; animation: peekIn var(--dur) ease-in var(--in) both; }
+.peeker > span { display: inline-block; animation: prowlBob 2.6s ease-in-out infinite; }
+.peeker img.px { width: 1em; height: 1em; }
+@keyframes peekIn { from { transform: translateX(95%) rotate(-4deg); } 15% { transform: translateX(70%) rotate(-10deg); } to { transform: translateX(38%) rotate(-16deg); } }
 @keyframes lurk { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-6px) rotate(6deg); } }
 .map.outage { filter: brightness(0.55) saturate(0.6); }
-.map.outage .spot.haunted, .map.outage .lurker { filter: none; }
+.map.outage .spot.haunted, .map.outage .prowler { filter: none; }
 .banish-m { border-color: #8ad1ff; } .banish-m .m-big { color: #8ad1ff; }
 
 .pick { position: relative; }
@@ -644,10 +658,10 @@ body.is-phone .moon { display: none; }
 .door-inside { position: absolute; inset: 0 0 3em; border-radius: 16px 16px 4px 4px; background: #0a0a0a; border: 4px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3em; }
 .door-inside .behind { font-size: 5em; }
 .door-inside b { font-size: 1.6em; }
-.door-wrap.monster .door-inside { border-color: var(--bad); box-shadow: inset 0 0 60px rgba(255, 40, 40, 0.5); }
-.door-wrap.monster .door-inside b { color: var(--bad); }
-.door-wrap.big .door-inside { border-color: var(--honey); box-shadow: inset 0 0 60px rgba(242, 177, 52, 0.5); }
-.door-wrap.big .door-inside b { color: var(--honey2); }
+.door-wrap.door-monster .door-inside { border-color: var(--bad); box-shadow: inset 0 0 60px rgba(255, 40, 40, 0.5); }
+.door-wrap.door-monster .door-inside b { color: var(--bad); }
+.door-wrap.door-big .door-inside { border-color: var(--honey); box-shadow: inset 0 0 60px rgba(242, 177, 52, 0.5); }
+.door-wrap.door-big .door-inside b { color: var(--honey2); }
 .door-panel { position: absolute; inset: 0 0 3em; border-radius: 16px 16px 4px 4px; background: linear-gradient(160deg, #6b4423, #3e2512); border: 4px solid #2a170a; transform-origin: left center; display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: inset 0 0 0 10px rgba(0,0,0,0.15); }
 .door-knob { position: absolute; right: 12%; top: 64%; width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--honey); }
 .door-label { font-size: 1.3em; font-weight: 800; text-align: center; padding: 0 0.5em; color: var(--ink); }

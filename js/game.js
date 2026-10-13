@@ -20,10 +20,10 @@ export const MINIGAMES = {
   trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Caught? Get 2 right to escape its grasp.' },
   draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The captured player needs someone to guess theirs.' },
   poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Caught? Match the crowd 2 of 3 times to escape its grasp.' },
-  hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Caught? Stay hidden 2 of 3 times to escape its grasp.' },
+  hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. {Killer} checks the most crowded spot first, then one more. Caught? Stay hidden 2 of 3 times to escape its grasp.' },
   guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Caught? Beat at least one other camper 2 of 3 times to escape its grasp.' },
   zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. The fastest right answers win 300, 200 and 100. Caught? Be the fastest right answer once to escape its grasp.' },
-  door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and an animatronic. Pick one. Caught? Dodge the animatronic 2 of 3 times to escape its grasp.' }
+  door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and {killer}. Pick one. Caught? Dodge {killer} 2 of 3 times to escape its grasp.' }
 };
 // Pick a Door: what's behind the three doors, and the door sets for each round
 export const DOOR_PRIZES = [{ kind: 'big', tickets: 300, emoji: '🎁' }, { kind: 'small', tickets: 100, emoji: '🍬' }, { kind: 'monster', tickets: 0, emoji: '' }];
@@ -37,7 +37,15 @@ export const DOOR_SETS = [
 export const DOOR_STEP = 2400;
 // Zoom In: the fastest right answers win these, in order; slower right answers get nothing
 export const ZOOM_POINTS = [300, 200, 100];
-// Hide and Seek: time between the animatronic's searches; Closest Guess: time between guesses popping in
+
+// The killer in play by its short name ("Cinderella", "the clown"): the one that caught someone, else the one on the map
+export function killerName(S, cap = false) {
+  const n = S.danger?.short || S.monster?.short || 'the animatronic';
+  return cap ? n.charAt(0).toUpperCase() + n.slice(1) : n;
+}
+// fill {killer} / {Killer} in rules and event text
+export const named = (S, text) => text.replace(/\{killer\}/g, killerName(S)).replace(/\{Killer\}/g, killerName(S, true));
+// Hide and Seek: time between the killer's searches; Closest Guess: time between guesses popping in
 export const SEARCH_MS = 2600;
 export const GUESS_STEP = 1100;
 
@@ -89,9 +97,9 @@ export const SPOT_CATEGORIES = {
 // The night shift: each right answer adds to the pot (question 1, 2, 3). Bank it any time; 3 in a row = 6 AM bonus.
 export const POT = [200, 300, 500];
 export const SIX_AM = 500;
-export const STAKE = 300;                    // lost if you stay captured; doubled on the animatronic's spot
+export const STAKE = 300;                    // lost if you stay captured; doubled on the killer's spot
 export const SIDE = { right: 100 };
-export const BANISH = 300;                   // bonus for a right answer on the animatronic's spot
+export const BANISH = 300;                   // bonus for a right answer on the killer's spot
 
 // Night events: one is drawn at the start of each night shift and lasts for that shift
 export const EVENTS = {
@@ -102,7 +110,7 @@ export const EVENTS = {
   fever: { name: 'Funspot Fever', emoji: '🎪', text: 'Everyone else\'s right answers pay double tonight.' },
   wind: { name: 'Mount Washington Wind', emoji: '🌪️', text: 'The categories blew around the map!' },
   witching: { name: 'Witching Hour', emoji: '🕛', text: 'Only 10 seconds to answer tonight.' },
-  moon: { name: 'Full Moon', emoji: '🌕', text: 'Banishing the animatronic pays triple tonight.' },
+  moon: { name: 'Full Moon', emoji: '🌕', text: 'Banishing {killer} pays triple tonight.' },
   golden: { name: 'Golden Ticket', emoji: '⭐', text: 'A golden ticket is hidden at one spot: answer right there for +300.' },
   nohide: { name: 'Lockdown', emoji: '🔒', text: 'The cabin door is locked. No hiding tonight until 6 AM!' },
   freeze: { name: 'Brain Freeze', emoji: '🧊', text: 'Only the hardest questions tonight, but the pot pays 50% more.' }
@@ -452,17 +460,17 @@ export class Game {
     this.emit('sfx', 'spin');
     setTimeout(() => {
       this.emit('sfx', 'great');
-      this.emit('say', `${w.name}, you're on the night shift! Tonight: ${ev.name}. ${ev.text}`);
+      this.emit('say', `${w.name}, you're on the night shift! Tonight: ${ev.name}. ${named(S, ev.text)}`);
     }, SPIN_MS * k);
     this.go('turnStart', TIMES.turnStart);
   }
 
-  // ---------- the roaming animatronic ----------
+  // ---------- the roaming killer ----------
   spawnMonster(avoid = -1) {
     const S = this.S;
     const spots = S.spots.map((_, i) => i).filter(i => i !== avoid);
     const kind = pick(DANGERS.filter(d => d.name !== S.monster?.name));
-    S.monster = { spot: pick(spots), name: kind.name, emoji: kind.emoji };
+    S.monster = { spot: pick(spots), name: kind.name, short: kind.short, emoji: kind.emoji };
   }
 
   moveMonster() {
@@ -634,7 +642,7 @@ export class Game {
       return this.go('decide', TIMES.decide);
     }
     S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot };
-    S.danger = w.st.haunted ? { name: lurker.name, emoji: lurker.emoji } : pick(DANGERS);
+    S.danger = w.st.haunted ? { name: lurker.name, short: lurker.short, emoji: lurker.emoji } : pick(DANGERS);
     this.emit('sfx', 'scare');
     const villain = S.danger.name.charAt(0).toUpperCase() + S.danger.name.slice(1);
     this.emit('say', `Oh no! ${villain} caught ${name}${w.pot ? `, and ${w.pot} tickets went flying` : ''}! Win the mini game to escape its grasp.`);
@@ -695,7 +703,7 @@ export class Game {
     const type = S.bag.pop();
     S.mg = { type, lostOk: false };
     S.gains = {};
-    this.emit('say', `${MINIGAMES[type].name}. ${MINIGAMES[type].rules}`);
+    this.emit('say', `${MINIGAMES[type].name}. ${named(S, MINIGAMES[type].rules)}`);
     this.go('mgIntro', TIMES.mgIntro);
   }
 
@@ -998,7 +1006,7 @@ export class Game {
     mg.answers = {};
     mg.behind = null;
     this.S.gains = {};
-    this.emit('say', mg.qi === 0 ? 'Pick a door. One hides a prize, one a little prize, and one… an animatronic.' : `Round ${mg.qi + 1}. Pick a door!`);
+    this.emit('say', mg.qi === 0 ? `Pick a door. One hides a prize, one a little prize, and one… ${killerName(this.S)}.` : `Round ${mg.qi + 1}. Pick a door!`);
     this.go('doorQ', TIMES.doorQ);
   }
 
@@ -1031,7 +1039,7 @@ export class Game {
       const names = who(i);
       this.emit('sfx', b.kind === 'monster' ? 'scare' : b.kind === 'big' ? 'great' : 'good');
       this.emit('say', b.kind === 'monster'
-        ? `The ${doors[i]}… it's the animatronic!${names.length ? ` Sorry, ${names.join(' and ')}.` : ''}`
+        ? `The ${doors[i]}… it's ${killerName(this.S)}!${names.length ? ` Sorry, ${names.join(' and ')}.` : ''}`
         : b.kind === 'big' ? `The ${doors[i]}: the big prize!` : `The ${doors[i]}: a little prize.`);
     }, (1000 + n * DOOR_STEP) * k));
     const end = 1000 + 3 * DOOR_STEP;
@@ -1292,7 +1300,7 @@ export class Game {
     else this.addScore(lost.pid, -lost.stake);
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
-    this.emit('say', ok ? `${name} escaped the animatronics!` : `${name} is still captured, and lost some tickets.`);
+    this.emit('say', ok ? `${name} escaped ${killerName(this.S)}!` : `${name} is still captured, and lost some tickets.`);
     this.emit('mood', { pid: lost.pid, mood: ok ? 'happy' : 'sad', tv: true, delay: 400 });
     this.go('mgResult', TIMES.mgResult);
   }
@@ -1472,8 +1480,8 @@ export class Game {
       case 'intro': return wait('How to play', 'The rules are on the TV. Listen up!', '📖');
       case 'turnStart': {
         const ev = EVENTS[S.event] || EVENTS.calm;
-        const v = w.watcherId === pid ? wait(`You're on the night shift! ${ev.emoji} ${ev.name}`, ev.text, '🔦')
-          : wait(`${watcher?.name} is on the night shift`, `${ev.emoji} ${ev.name}: ${ev.text}`, '🔦');
+        const v = w.watcherId === pid ? wait(`You're on the night shift! ${ev.emoji} ${ev.name}`, named(S, ev.text), '🔦')
+          : wait(`${watcher?.name} is on the night shift`, `${ev.emoji} ${ev.name}: ${named(S, ev.text)}`, '🔦');
         return { ...v, spin: true };
       }
       case 'pick':
@@ -1522,7 +1530,7 @@ export class Game {
       case 'dragged': return wait(isLost ? "You've been caught!" : `${lostName} got caught!`, isLost ? `By ${S.danger.name}. Win the mini-game to escape its grasp!` : `By ${S.danger.name}.`, S.danger.emoji);
       case 'mgIntro': {
         const m = MINIGAMES[mg.type];
-        return wait(m.name, isLost ? `You're caught! ${m.rules}` : m.rules, m.emoji);
+        return wait(m.name, isLost ? `You're caught! ${named(S, m.rules)}` : named(S, m.rules), m.emoji);
       }
       case 'triviaQ': case 'finaleQ': case 'pollQ': {
         const q = mg.questions[mg.qi];
@@ -1550,7 +1558,7 @@ export class Game {
       case 'hideQ':
         return {
           ...base, screen: 'choices', title: 'Hide and Seek', num: `${mg.qi + 1}/${mg.rounds.length}`,
-          q: 'Where will you hide?', sub: 'The animatronic checks the most crowded spot first!',
+          q: 'Where will you hide?', sub: `${killerName(S, true)} checks the most crowded spot first!`,
           choices: mg.rounds[mg.qi].map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null
         };
       case 'hideA': {
@@ -1575,14 +1583,14 @@ export class Game {
       case 'doorQ':
         return {
           ...base, screen: 'choices', title: 'Pick a Door', num: `${mg.qi + 1}/${mg.rounds.length}`,
-          q: 'Which door?', sub: '🎁 +300 · 🍬 +100 · one hides an animatronic',
+          q: 'Which door?', sub: `🎁 +300 · 🍬 +100 · one hides ${killerName(S)}`,
           choices: mg.rounds[mg.qi].map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null
         };
       case 'doorA': {
         const a = mg.answers[pid];
         const b = a ? mg.behind[a.i] : null;
         if (!b) return { ...wait('You froze!', 'No door, no escape.', '😱'), suspense: true, revealMs: mg.revealMs };
-        return { ...wait(b.kind === 'monster' ? 'The animatronic!' : b.kind === 'big' ? 'The big prize!' : 'A little prize', b.tickets ? `+${b.tickets} 🎟️` : '', b.kind === 'monster' ? mg.seeker : b.emoji), suspense: true, revealMs: mg.revealMs };
+        return { ...wait(b.kind === 'monster' ? `${killerName(S, true)}!` : b.kind === 'big' ? 'The big prize!' : 'A little prize', b.tickets ? `+${b.tickets} 🎟️` : '', b.kind === 'monster' ? mg.seeker : b.emoji), suspense: true, revealMs: mg.revealMs };
       }
       case 'guessQ': {
         const q = mg.questions[mg.qi];
@@ -1609,7 +1617,7 @@ export class Game {
         };
       case 'drawReveal': return wait('Look at the TV', 'Who got fooled?', '😈');
       case 'drawGallery': return wait('The gallery', 'Bonus masterpieces on the TV', '🖼️');
-      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost tickets to the animatronics`, '', mg.result ? '🏠' : '💀');
+      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost tickets to ${killerName(S)}`, '', mg.result ? '🏠' : '💀');
       case 'scores': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return wait(`You're #${rank}`, `${me.score} 🎟️`, '📊');

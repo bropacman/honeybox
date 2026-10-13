@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt } from './game.js';
+import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -378,15 +378,39 @@ export function startTV(root, { resume = null } = {}) {
     'Funspot': [11, 77], 'Weirs Drive-In': [30, 75], 'Lake Dock': [50, 77], 'Meadowbrook': [70, 75], 'Loudon Speedway': [89, 77]
   };
 
+  const spotXY = (i) => SPOTS[game.S.spots[i].name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
+
+  // The killer on the map: the first time the map shows after it moves, it walks over from its old spot;
+  // then it paces back and forth above its spot. Both are timed from fixed clocks, so the TV re-rendering
+  // (someone answering, the timer) carries on mid-stride instead of restarting the walk.
+  const TRAVEL_MS = 2600;
+  const PACE_MS = 9000;
+  let prowl = null; // { name, spot, from, at }: what the TV last showed
+  function prowler() {
+    const m = game.S.monster;
+    if (!m || !game.S.spots[m.spot]) return '';
+    if (!prowl || prowl.name !== m.name) prowl = { name: m.name, spot: m.spot, from: null, at: 0 }; // a new killer just appears
+    else if (prowl.spot !== m.spot) prowl = { name: m.name, spot: m.spot, from: prowl.spot, at: Date.now() };
+    const [x1, y1] = spotXY(m.spot);
+    const [x0, y0] = prowl.from == null ? [x1, y1] : spotXY(prowl.from);
+    const left = Math.max(0, TRAVEL_MS - (Date.now() - prowl.at));
+    const travel = prowl.from != null && left > 0;
+    // pacing starts when the walk ends, and stays on that clock across re-renders
+    const pace = travel ? left : -((Date.now() - prowl.at - TRAVEL_MS) % PACE_MS);
+    return `<div class="prowler ${travel ? 'travel' : ''}" title="${esc(m.name)}"
+        style="--x0:${x0}%;--y0:${y0}%;--x1:${x1}%;--y1:${y1}%;--dir:${x1 < x0 ? 1 : -1};--travel:-${TRAVEL_MS - left}ms;--pace:${pace}ms">
+      <div class="prowl-pace"><div class="prowl-face"><span class="prowl-bob">${m.emoji}</span></div></div>
+    </div>`;
+  }
+
   function board(highlight = null) {
     const S = game.S;
     const piles = S.spots.map((sp, i) => {
       const hidden = S.event === 'outage' && i !== highlight;
       const c = CATEGORIES[sp.cat];
       const st = game.stakesNow(i);
-      const [x, y] = SPOTS[sp.name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
+      const [x, y] = spotXY(i);
       return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
-        ${st.haunted ? `<div class="lurker" title="${esc(S.monster.name)}">${S.monster.emoji}</div>` : ''}
         ${st.golden ? '<div class="golden-tag">⭐ +' + st.golden + '</div>' : ''}
         <div class="cat-badge">${hidden ? '❓' : c.emoji}</div>
         <div class="cat-name">${hidden ? 'Mystery' : esc(c.name)}</div>
@@ -412,6 +436,7 @@ export function startTV(root, { resume = null } = {}) {
       <div class="map-label" style="left:44%;top:30%">White Mountains</div>
       <div class="map-label" style="left:2%;top:54%">Lincoln</div>
       ${piles}
+      ${prowler()}
     </div>`;
   }
 
@@ -476,7 +501,7 @@ export function startTV(root, { resume = null } = {}) {
     const ev = EVENTS[game.S.event];
     if (!ev) return '';
     return big
-      ? `<div class="event-card"><span class="ev-emoji">${ev.emoji}</span><div><b>${esc(ev.name)}</b><p>${esc(ev.text)}</p></div></div>`
+      ? `<div class="event-card"><span class="ev-emoji">${ev.emoji}</span><div><b>${esc(ev.name)}</b><p>${esc(named(game.S, ev.text))}</p></div></div>`
       : `<span class="event-chip">${ev.emoji} ${esc(ev.name)}</span>`;
   }
 
@@ -555,7 +580,10 @@ export function startTV(root, { resume = null } = {}) {
         const mine = w.answers[w.watcherId];
         const ok = reveal && w.results[w.watcherId];
         const verdict = !reveal ? '' : w.saved ? '🐕 SAVED BY THE DOGS!' : w.banished ? `⚡ BANISHED ${S.monster.emoji}!` : ok ? (w.streak >= 3 ? '🌅 6 AM!' : '✅ RIGHT!') : '💀 WRONG!';
-        return `<div class="watch">
+        // the haunted spot's killer leans in while they answer, timed from the phase start so re-renders don't reset it
+        const lean = !reveal && w.st.haunted
+          ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
+        return `<div class="watch">${lean}
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2>${streakDots(w.streak - (ok ? 1 : 0))}</div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
@@ -607,7 +635,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="center">
           <div class="emoji-xl">${m.emoji}</div>
           <h1>${m.name}</h1>
-          <p class="big">${esc(m.rules)}</p>
+          <p class="big">${esc(named(S, m.rules))}</p>
           ${mg.finale ? '<p class="big win">🌅 FINALE · DOUBLE HONEY</p>' : `<p>Captured: ${avatar(lost)} ${S.danger ? S.danger.emoji : ''} · ${S.lost.stake} 🎟️ at stake</p>`}
         </div>`;
       }
@@ -673,7 +701,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz hide-game">
           <div class="quiz-head">🙈 Hide and Seek <span class="muted">${mg.qi + 1}/${mg.rounds.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${reveal ? 'Ready or not…' : 'Where will you hide?'}</h1>
-          ${reveal ? '' : '<p class="muted">The animatronic checks the most crowded spot first, then one more. Unfound = +200</p>'}
+          ${reveal ? '' : `<p class="muted">${esc(killerName(S, true))} checks the most crowded spot first, then one more. Unfound = +200</p>`}
           <div class="hide-grid">${cards}</div>
           ${exposed.length ? `<p class="muted">Caught in the open: ${exposed.map(p => p.avatar).join(' ')}</p>` : ''}
           ${reveal ? '' : waitingStrip()}
@@ -708,7 +736,7 @@ export function startTV(root, { resume = null } = {}) {
           const pickers = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
           const b = reveal ? mg.behind[i] : null;
           const at = reveal ? 1000 + mg.openOrder.indexOf(i) * DOOR_STEP : 0;
-          return `<div class="door-wrap ${b ? `opens ${b.kind}` : ''}" style="--at:${at}ms">
+          return `<div class="door-wrap ${b ? `opens door-${b.kind}` : ''}" style="--at:${at}ms">
             <div class="door-inside">${b ? (b.kind === 'monster' ? `<span class="behind">${mg.seeker}</span><b>CAUGHT</b>` : `<span class="behind">${b.emoji}</span><b>+${b.tickets}</b>`) : ''}</div>
             <div class="door-panel"><span class="door-knob"></span><span class="door-label">${esc(d)}</span></div>
             <div class="door-who">${pickers.map(p => p.avatar).join(' ')}</div>
@@ -718,7 +746,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz door-game">
           <div class="quiz-head">🚪 Pick a Door <span class="muted">${mg.qi + 1}/${mg.rounds.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${reveal ? 'Let\'s open them up…' : 'Which door?'}</h1>
-          ${reveal ? '' : '<p class="muted">🎁 +300 · 🍬 +100 · one hides an animatronic</p>'}
+          ${reveal ? '' : `<p class="muted">🎁 +300 · 🍬 +100 · one hides ${esc(killerName(S))}</p>`}
           <div class="doors">${doors}</div>
           ${froze.length ? `<p class="muted">Froze and didn't pick: ${froze.map(p => p.avatar).join(' ')}</p>` : ''}
           ${reveal ? '' : waitingStrip()}
@@ -780,7 +808,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="center ${mg.result ? '' : 'dark'}">
           <div class="emoji-xl ${mg.result ? 'bounce' : 'shake'}">${mg.result ? '🏠🔥' : '💀🌲'}</div>
           <h1>${avatar(lost)} ${mg.result ? `broke free from ${S.danger.emoji}!` : `is still in ${S.danger.emoji}'s grasp…`}</h1>
-          <p class="big">${mg.result ? '+300 🎟️' : `−${S.lost.stake} 🎟️ lost to the animatronics`}</p>
+          <p class="big">${mg.result ? '+300 🎟️' : `−${S.lost.stake} 🎟️ lost to ${esc(killerName(S))}`}</p>
         </div>`;
       case 'scores':
         return `<div class="center"><div class="emoji-xl">🎟️</div><h1>Ticket Count</h1>${scoreboard(true)}<p class="muted">Night ${S.turnIdx + 1} of ${S.turnOrder.length} survived</p></div>`;
