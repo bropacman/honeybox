@@ -33,7 +33,7 @@ input { font: inherit; }
 /* night sky */
 .sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .moon {
-  position: absolute; top: 4vh; left: 47vw; width: 6vmin; height: 6vmin; border-radius: 50%;
+  position: absolute; top: 5vh; right: 9vw; width: 6vmin; height: 6vmin; border-radius: 50%;
   background: #f6efd2; box-shadow: 0 0 60px 20px rgba(246, 239, 210, 0.18); opacity: 0.22; /* dim, so text over it stays readable */
 }
 .trees {
@@ -649,8 +649,8 @@ body.is-phone .moon { display: none; }
 .door-wrap.big .door-inside { border-color: var(--honey); box-shadow: inset 0 0 60px rgba(242, 177, 52, 0.5); }
 .door-wrap.big .door-inside b { color: var(--honey2); }
 .door-panel { position: absolute; inset: 0 0 3em; border-radius: 16px 16px 4px 4px; background: linear-gradient(160deg, #6b4423, #3e2512); border: 4px solid #2a170a; transform-origin: left center; display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: inset 0 0 0 10px rgba(0,0,0,0.15); }
-.door-knob { position: absolute; right: 12%; top: 50%; width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--honey); }
-.door-label { font-size: 1.3em; font-weight: 800; text-align: center; padding: 0 0.4em; color: var(--ink); }
+.door-knob { position: absolute; right: 12%; top: 64%; width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--honey); }
+.door-label { font-size: 1.3em; font-weight: 800; text-align: center; padding: 0 0.5em; color: var(--ink); }
 .door-wrap.opens .door-panel { animation: doorOpen 0.9s ease-in var(--at) both; }
 @keyframes doorOpen { to { transform: rotateY(-105deg); opacity: 0.15; } }
 .door-who { position: absolute; bottom: 0; font-size: 2em; min-height: 1.3em; }
@@ -668,7 +668,9 @@ body.is-phone .moon { display: none; }
 /* ---------- presentation layer (js/fx.js) ---------- */
 @font-face { font-family: 'Pixelify Sans'; src: url('../fonts/pixelify-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Pixelify Sans'; src: url('../fonts/pixelify-sans-latin-700-normal.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
-.tv h1:not(.q):not(.tot-q), .quiz-head, .battery, .pts, .pot-big, .final-title, .f-pts, .m-big, .guess-answer, .zoom-worth, .splash b, .choice-card b { font-family: 'Pixelify Sans', 'Nunito', sans-serif; letter-spacing: 0.02em; }
+.tv h1:not(.q):not(.tot-q), .quiz-head, .battery, .final-title, .guess-answer, .splash b, .choice-card b { font-family: 'Pixelify Sans', 'Nunito', sans-serif; letter-spacing: 0.02em; }
+/* ticket counts: chunky but readable at any size */
+.pts, .pot-big, .f-pts, .m-big, .zoom-worth { font-family: 'Lilita One', 'Nunito', sans-serif; font-weight: 400; letter-spacing: 0.03em; }
 
 /* flashlight: everything outside the beam is dark; the beam narrows as the battery drains */
 .fx-dark { position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: 0; transition: opacity 0.8s;
@@ -723,6 +725,9 @@ body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-in
 .battery.idle { opacity: 0; }
 
 /* pixel sprites standing in for emoji (js/sprites.js) */
+.px-anim { display: inline-block; width: 1.15em; height: 1.15em; overflow: hidden; vertical-align: -0.18em; }
+.px-anim img { display: block; height: 100%; width: calc(var(--n) * 100%); max-width: none; image-rendering: pixelated; image-rendering: crisp-edges; animation: flip var(--dur, 0.6s) steps(var(--n)) infinite; }
+@keyframes flip { to { transform: translateX(-100%); } }
 img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-rendering: crisp-edges; vertical-align: -0.18em; display: inline-block; }
 /* the caught player, struggling in the villain's grasp during the mini-game */
 .captive { position: fixed; left: 1em; bottom: 3.2em; z-index: 30; display: flex; align-items: flex-end; gap: 0.2em; background: rgba(40, 6, 10, 0.82); border: 3px solid var(--bad); border-radius: 18px; padding: 0.4em 0.9em 0.5em 0.5em; box-shadow: 0 0 40px rgba(255, 40, 40, 0.35); }
@@ -731,6 +736,11 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 .cap-sweat { position: absolute; top: -0.35em; right: -0.35em; font-size: 0.45em; animation: sweat 1.1s ease-in infinite; }
 .cap-text { display: flex; flex-direction: column; margin-left: 0.5em; font-size: 1.05em; }
 .cap-text small { color: var(--honey2); font-weight: 800; }
+/* the panel takes real space: content above it shrinks instead of hiding behind it */
+.tv.has-captive .tv-main { padding-bottom: 8.5em; }
+.tv.has-captive .art canvas { width: min(62vh, 100vh - 20em); height: min(62vh, 100vh - 20em); }
+.tv.has-captive .zoom-frame { width: min(58vh, 100vh - 21em); height: min(58vh, 100vh - 21em); }
+.tv.has-captive .door-wrap { height: min(46vh, 100vh - 22em); }
 @keyframes struggle { 0%, 100% { transform: translateX(0) rotate(-6deg); } 25% { transform: translateX(-3px) rotate(7deg); } 50% { transform: translateX(3px) rotate(-8deg); } 75% { transform: translateX(-2px) rotate(5deg); } }
 @keyframes capLoom { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.06) rotate(2deg); } }
 @keyframes sweat { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, 14px); } }
@@ -756,14 +766,17 @@ img.px { width: 1.15em; height: 1.15em; image-rendering: pixelated; image-render
 .campfire .camper { font-size: 2.6em; animation: camperBob 2.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.37s); }
 .campfire .camper span { font-size: 0.32em; }
 .campfire .camper img.px { width: 1.3em; height: 1.3em; }
-.campfire .fire { font-size: 3em; filter: drop-shadow(0 0 24px rgba(255, 150, 40, 0.8)); animation: fireFlicker 0.9s steps(2) infinite; }
-.campfire .fire img.px { width: 1.2em; height: 1.2em; }
+.campfire .fire { font-size: 3em; line-height: 1; filter: drop-shadow(0 0 24px rgba(255, 150, 40, 0.8)); animation: fireGlow 1.7s ease-in-out infinite; }
+.campfire .fire .px-anim { width: 1.4em; height: 1.4em; --dur: 0.56s; }
 @keyframes camperBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-@keyframes fireFlicker { 50% { transform: scale(1.06) rotate(2deg); filter: drop-shadow(0 0 34px rgba(255, 120, 30, 0.9)); } }
+@keyframes fireGlow { 0%, 100% { filter: drop-shadow(0 0 22px rgba(255, 150, 40, 0.75)); } 35% { filter: drop-shadow(0 0 34px rgba(255, 120, 30, 0.95)); } 70% { filter: drop-shadow(0 0 26px rgba(255, 170, 60, 0.8)); } }
 .lobby-summary { color: var(--muted); display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; text-transform: capitalize; }
 .settings-panel { width: min(80vw, 1100px); gap: 0.7em; }
 .settings-panel .big-btn { align-self: center; }
 
 /* bouncing event icons (positions driven from js/tv.js) */
 #ev-fx.twinkle i, #ev-fx.lock i, #ev-fx.pulse i, #ev-fx.dark i, #ev-fx.moon i { left: 0; top: 0; animation: none; opacity: 0; will-change: transform, opacity; }
-#ev-fx i img.px { width: 1.15em; height: 1.15em; }
+#ev-fx i .px-anim { display: inline-block; width: 1.15em; height: 1.15em; overflow: hidden; vertical-align: -0.18em; }
+.px-anim img { display: block; height: 100%; width: calc(var(--n) * 100%); max-width: none; image-rendering: pixelated; image-rendering: crisp-edges; animation: flip var(--dur, 0.6s) steps(var(--n)) infinite; }
+@keyframes flip { to { transform: translateX(-100%); } }
+img.px { width: 1.15em; height: 1.15em; }

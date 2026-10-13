@@ -5,7 +5,7 @@ import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
 import { startFx, FX_LEVELS } from './fx.js';
-import { spritify, spriteImg } from './sprites.js';
+import { spritify, spriteImg, spriteAnim } from './sprites.js';
 import { PILE_ICONS } from './content.js';
 import ZOOM from './packs/zoom.js';
 
@@ -512,7 +512,7 @@ export function startTV(root, { resume = null } = {}) {
             <h2>Around the campfire (${S.players.length}/8)</h2>
             <div class="campfire">
               <div class="campers">${S.players.map((p, i) => `<button class="camper ${p.connected ? '' : 'off'}" style="--i:${i}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
-              <div class="fire">🔥</div>
+              <div class="fire">${spriteAnim('fire')}</div>
             </div>
             <button class="big-btn" data-act="start" ${S.players.length >= MIN_PLAYERS ? '' : 'disabled'}>Start the night 🔥</button>
             <p class="muted small">Best with 3–8 players. ${S.players[0] ? `⭐ VIP ${esc(game.player(game.vipId())?.name || '')} can also start, pause and skip from their phone.` : 'The first player to join becomes the ⭐ VIP.'}</p>
@@ -996,8 +996,9 @@ export function startTV(root, { resume = null } = {}) {
     if (S.phase !== 'end') musicOverride = null;
     setMusic(hurryOn ? 'panic' : (musicOverride || MUSIC[S.phase] || 'none'));
     const showSide = !['lobby', 'end', 'scores', 'intro'].includes(S.phase);
+    const cap = captive(S);
     root.innerHTML = `
-      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''}">
+      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''} ${cap ? 'has-captive' : ''}">
         <div id="final-count" class="final-count"></div>
         ${splash}
         <div class="tv-main">${stage()}</div>
@@ -1012,7 +1013,7 @@ export function startTV(root, { resume = null } = {}) {
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
         </div>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
-        ${captive(S)}
+        ${cap}
         ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
         ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
         ${settingsOpen && S.phase === 'lobby' ? settingsPanel() : ''}
