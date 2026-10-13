@@ -22,7 +22,7 @@ export const MINIGAMES = {
   poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Caught? Match the crowd 2 of 3 times to escape its grasp.' },
   hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. The animatronic checks the most crowded spot first, then one more. Caught? Stay hidden 2 of 3 times to escape its grasp.' },
   guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Caught? Beat at least one other camper 2 of 3 times to escape its grasp.' },
-  zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. Lock in early for 300, later for 200, last for 100. Caught? Get 2 of 3 right to escape its grasp.' },
+  zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. The fastest right answers win 300, 200 and 100. Caught? Be the fastest right answer once to escape its grasp.' },
   door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and an animatronic. Pick one. Caught? Dodge the animatronic 2 of 3 times to escape its grasp.' }
 };
 // Pick a Door: what's behind the three doors, and the door sets for each round
@@ -35,7 +35,7 @@ export const DOOR_SETS = [
   ['🛖 Outhouse', '⛺ Tent', '🛶 Boathouse']
 ];
 export const DOOR_STEP = 2400;
-// Zoom In: points by when you lock in (first, middle, last third of the zoom)
+// Zoom In: the fastest right answers win these, in order; slower right answers get nothing
 export const ZOOM_POINTS = [300, 200, 100];
 // Hide and Seek: time between the animatronic's searches; Closest Guess: time between guesses popping in
 export const SEARCH_MS = 2600;
@@ -281,7 +281,10 @@ export class Game {
 
   togglePause() {
     if (this.S.pausedLeft != null) {
-      this.S.deadline = Date.now() + this.S.pausedLeft;
+      // shift the clock by however long we were paused (Zoom In times its photo from startedAt too)
+      const shift = Date.now() + this.S.pausedLeft - this.S.deadline;
+      this.S.deadline += shift;
+      if (this.S.mg?.startedAt) this.S.mg.startedAt += shift;
       this.S.pausedLeft = null;
     } else if (this.S.deadline) {
       this.S.pausedLeft = Math.max(0, this.S.deadline - Date.now());
@@ -541,8 +544,7 @@ export class Game {
     } else if (S.phase === 'zoomQ') {
       const mg = S.mg;
       if (mg.answers[pid] || !(i >= 0 && i < 4)) return;
-      const frac = (Date.now() - mg.startedAt) / Math.max(1, (S.deadline || Date.now()) - mg.startedAt);
-      mg.answers[pid] = { i, at: Date.now(), worth: ZOOM_POINTS[Math.min(2, Math.max(0, Math.floor(frac * 3)))] };
+      mg.answers[pid] = { i, at: Date.now() };
     } else if (['triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'doorQ'].includes(S.phase)) {
       const mg = S.mg;
       const q = ['hideQ', 'doorQ'].includes(S.phase) ? null : mg.questions[mg.qi];
@@ -720,7 +722,7 @@ export class Game {
     if (mg.type === 'zoom') {
       mg.questions = this.takeZooms(3);
       mg.qi = -1;
-      mg.correct = {};
+      mg.firsts = {};
       return this.askZoom();
     }
     if (mg.type === 'door') {
@@ -953,9 +955,10 @@ export class Game {
     mg.qi++;
     mg.answers = {};
     this.S.gains = {};
-    this.emit('say', mg.qi === 0 ? 'What is it? Lock in early for more tickets.' : 'Next picture!');
-    this.go('zoomQ', TIMES.zoomQ);
+    this.emit('say', mg.qi === 0 ? 'What is it? The fastest right answers win.' : 'Next picture!');
+    // set before go(): go() renders right away, and the TV times the zoom from startedAt
     mg.startedAt = Date.now();
+    this.go('zoomQ', TIMES.zoomQ);
   }
 
   revealZoom() {
@@ -963,11 +966,13 @@ export class Game {
     const mg = S.mg;
     const q = mg.questions[mg.qi];
     S.gains = {};
-    for (const [pid, a] of Object.entries(mg.answers)) {
-      if (a.i !== q.a) continue;
+    const right = Object.entries(mg.answers).filter(([, a]) => a.i === q.a).sort((x, y) => x[1].at - y[1].at);
+    right.forEach(([pid, a], rank) => {
+      a.rank = rank;
+      a.worth = ZOOM_POINTS[rank] || 0;
       this.addScore(pid, a.worth);
-      mg.correct[pid] = (mg.correct[pid] || 0) + 1;
-    }
+      if (rank === 0) mg.firsts[pid] = (mg.firsts[pid] || 0) + 1;
+    });
     this.emit('sfx', 'good');
     this.emit('say', `It's ${q.c[q.a]}!`);
     for (const [pid, a] of Object.entries(mg.answers)) this.emit('mood', { pid, mood: a.i === q.a ? 'happy' : 'sad', tv: false, delay: 600 });
@@ -977,7 +982,7 @@ export class Game {
   nextZoom() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askZoom();
-    return this.finishMinigame((mg.correct[this.S.lost.pid] || 0) >= 2);
+    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= 1);
   }
 
   // the TV reports which Zoom In photos actually loaded (they're hosted elsewhere)
@@ -1555,14 +1560,17 @@ export class Game {
       case 'zoomQ':
         return {
           ...base, screen: 'choices', title: 'Zoom In', num: `${mg.qi + 1}/${mg.questions.length}`,
-          q: 'What is it?', sub: 'Lock in early for 300 · later 200 · last 100',
+          q: 'What is it?', sub: 'Fastest right answers win: 300 · 200 · 100',
           choices: mg.questions[mg.qi].c.map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null
         };
       case 'zoomA': {
         const q = mg.questions[mg.qi];
         const a = mg.answers[pid];
         const ok = a && a.i === q.a;
-        return wait(ok ? `Got it! +${a.worth}` : 'Nope!', `It's ${q.c[q.a]}`, ok ? '🔍' : '❌');
+        if (!ok) return wait('Nope!', `It's ${q.c[q.a]}`, '❌');
+        return a.worth
+          ? wait(`${['1st', '2nd', '3rd'][a.rank]}! +${a.worth}`, `It's ${q.c[q.a]}`, ['🥇', '🥈', '🥉'][a.rank])
+          : wait('Right, but too slow!', `It's ${q.c[q.a]}`, '🐢');
       }
       case 'doorQ':
         return {

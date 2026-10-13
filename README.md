@@ -31,6 +31,22 @@ using [PeerJS](https://peerjs.com/) (vendored in `vendor/`) and its free public 
 
 All questions, prompts, polls and danger lines live in `js/content.js`. Add more!
 
+### Playing across networks (TURN)
+
+On the same Wi-Fi, phones reach the TV directly. A phone on cellular often can't, so it relays through
+Cloudflare's TURN service. The API token can't live in this public repo, so a tiny Cloudflare Worker
+(`worker/turn.js`) keeps it as a secret and hands the game short-lived credentials. To set it up, from `worker/`:
+
+```bash
+npx wrangler login
+npx wrangler secret put TURN_KEY_ID
+npx wrangler secret put TURN_API_TOKEN
+npx wrangler deploy
+```
+
+Then put the Worker's URL in `TURN_URL` at the top of `js/net.js`. If the Worker is down, the game falls back to
+direct connections only.
+
 ## Publishing changes
 
 Run `npm run stamp` before committing. It fingerprints every JS/CSS file in `index.html`, so browsers pick up

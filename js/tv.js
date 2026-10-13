@@ -5,7 +5,7 @@ import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
 import { startFx, FX_LEVELS } from './fx.js';
-import { spritify, spriteImg } from './sprites.js';
+import { spritify, spriteImg, spriteAnim } from './sprites.js';
 import { PILE_ICONS } from './content.js';
 import ZOOM from './packs/zoom.js';
 
@@ -243,11 +243,6 @@ export function startTV(root, { resume = null } = {}) {
   let hurryOn = false;
   setInterval(() => {
     game.speaking = SPEED >= 1 && isSpeaking();
-    const worth = root.querySelector('#zoom-worth');
-    if (worth && game.S.mg?.startedAt && game.S.deadline) {
-      const f = (Date.now() - game.S.mg.startedAt) / Math.max(1, game.S.deadline - game.S.mg.startedAt);
-      worth.textContent = `Worth ${ZOOM_POINTS[Math.min(2, Math.max(0, Math.floor(f * 3)))]} 🎟️ right now`;
-    }
     game.tick();
     const left = game.timeLeft();
     const S = game.S;
@@ -512,7 +507,7 @@ export function startTV(root, { resume = null } = {}) {
             <h2>Around the campfire (${S.players.length}/8)</h2>
             <div class="campfire">
               <div class="campers">${S.players.map((p, i) => `<button class="camper ${p.connected ? '' : 'off'}" style="--i:${i}" data-act="kick" data-id="${esc(p.id)}" title="Click to remove">${p.avatar}<span>${esc(p.name)}</span></button>`).join('') || '<p class="muted">Waiting for campers to join…</p>'}</div>
-              <div class="fire">🔥</div>
+              <div class="fire">${spriteAnim('fire')}</div>
             </div>
             <button class="big-btn" data-act="start" ${S.players.length >= MIN_PLAYERS ? '' : 'disabled'}>Start the night 🔥</button>
             <p class="muted small">Best with 3–8 players. ${S.players[0] ? `⭐ VIP ${esc(game.player(game.vipId())?.name || '')} can also start, pause and skip from their phone.` : 'The first player to join becomes the ⭐ VIP.'}</p>
@@ -696,7 +691,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="zoom-row">
             <div class="zoom-frame ${reveal ? 'revealed' : ''}">${img}</div>
             <div class="zoom-side">
-              ${reveal ? '' : '<h2>What is it?</h2><p class="zoom-worth" id="zoom-worth"></p>'}
+              ${reveal ? '' : `<h2>What is it?</h2><p class="zoom-worth">🥇 ${ZOOM_POINTS[0]} · 🥈 ${ZOOM_POINTS[1]} · 🥉 ${ZOOM_POINTS[2]}</p><p class="muted">Fastest right answers win</p>`}
               <div class="answers">${q.c.map((c, i) => {
                 const who = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
                 return `<div class="ans ${reveal ? (i === q.a ? 'right-n' : 'wrong-n') : ''}" style="--at:0ms"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span></div>`;
@@ -923,8 +918,9 @@ export function startTV(root, { resume = null } = {}) {
   function escapeProgress(S) {
     const mg = S.mg;
     const id = S.lost.pid;
-    const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged, zoom: mg.correct }[mg.type];
+    const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged }[mg.type];
     if (mg.type === 'draw') return 'Escape: someone guesses their drawing';
+    if (mg.type === 'zoom') return (mg.firsts?.[id] || 0) ? 'Escaped: fastest right answer!' : 'Escape: be the fastest right answer once';
     return tally ? `Escape: ${Math.min(2, tally[id] || 0)} of 2` : '';
   }
   function captive(S) {
@@ -996,8 +992,9 @@ export function startTV(root, { resume = null } = {}) {
     if (S.phase !== 'end') musicOverride = null;
     setMusic(hurryOn ? 'panic' : (musicOverride || MUSIC[S.phase] || 'none'));
     const showSide = !['lobby', 'end', 'scores', 'intro'].includes(S.phase);
+    const cap = captive(S);
     root.innerHTML = `
-      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''}">
+      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''} ${cap ? 'has-captive' : ''}">
         <div id="final-count" class="final-count"></div>
         ${splash}
         <div class="tv-main">${stage()}</div>
@@ -1012,7 +1009,7 @@ export function startTV(root, { resume = null } = {}) {
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
         </div>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
-        ${captive(S)}
+        ${cap}
         ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
         ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
         ${settingsOpen && S.phase === 'lobby' ? settingsPanel() : ''}

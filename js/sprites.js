@@ -7,6 +7,7 @@ import ITEMS from './sprites/items.js';
 import PLACES from './sprites/places.js';
 import ANIME_A from './sprites/anime-a.js';
 import ANIME_B from './sprites/anime-b.js';
+import ANIMS from './sprites/anim.js';
 import { ANIME_MARK } from './content.js';
 
 const VS = /\uFE0F/g;
@@ -18,19 +19,32 @@ for (const set of [ANIME_A, ANIME_B]) for (const [k, v] of Object.entries(set)) 
 const urls = {};
 function url(key) {
   if (urls[key]) return urls[key];
-  const grid = GRIDS[key];
-  const c = document.createElement('canvas');
-  c.width = grid[0].length;
-  c.height = grid.length;
-  const g = c.getContext('2d');
-  grid.forEach((row, y) => [...row].forEach((ch, x) => {
-    if (ch === '.' || !PAL[ch]) return;
-    g.fillStyle = PAL[ch];
-    g.fillRect(x, y, 1, 1);
-  }));
-  urls[key] = c.toDataURL();
+  urls[key] = paint([GRIDS[key]]);
   return urls[key];
 }
+
+// Draw frames side by side into one canvas and return it as a data URL
+function paint(frames) {
+  const w = frames[0][0].length;
+  const c = document.createElement('canvas');
+  c.width = w * frames.length;
+  c.height = frames[0].length;
+  const g = c.getContext('2d');
+  frames.forEach((grid, f) => grid.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch === '.' || !PAL[ch]) return;
+    g.fillStyle = PAL[ch];
+    g.fillRect(f * w + x, y, 1, 1);
+  })));
+  return c.toDataURL();
+}
+
+// Flipbook sprite: the frames sit in one strip that CSS steps through (see .px-anim)
+const strips = {};
+export const spriteAnim = (name, cls = '') => {
+  const frames = ANIMS[name];
+  strips[name] ||= paint(frames);
+  return `<span class="px-anim ${cls}" style="--n:${frames.length}"><img src="${strips[name]}" alt="" draggable="false"></span>`;
+};
 
 export const hasSprite = (emoji) => Boolean(GRIDS[String(emoji).replace(VS, '')]);
 export const spriteImg = (emoji, cls = '') => `<img class="px ${cls}" src="${url(String(emoji).replace(VS, ''))}" alt="${emoji}" draggable="false">`;
