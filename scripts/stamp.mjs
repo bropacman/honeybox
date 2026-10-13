@@ -6,7 +6,8 @@ import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const hash = (file) => createHash('sha1').update(readFileSync(join(ROOT, file))).digest('hex').slice(0, 8);
+// line endings are normalized so Windows (CRLF checkouts) and CI (LF) agree on every hash
+const hash = (file) => createHash('sha1').update(readFileSync(join(ROOT, file), 'utf8').replace(/\r\n/g, '\n')).digest('hex').slice(0, 8);
 const walk = (dir) => readdirSync(join(ROOT, dir)).flatMap((f) => {
   const p = join(dir, f);
   return statSync(join(ROOT, p)).isDirectory() ? walk(p) : [p];
@@ -17,7 +18,7 @@ const imports = Object.fromEntries(modules.map(f => [`./${f}`, `./${f}?v=${hash(
 const map = `<script type="importmap">${JSON.stringify({ imports }, null, 2)}</script>`;
 
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-html = html.replace(/<!-- stamp:start -->[\s\S]*<!-- stamp:end -->/, '').trimEnd();
+html = html.replace(/\s*<!-- stamp:start -->[\s\S]*<!-- stamp:end -->/, '').trimEnd();
 const block = `<!-- stamp:start -->
   ${map}
   <link rel="stylesheet" href="css/style.css?v=${hash('css/style.css')}">
