@@ -243,11 +243,6 @@ export function startTV(root, { resume = null } = {}) {
   let hurryOn = false;
   setInterval(() => {
     game.speaking = SPEED >= 1 && isSpeaking();
-    const worth = root.querySelector('#zoom-worth');
-    if (worth && game.S.mg?.startedAt && game.S.deadline) {
-      const f = (Date.now() - game.S.mg.startedAt) / Math.max(1, game.S.deadline - game.S.mg.startedAt);
-      worth.textContent = `Worth ${ZOOM_POINTS[Math.min(2, Math.max(0, Math.floor(f * 3)))]} 🎟️ right now`;
-    }
     game.tick();
     const left = game.timeLeft();
     const S = game.S;
@@ -696,7 +691,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="zoom-row">
             <div class="zoom-frame ${reveal ? 'revealed' : ''}">${img}</div>
             <div class="zoom-side">
-              ${reveal ? '' : '<h2>What is it?</h2><p class="zoom-worth" id="zoom-worth"></p>'}
+              ${reveal ? '' : `<h2>What is it?</h2><p class="zoom-worth">🥇 ${ZOOM_POINTS[0]} · 🥈 ${ZOOM_POINTS[1]} · 🥉 ${ZOOM_POINTS[2]}</p><p class="muted">Fastest right answers win</p>`}
               <div class="answers">${q.c.map((c, i) => {
                 const who = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
                 return `<div class="ans ${reveal ? (i === q.a ? 'right-n' : 'wrong-n') : ''}" style="--at:0ms"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span></div>`;
@@ -923,8 +918,9 @@ export function startTV(root, { resume = null } = {}) {
   function escapeProgress(S) {
     const mg = S.mg;
     const id = S.lost.pid;
-    const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged, zoom: mg.correct }[mg.type];
+    const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged }[mg.type];
     if (mg.type === 'draw') return 'Escape: someone guesses their drawing';
+    if (mg.type === 'zoom') return (mg.firsts?.[id] || 0) ? 'Escaped: fastest right answer!' : 'Escape: be the fastest right answer once';
     return tally ? `Escape: ${Math.min(2, tally[id] || 0)} of 2` : '';
   }
   function captive(S) {
