@@ -7,7 +7,7 @@ const PREFIX = 'honeybox-v1-';
 // STUN finds a direct route, which is all you need on the same Wi-Fi. Across networks (a phone on
 // cellular) there often isn't one, so we also ask our Worker (worker/turn.js) for TURN relay
 // credentials. If that fails, play carries on with STUN alone.
-const TURN_URL = '';
+const TURN_URL = 'https://honeybox.bropacman.workers.dev/';
 const STUN = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
