@@ -9,7 +9,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // line endings are normalized so Windows (CRLF checkouts) and CI (LF) agree on every hash
 const hash = (file) => createHash('sha1').update(readFileSync(join(ROOT, file), 'utf8').replace(/\r\n/g, '\n')).digest('hex').slice(0, 8);
 const walk = (dir) => readdirSync(join(ROOT, dir)).flatMap((f) => {
-  const p = join(dir, f);
+  const p = `${dir}/${f}`; // forward slashes on every OS: these become URLs
   return statSync(join(ROOT, p)).isDirectory() ? walk(p) : [p];
 });
 
