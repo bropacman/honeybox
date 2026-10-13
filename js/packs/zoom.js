@@ -1,3 +1,35 @@
-// Zoom In photos: public domain / CC0 images from Wikimedia Commons. Credits in images/zoom/CREDITS.md.
-// name = the answer; file = path under images/zoom; fx/fy = where the zoom starts (0..1).
-export default [];
+// Zoom In photos (Unsplash License, free to use). Small 800px copies live in images/zoom/.
+// name = the answer; fx/fy = where the zoom starts (0..1, default center).
+const img = (f) => `images/zoom/${f}.jpg`;
+export default [
+  { name: 'A raccoon', url: img('raccoon'), fx: 0.6, fy: 0.45 },
+  { name: 'A meerkat', url: img('meerkat') },
+  { name: 'A dolphin', url: img('dolphin'), fy: 0.4 },
+  { name: 'A deer', url: img('deer'), fy: 0.6 },
+  { name: 'A frog', url: img('frog'), fx: 0.6, fy: 0.45 },
+  { name: 'A penguin', url: img('penguin'), fx: 0.6 },
+  { name: 'A skeleton', url: img('skeleton'), fx: 0.45, fy: 0.4 },
+  { name: 'A strawberry', url: img('strawberry') },
+  { name: 'A pineapple', url: img('pineapple'), fy: 0.6 },
+  { name: 'Blueberries', url: img('blueberry') },
+  { name: 'A bell pepper', url: img('pepper') },
+  { name: 'Raspberries', url: img('raspberry') },
+  { name: 'A cheeseburger', url: img('cheeseburger') },
+  { name: 'Pizza', url: img('pizza') },
+  { name: 'A toaster', url: img('toaster') },
+  { name: 'Walmart', url: img('walmart'), fx: 0.4, fy: 0.4 },
+  { name: 'A library', url: img('library') },
+  { name: 'A toothbrush', url: img('toothbrush') },
+  { name: 'A fireplace', url: img('fireplace') },
+  { name: 'A fan', url: img('fan') },
+  { name: 'Catan', url: img('catan') },
+  { name: 'Monopoly', url: img('monopoly') },
+  { name: 'Hungry Hungry Hippos', url: img('hungryhungryhippos') },
+  { name: 'Minions', url: img('minions') },
+  { name: 'Thomas the Tank Engine', url: img('thomasthetankengine'), fx: 0.4 },
+  { name: 'Buzz Lightyear', url: img('buzzlightyear') },
+  { name: 'Mario', url: img('mario'), fy: 0.4 },
+  { name: 'WALL-E', url: img('walle') },
+  { name: 'Yoda', url: img('yoda'), fy: 0.4 },
+  { name: 'Pikachu', url: img('pikachu') }
+];

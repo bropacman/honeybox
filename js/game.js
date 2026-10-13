@@ -687,7 +687,7 @@ export class Game {
   startMinigame() {
     const S = this.S;
     // Cabin Census needs a crowd: skip it with fewer than 3 players
-    const allowed = Object.keys(MINIGAMES).filter(t => (t !== 'poll' || this.connected().length >= 3) && (t !== 'zoom' || ZOOM.length >= 8));
+    const allowed = Object.keys(MINIGAMES).filter(t => (t !== 'poll' || this.connected().length >= 3) && (t !== 'zoom' || (this.S.zoomOk || []).length >= 8));
     S.bag = S.bag.filter(t => allowed.includes(t));
     if (!S.bag.length) S.bag = shuffle(allowed);
     const type = S.bag.pop();
@@ -933,17 +933,18 @@ export class Game {
   takeZooms(n) {
     const S = this.S;
     S.used.zoom = S.used.zoom || [];
-    let pool = ZOOM.map((_, i) => i).filter(i => !S.used.zoom.includes(i));
-    if (pool.length < n) { S.used.zoom = []; pool = ZOOM.map((_, i) => i); }
+    const ok = (S.zoomOk || []).filter(i => ZOOM[i]);
+    let pool = ok.filter(i => !S.used.zoom.includes(i));
+    if (pool.length < n) { S.used.zoom = []; pool = ok.slice(); }
     const chosen = shuffle(pool).slice(0, n);
     S.used.zoom.push(...chosen);
     return chosen.map(i => {
       const z = ZOOM[i];
-      const others = shuffle(ZOOM.filter(o => o.name !== z.name).map(o => o.name)).slice(0, 3);
+      const others = shuffle(ok.map(j => ZOOM[j].name).filter(name => name !== z.name)).slice(0, 3);
       const c = shuffle([z.name, ...others]);
       // start the zoom near the photo's subject, nudged a little so it's never dead center
       const jitter = () => (Math.random() - 0.5) * 0.16;
-      return { file: z.file, c, a: c.indexOf(z.name), fx: Math.min(0.85, Math.max(0.15, (z.fx ?? 0.5) + jitter())), fy: Math.min(0.85, Math.max(0.15, (z.fy ?? 0.5) + jitter())) };
+      return { file: z.url || z.file, c, a: c.indexOf(z.name), fx: Math.min(0.85, Math.max(0.15, (z.fx ?? 0.5) + jitter())), fy: Math.min(0.85, Math.max(0.15, (z.fy ?? 0.5) + jitter())) };
     });
   }
 
@@ -977,6 +978,12 @@ export class Game {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askZoom();
     return this.finishMinigame((mg.correct[this.S.lost.pid] || 0) >= 2);
+  }
+
+  // the TV reports which Zoom In photos actually loaded (they're hosted elsewhere)
+  setZoomAvailable(indices) {
+    this.S.zoomOk = indices.filter(i => ZOOM[i]);
+    this.changed();
   }
 
   // ---------- Pick a Door ----------
