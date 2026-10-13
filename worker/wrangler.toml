@@ -1,4 +1,4 @@
-name = "honeybox-turn"
+name = "honeybox"
 main = "turn.js"
 compatibility_date = "2026-09-01"
 
