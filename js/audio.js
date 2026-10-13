@@ -50,6 +50,8 @@ export const sfx = {
     tone(640, 1.2, { type: 'sine', vol: 0.08, delay: 0.5, slide: -300 });
   },
   lock() { tone(500, 0.06, { type: 'square', vol: 0.05 }); },
+  // the Cyclone light stepping to the next bulb
+  blip() { tone(1180, 0.035, { type: 'square', vol: 0.035 }); },
   // swoosh for title cards
   whoosh() {
     if (!ctx || muted) return;

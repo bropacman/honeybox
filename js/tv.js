@@ -458,8 +458,31 @@ export function startTV(root, { resume = null } = {}) {
       </div>`;
   }
 
-  function potMeter(w) {
-    return `<div class="pot-meter">🎟️ Pot: <b>${w.pot}</b> · next right answer: <b class="win">+${game.potValue(w.streak)}</b></div>`;
+  // The night track: the night shift sneaking from 12 AM to 6 AM with the pot in hand, something waiting in the
+  // dark on the way to the next hour, and what the next right answer adds. On a reveal (`at` = when the verdict
+  // lands) they walk on to the next hour, or the killer lunges, or a banished killer flees.
+  function nightTrack(w, { st = null, reveal = null } = {}) {
+    const S = game.S;
+    const pos = (i) => `${(i * 100) / 3}%`;
+    const now = Math.min(3, w.streak);
+    const was = reveal?.ok ? Math.max(0, now - 1) : now; // where they stood for this question
+    const next = Math.min(3, was + 1);
+    const mid = `calc((${pos(was)} + ${pos(next)}) / 2)`;
+    const haunted = st?.haunted;
+    const stops = CLOCK.map((t, i) => `<div class="nt-stop ${i <= now ? 'on' : ''} ${i === 3 ? 'dawn' : ''}" style="left:${pos(i)}">
+        <i></i><span>${t}</span>${i === 3 ? `<small>+${SIX_AM} bonus</small>` : ''}</div>`).join('');
+    const fate = !reveal ? '' : reveal.ok ? (haunted ? 'flee' : 'stay') : reveal.saved ? 'stay' : 'lunge';
+    const lurk = was < 3 ? `<div class="nt-lurk ${haunted ? 'haunted' : ''} ${fate}" style="left:${mid};--to:${pos(was)};--at:${reveal?.at ?? 0}ms">
+        <span class="nt-killer">${haunted ? S.monster.emoji : '👀'}</span>
+        ${reveal ? '' : `<small>${haunted ? `miss: caught, −${st.risk}` : `miss: drop ${w.pot} 🎟️`}</small>`}</div>` : '';
+    const win = st?.win ?? game.potValue(w.streak);
+    const gain = !reveal && was < 3 ? `<div class="nt-gain" style="left:${mid}"><b>+${win}</b>${st?.golden ? `<em>⭐ +${st.golden}</em>` : ''}${haunted ? `<em class="banish">⚡ +${st.banish} banish</em>` : ''}</div>` : '';
+    const walk = reveal?.ok ? `--x0:${pos(was)};--at:${reveal.at}ms` : '';
+    return `<div class="night-track">
+      <div class="nt-road"></div>${stops}${gain}${lurk}
+      <div class="nt-me ${reveal?.ok ? 'walk' : ''}" style="left:${pos(now)};${walk}">
+        <span class="nt-pot">${w.pot} 🎟️</span><span class="nt-av">${game.player(w.watcherId)?.avatar || ''}</span></div>
+    </div>`;
   }
 
   // a quick full-screen title card when a category, minigame or finale begins
@@ -474,27 +497,61 @@ export function startTV(root, { resume = null } = {}) {
     return '';
   }
 
-  // the turn wheel: spins once per turn (re-renders show it already stopped)
+  // Picking the night shift, Cyclone style: one light races around a ring of bulbs, slows down bulb by bulb,
+  // and stops on a player. Players sit at evenly spaced bulbs with blanks between. The lit bulb is worked out
+  // from the time since the spin started, so re-renders mid-spin pick up where it is.
   let spunFor = null;
+  let spinStart = 0;
+  let chaseTimer = null;
+  const cycloneSlots = (n) => n * Math.max(2, Math.ceil(12 / n)); // bulbs on the ring, a multiple of the players
   function wheel(wh, winnerId) {
     const ids = (wh?.ids?.length ? wh.ids : [winnerId]).filter(id => game.player(id));
     const n = ids.length;
-    const seg = 360 / n;
-    const win = Math.max(0, ids.indexOf(winnerId));
-    const jitter = ((wh?.spin ?? 0.5) - 0.5) * seg * 0.6;
-    const end = 360 * 6 - (win * seg + seg / 2) + jitter;
+    const k = cycloneSlots(n);
+    const gap = k / n;
     const key = `${game.S.turnIdx}`;
-    const fresh = spunFor !== key;
-    spunFor = key;
-    const colors = ['#2e5c43', '#6b4a24', '#24425c', '#5c2e45', '#4a5c24', '#5c4a24', '#2e3f5c', '#5c3a24'];
-    const stops = ids.map((_, i) => `${colors[i % colors.length]} ${i * seg}deg ${(i + 1) * seg}deg`).join(', ');
-    const labels = ids.map((id, i) => {
+    if (spunFor !== key) { spunFor = key; spinStart = performance.now(); startChase(); }
+    const now = chaseAt(performance.now() - spinStart); // drawn in place so a re-render keeps the light where it is
+    const bulbs = Array.from({ length: k }, (_, i) => `<i class="cy-bulb ${i % gap === 0 ? 'pl' : ''} ${i === now.lit ? 'lit' : ''}" data-i="${i}" style="--a:${(i * 360) / k}deg"></i>`).join('');
+    const seats = ids.map((id, i) => {
       const p = game.player(id);
-      return `<div class="wl" style="transform: rotate(${i * seg + seg / 2}deg) translateY(-34vh)"><span style="transform: rotate(${-(i * seg + seg / 2)}deg)">${p.avatar}<small>${esc(p.name)}</small></span></div>`;
+      const a = (i * gap * 360) / k;
+      return `<div class="cy-seat ${i * gap === now.lit ? 'lit' : ''}" data-i="${i * gap}" style="--a:${a}deg"><span style="--na:${-a}deg">${p.avatar}<small>${esc(p.name)}</small></span></div>`;
     }).join('');
-    return `<div class="wheel-wrap"><div class="wheel-pointer">▼</div>
-      <div class="wheel ${fresh ? 'spinning' : ''}" style="--end:${end}deg; transform: rotate(${end}deg); background: conic-gradient(${stops})">${labels}<div class="wheel-hub">🎟️</div></div>
-    </div>`;
+    const on = now.lit % gap === 0 ? game.player(ids[now.lit / gap]) : null;
+    return `<div class="cyclone ${now.done ? 'won' : ''}"><div class="cy-dome"></div>${bulbs}${seats}<div class="cy-sign"><small>JACKPOT</small><b id="cy-name">${on ? esc(on.name) : '…'}</b></div></div>`;
+  }
+  // where the light is: laps of the ring plus the winner's bulb, eased out so it slows to a stop
+  function chaseAt(t) {
+    const wh = game.S.wheel;
+    const ids = (wh?.ids?.length ? wh.ids : [game.S.watch?.watcherId]).filter(id => game.player(id));
+    const k = cycloneSlots(ids.length);
+    const target = Math.max(0, ids.indexOf(game.S.watch?.watcherId)) * (k / ids.length);
+    const total = 3 * k + target;
+    const f = Math.min(1, t / SPIN_MS);
+    return { lit: Math.floor(total * (1 - Math.pow(1 - f, 3))) % k, done: f >= 1, ids, k };
+  }
+  function startChase() {
+    clearInterval(chaseTimer);
+    let last = -1;
+    const step = () => {
+      const ring = root.querySelector('.cyclone');
+      if (!ring) { clearInterval(chaseTimer); return; }
+      const { lit, done, ids, k } = chaseAt(performance.now() - spinStart);
+      ring.querySelectorAll('.cy-bulb').forEach(b => b.classList.toggle('lit', Number(b.dataset.i) === lit));
+      ring.querySelectorAll('.cy-seat').forEach(s => s.classList.toggle('lit', Number(s.dataset.i) === lit));
+      const on = lit % (k / ids.length) === 0 ? game.player(ids[lit / (k / ids.length)]) : null;
+      const name = ring.querySelector('#cy-name');
+      if (name) name.textContent = on ? on.name : '…';
+      if (lit !== last) { last = lit; if (!done) sfx.blip(); }
+      if (done) {
+        clearInterval(chaseTimer);
+        ring.classList.add('won');
+        sfx.great();
+      }
+    };
+    chaseTimer = setInterval(step, 30);
+    requestAnimationFrame(step);
   }
 
   function eventCard(big) {
@@ -505,9 +562,6 @@ export function startTV(root, { resume = null } = {}) {
       : `<span class="event-chip">${ev.emoji} ${esc(ev.name)}</span>`;
   }
 
-  function streakDots(n) {
-    return `<div class="clock"><span class="now">🕛 ${CLOCK[Math.min(3, n)]}</span><span class="steps">${CLOCK.map((t, i) => `<i class="${i <= n ? 'on' : ''}">${t}</i>`).join('')}</span></div>`;
-  }
 
   function stage() {
     const S = game.S;
@@ -564,11 +618,9 @@ export function startTV(root, { resume = null } = {}) {
         </div>`;
       case 'pick':
         return `<div class="watch pick-layout">
-          ${board(null)}
+          <div class="pick-main">${board(null)}${nightTrack(w)}</div>
           <div class="pick-info">
             <h2>${avatar(watcher)} is picking a category…</h2>
-            ${streakDots(w.streak)}
-            ${potMeter(w)}
             ${eventCard(false)}
             <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> lurks at ${esc(S.spots[S.monster.spot].name)}: miss there = double stake, right = <b class="win">+${game.stakesNow(S.monster.spot).banish} banish!</b></p>
           </div>
@@ -584,17 +636,11 @@ export function startTV(root, { resume = null } = {}) {
         const lean = !reveal && w.st.haunted
           ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
         return `<div class="watch">${lean}
-          <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2>${streakDots(w.streak - (ok ? 1 : 0))}</div>
+          <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
-            ? `<div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}`
-            : `<div class="medals">
-                <div class="medal win-m"><span class="m-icon">✅</span><span class="m-big">+${w.st.win}</span><span class="m-sub">into the pot</span></div>
-                <div class="medal same-m"><span class="m-icon">🎟️</span><span class="m-big">${w.pot}</span><span class="m-sub">pot so far</span></div>
-                <div class="medal risk-m"><span class="m-icon">💀</span><span class="m-big">−${w.pot}</span><span class="m-sub">${w.st.haunted ? `${S.monster.emoji} haunted: caught, ${w.st.risk} at stake` : 'miss = drop the pot, get caught'}</span></div>
-                ${w.st.golden ? `<div class="medal golden-m"><span class="m-icon">⭐</span><span class="m-big">+${w.st.golden}</span><span class="m-sub">golden ticket</span></div>` : ''}
-                ${w.st.haunted ? `<div class="medal banish-m"><span class="m-icon">⚡</span><span class="m-big">+${w.st.banish}</span><span class="m-sub">banish ${S.monster.emoji}</span></div>` : ''}
-              </div>
+            ? `${nightTrack(w, { st: w.st, reveal: { ok, saved: w.saved, at: revealAt(w.order.length) } })}<div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}`
+            : `${nightTrack(w, { st: w.st })}
               <div class="side-note">Everyone else: right answer <b class="win">+${game.sideRight()}</b> ${eventCard(false)}</div>
               ${waitingStrip()}`}
         </div>`;
@@ -604,8 +650,7 @@ export function startTV(root, { resume = null } = {}) {
         const bank = w.decision === 'bank';
         return `<div class="center decide">
           <h2>${avatar(watcher)} has <span class="pot-big">${w.pot} 🎟️</span> in the pot</h2>
-          ${streakDots(w.streak)}
-          <p class="risk-line">${w.streak} of 3 right · ${3 - w.streak} more to 6 AM · <b class="bad-t">risking ${w.pot} 🎟️</b></p>
+          ${nightTrack(w)}
           <div class="choice-cards">
             <div class="choice-card keep ${reveal && !bank ? 'chosen' : ''} ${reveal && bank ? 'faded' : ''}">
               <span class="emoji-xl">🔦</span><b>KEEP GOING</b><small>Next right: +${game.potValue(w.streak)} · miss: lose it all</small>
@@ -939,26 +984,34 @@ export function startTV(root, { resume = null } = {}) {
     requestAnimationFrame(step);
   }
 
-  // While a mini-game decides their fate, the caught player is shown struggling in the villain's grasp,
-  // with how close they are to escaping.
+  // While a mini-game decides their fate, the killer drags the caught player back toward the woods;
+  // each step toward escaping hauls them back up the trail, and escaping snaps the rope.
   const CAPTIVE_PHASES = ['mgIntro', 'triviaQ', 'triviaA', 'pollQ', 'pollA', 'hideQ', 'hideA', 'guessQ', 'guessA', 'doorQ', 'doorA',
     'zoomQ', 'zoomA', 'drawDraw', 'drawFib', 'drawVote', 'drawReveal', 'drawGallery'];
   function escapeProgress(S) {
     const mg = S.mg;
     const id = S.lost.pid;
+    if (mg.type === 'draw') return { have: mg.lostOk ? 1 : 0, need: 1, text: mg.lostOk ? 'Escaped: their drawing was guessed!' : 'Escape: someone guesses their drawing' };
+    if (mg.type === 'zoom') {
+      const have = Math.min(1, mg.firsts?.[id] || 0);
+      return { have, need: 1, text: have ? 'Escaped: fastest right answer!' : 'Escape: be the fastest right answer once' };
+    }
     const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged }[mg.type];
-    if (mg.type === 'draw') return 'Escape: someone guesses their drawing';
-    if (mg.type === 'zoom') return (mg.firsts?.[id] || 0) ? 'Escaped: fastest right answer!' : 'Escape: be the fastest right answer once';
-    return tally ? `Escape: ${Math.min(2, tally[id] || 0)} of 2` : '';
+    const have = Math.min(2, tally?.[id] || 0);
+    return { have, need: 2, text: !tally ? '' : have >= 2 ? 'Escaped!' : `Escape: ${have} of 2` };
   }
   function captive(S) {
     if (!S.lost || !S.danger || !S.mg || S.mg.finale || !CAPTIVE_PHASES.includes(S.phase)) return '';
     const p = game.player(S.lost.pid);
     if (!p) return '';
-    return `<div class="captive">
-      <div class="cap-villain">${S.danger.emoji}</div>
-      <div class="cap-player">${p.avatar}<span class="cap-sweat">💦</span></div>
-      <div class="cap-text"><b>${esc(p.name)}</b> is caught!<small>${escapeProgress(S)}</small></div>
+    const e = escapeProgress(S);
+    return `<div class="captive ${e.have >= e.need ? 'free' : ''}" style="--p:${e.have / e.need}">
+      <div class="dg-woods">🌲🌲</div>
+      <div class="dg-lane">
+        <span class="dg-drop">🎟️</span><span class="dg-drop">🎟️</span>
+        <div class="dg-pair"><div class="cap-villain">${S.danger.emoji}</div><div class="dg-rope"></div><div class="cap-player">${p.avatar}<span class="cap-sweat">💦</span></div></div>
+      </div>
+      <div class="cap-text"><b>${esc(p.name)}</b> is caught!<small>${e.text}</small><small class="bad-t">${S.lost.stake} 🎟️ at stake</small></div>
     </div>`;
   }
 
