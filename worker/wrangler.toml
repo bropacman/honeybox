@@ -1,0 +1,5 @@
+name = "honeybox-turn"
+main = "turn.js"
+compatibility_date = "2026-09-01"
+
+# Secrets (never in this file): wrangler secret put TURN_KEY_ID / TURN_API_TOKEN
