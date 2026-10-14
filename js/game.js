@@ -13,7 +13,8 @@ export const TIMES = {
   drawDraw: 80, drawFib: 35, drawVote: 20, drawReveal: 14, drawGallery: 9, mgResult: 6, scores: 5,
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
   stakesIntro: 14, stakesBet: 20, stakesReveal: 7,
-  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4, zoomQ: 21, zoomA: 6
+  hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4, zoomQ: 21, zoomA: 6,
+  seanceIntro: 7, seanceQ: 12, seanceA: 7
 };
 
 export const MINIGAMES = {
@@ -126,7 +127,7 @@ export const DRAW_JUDGED = 4;
 export const NARRATED = ['intro', 'turnStart', 'safe', 'dragged', 'mgIntro', 'mgResult', 'finaleIntro', 'stakesIntro'];
 
 // phases where players are answering on their phones (the last-10-seconds hurry-up applies)
-export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'zoomQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick'];
+export const ANSWER_PHASES = ['pick', 'tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'zoomQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'finalePick', 'seanceQ'];
 
 // Sunrise Stakes: 5 This or That questions for everyone, each worth more
 export const STAKES = { values: [200, 300, 400, 500, 1000], diff: [2, 2, 3, 3, 3], boost: 1.5 };
@@ -367,11 +368,12 @@ export class Game {
       S.turnOrder.push(...order);
     }
     S.turnIdx = -1;
+    S.lastSeance = null;
     const on = this.activeCats();
     // only the categories that are on get a spot on the map, plus the Wild Card
     S.spots = PILE_NAMES.map(name => ({ name, cat: SPOT_CATEGORIES[name] || 'wild' })).filter(sp => sp.cat === 'wild' || on.includes(sp.cat));
     S.bag = [];
-    S.players.forEach(p => { p.score = 0; });
+    S.players.forEach(p => { p.score = 0; p.ghost = false; });
     S.board = {};
     S.event = null;
     S.lastEvent = null;
@@ -383,7 +385,7 @@ export class Game {
       'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
       'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have. Whoever is in the lead has to get two right before they can hide.',
       'Three in a row gets you to 6 A M, and a bonus.',
-      'Miss, and an animatronic catches you and you drop the pot. Win the mini game to escape its grasp.',
+      'Miss, and the killer catches you and you drop the pot. Win the mini game to escape, or become a ghost: no more night shifts, unless a seance brings you back.',
       'At sunrise, last place picks the finale. Most tickets wins the grand prize!'
     ]);
     this.go('intro', TIMES.intro);
@@ -398,7 +400,7 @@ export class Game {
     S.lost = null;
     S.gains = {};
     S.players = S.players.filter(p => p.connected);
-    S.players.forEach(p => { p.score = 0; });
+    S.players.forEach(p => { p.score = 0; p.ghost = false; });
     this.changed();
   }
 
@@ -427,6 +429,9 @@ export class Game {
       case 'doorA': return this.nextDoor();
       case 'zoomQ': return this.revealZoom();
       case 'zoomA': return this.nextZoom();
+      case 'seanceIntro': return this.askSeance();
+      case 'seanceQ': return this.revealSeance();
+      case 'seanceA': return this.nextTurn();
       case 'drawDraw': return this.startFibs();
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
@@ -446,10 +451,14 @@ export class Game {
   nextTurn() {
     const S = this.S;
     S.gains = {};
-    S.mg = null;
     S.lost = null;
+    // everyone's a ghost: the night is over
+    if (S.players.length && S.players.every(p => p.ghost)) { S.mg = null; return this.startFinale(); }
+    if (S.phase !== 'seanceA' && this.maybeSeance()) return;
+    S.mg = null;
     S.turnIdx++;
-    while (S.turnIdx < S.turnOrder.length && !this.player(S.turnOrder[S.turnIdx])) S.turnIdx++;
+    const alive = (id) => this.player(id) && !this.player(id).ghost;
+    while (S.turnIdx < S.turnOrder.length && !alive(S.turnOrder[S.turnIdx])) S.turnIdx++;
     if (S.turnIdx >= S.turnOrder.length) return this.startFinale();
     const w = this.player(S.turnOrder[S.turnIdx]);
     S.watch = { watcherId: w.id, streak: 0, pot: 0, spot: null, q: null, answers: {}, results: null, decision: null, dogsUsed: false };
@@ -465,8 +474,8 @@ export class Game {
     // the TV spins a wheel of everyone still waiting for a turn this round; it lands on the next player in the fair order
     const n = new Set(S.turnOrder).size || 1;
     const roundStart = Math.floor(S.turnIdx / n) * n;
-    const round = S.turnOrder.slice(roundStart, roundStart + n).filter(id => this.player(id));
-    const left = S.turnOrder.slice(S.turnIdx, roundStart + n).filter(id => this.player(id));
+    const round = S.turnOrder.slice(roundStart, roundStart + n).filter(alive);
+    const left = S.turnOrder.slice(S.turnIdx, roundStart + n).filter(alive);
     S.wheel = { ids: left.length > 1 ? left : round, spin: Math.random() };
     const k = Math.min(1, this.speed * 4);
     this.emit('sfx', 'spin');
@@ -541,7 +550,8 @@ export class Game {
     if (S.phase !== 'pick' || pid !== w.watcherId || !S.spots[i]) return;
     w.spot = i;
     w.st = this.stakesNow(i);
-    w.q = this.takeTot(S.spots[i].cat, S.event === 'freeze' ? 3 : TOT_DIFF[Math.min(w.streak, TOT_DIFF.length - 1)]);
+    // the killer's own spot always asks the hardest kind of question
+    w.q = this.takeTot(S.spots[i].cat, S.event === 'freeze' || w.st.haunted ? 3 : TOT_DIFF[Math.min(w.streak, TOT_DIFF.length - 1)]);
     w.answers = {};
     w.results = null;
     w.saved = false;
@@ -556,6 +566,14 @@ export class Game {
   answer(pid, i) {
     const S = this.S;
     if (!this.player(pid)) return;
+    if (S.phase === 'seanceQ') {
+      const mg = S.mg;
+      if (!this.player(pid).ghost || mg.answers[pid] || !(i >= 0 && i < mg.questions[0].c.length)) return;
+      mg.answers[pid] = { i, at: Date.now() };
+      this.emit('sfx', 'lock');
+      this.changed();
+      return this.checkAllDone();
+    }
     if (S.phase === 'tot') {
       if (S.watch.answers[pid] != null || !(i === 0 || i === 1)) return;
       S.watch.answers[pid] = i;
@@ -653,11 +671,11 @@ export class Game {
       this.emit('say', `${name}, you're risking ${w.pot} tickets. Keep going for ${this.potValue(w.streak)} more… or hide till morning?`);
       return this.go('decide', TIMES.decide);
     }
-    S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot };
+    S.lost = { pid: w.watcherId, stake: w.st.risk, pot: w.pot, lair: w.st.haunted };
     S.danger = w.st.haunted ? { name: lurker.name, short: lurker.short, emoji: lurker.emoji } : pick(DANGERS);
     this.emit('sfx', 'scare');
     const villain = S.danger.name.charAt(0).toUpperCase() + S.danger.name.slice(1);
-    this.emit('say', `Oh no! ${villain} caught ${name}${w.pot ? `, and ${w.pot} tickets went flying` : ''}! Win the mini game to escape its grasp.`);
+    this.emit('say', `Oh no! ${villain} caught ${name}${w.pot ? `, and ${w.pot} tickets went flying` : ''}! ${w.st.haunted ? 'Caught in its lair, so escaping takes one extra win.' : 'Win the mini game to escape its grasp.'} Fail, and you're a ghost.`);
     this.emit('mood', { pid: w.watcherId, mood: 'sad', tv: true, delay: 1300 });
     return this.go('dragged', TIMES.dragged);
   }
@@ -837,7 +855,7 @@ export class Game {
     if (mg.qi + 1 < mg.questions.length) return this.askTrivia();
     if (mg.type === 'finale' || mg.finale) return this.finish();
     const lost = this.S.lost;
-    return this.finishMinigame((mg.firsts[lost.pid] || 0) >= 1);
+    return this.finishMinigame((mg.firsts[lost.pid] || 0) >= this.escapeNeed(1));
   }
 
   takePolls(n) {
@@ -910,7 +928,7 @@ export class Game {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askPoll();
     if (mg.finale) return this.finish();
-    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= 1);
+    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= this.escapeNeed(1));
   }
 
   // ---------- Hide and Seek ----------
@@ -964,7 +982,7 @@ export class Game {
   nextHide() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.rounds.length) return this.askHide();
-    return this.finishMinigame((mg.safe[this.S.lost.pid] || 0) >= 2);
+    return this.finishMinigame((mg.safe[this.S.lost.pid] || 0) >= this.escapeNeed(2));
   }
 
   // ---------- Zoom In ----------
@@ -1018,7 +1036,7 @@ export class Game {
   nextZoom() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askZoom();
-    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= 1);
+    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= this.escapeNeed(1));
   }
 
   // the TV reports which Zoom In photos actually loaded (they're hosted elsewhere)
@@ -1079,7 +1097,7 @@ export class Game {
   nextDoor() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.rounds.length) return this.askDoor();
-    return this.finishMinigame((mg.dodged[this.S.lost.pid] || 0) >= 2);
+    return this.finishMinigame((mg.dodged[this.S.lost.pid] || 0) >= this.escapeNeed(2));
   }
 
   // ---------- Closest Guess ----------
@@ -1142,7 +1160,7 @@ export class Game {
   nextGuess() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askGuess();
-    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= 1);
+    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= this.escapeNeed(1));
   }
 
   // Drawful-style
@@ -1323,11 +1341,55 @@ export class Game {
     S.gains = {};
     if (ok) this.addScore(lost.pid, 300);
     else this.addScore(lost.pid, -lost.stake);
+    const p = this.player(lost.pid);
+    if (!ok && p) p.ghost = true;
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
-    this.emit('say', ok ? `${name} escaped ${killerName(this.S)}!` : `${name} is still captured, and lost some tickets.`);
+    this.emit('say', ok ? `${name} escaped ${killerName(this.S)}!` : `${name} didn't make it. ${name} is a ghost now, and won't be picked for the night shift.`);
     this.emit('mood', { pid: lost.pid, mood: ok ? 'happy' : 'sad', tv: true, delay: 400 });
     this.go('mgResult', TIMES.mgResult);
+  }
+
+  // wins a captured player needs to escape: one more when caught in the killer's lair
+  escapeNeed(base) { return base + (this.S.lost?.lair ? 1 : 0); }
+
+  // ---------- séance ----------
+  // At the start of a night, if anyone's a ghost, sometimes the ghosts get one hard question.
+  // The fastest right answer comes back to life. Never two nights running.
+  maybeSeance() {
+    const S = this.S;
+    const ghosts = S.players.filter(p => p.ghost && p.connected);
+    if (!ghosts.length || S.lastSeance === S.turnIdx) return false;
+    if (Math.random() >= Math.min(0.5, 0.15 + 0.1 * ghosts.length)) return false;
+    S.lastSeance = S.turnIdx + 1;
+    S.mg = { type: 'seance', questions: this.takeTrivia(1), qi: 0, answers: {} };
+    this.emit('sfx', 'howl');
+    this.emit('say', 'The candles flicker. The dead are stirring… One ghost gets a chance to come back. Fastest right answer lives again.');
+    this.go('seanceIntro', TIMES.seanceIntro);
+    return true;
+  }
+
+  askSeance() {
+    const mg = this.S.mg;
+    mg.askedAt = Date.now();
+    const q = mg.questions[0];
+    this.emit('say', `${q.q} ${q.c.map((c, i) => `${'ABCD'[i]}: ${c}`).join('. ')}.`);
+    this.go('seanceQ', TIMES.seanceQ);
+  }
+
+  revealSeance() {
+    const S = this.S;
+    const mg = S.mg;
+    const q = mg.questions[0];
+    const right = Object.keys(mg.answers).filter(id => mg.answers[id].i === q.a && this.player(id)?.ghost);
+    const top = right.sort((a, b) => mg.answers[a].at - mg.answers[b].at)[0];
+    mg.revived = top || null;
+    if (top) this.player(top).ghost = false;
+    const name = top && this.player(top)?.name;
+    this.emit('sfx', top ? 'great' : 'bad');
+    this.emit('say', top ? `The answer is ${q.c[q.a]}. ${name} is back from the dead!` : `The answer is ${q.c[q.a]}. The spirits stay restless.`);
+    if (top) this.emit('mood', { pid: top, mood: 'happy', tv: true, delay: 400 });
+    this.go('seanceA', TIMES.seanceA);
   }
 
   // ---------- finale ----------
@@ -1469,6 +1531,7 @@ export class Game {
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
       case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
       case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': case 'doorQ': case 'zoomQ': return ids.filter(id => !mg.answers[id]);
+      case 'seanceQ': return ids.filter(id => this.player(id).ghost && !mg.answers[id]);
       case 'stakesBet': return ids.filter(id => !mg.bets[id]);
       case 'finalePick': return [mg.picker].filter(id => this.player(id)?.connected);
       case 'drawDraw': return ids.filter(id => mg.prompts[id] && !mg.drawings[id]);
@@ -1479,7 +1542,7 @@ export class Game {
   }
 
   checkAllDone() {
-    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'zoomQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet'];
+    const phases = ['tot', 'decide', 'triviaQ', 'finaleQ', 'pollQ', 'hideQ', 'guessQ', 'doorQ', 'zoomQ', 'drawDraw', 'drawFib', 'drawVote', 'stakesBet', 'seanceQ'];
     if (!phases.includes(this.S.phase)) return;
     if (this.waitingOn().length === 0 && this.S.pausedLeft == null) {
       // a short beat so the last lock-in is visible
@@ -1492,7 +1555,7 @@ export class Game {
     const S = this.S;
     const me = this.player(pid);
     if (!me) return { screen: 'gone' };
-    const base = { me: { name: me.name, avatar: me.avatar, score: me.score }, gain: S.gains[pid] || 0, vip: this.vipId() === pid, story: this.isNarrated() };
+    const base = { me: { name: me.name, avatar: me.avatar, score: me.score, ghost: !!me.ghost }, gain: S.gains[pid] || 0, vip: this.vipId() === pid, story: this.isNarrated() };
     const wait = (title, sub = '', emoji = '🏕️') => ({ ...base, screen: 'wait', title, sub, emoji });
     const w = S.watch;
     const watcher = w && this.player(w.watcherId);
@@ -1642,7 +1705,19 @@ export class Game {
         };
       case 'drawReveal': return wait('Look at the TV', 'Who got fooled?', '😈');
       case 'drawGallery': return wait('The gallery', 'Bonus masterpieces on the TV', '🖼️');
-      case 'mgResult': return wait(mg.result ? `${lostName} made it home!` : `${lostName} lost tickets to ${killerName(S)}`, '', mg.result ? '🏠' : '💀');
+      case 'mgResult': return isLost && !mg.result ? wait("You're a ghost now", "You won't get the night shift, but you still play everything else. Watch for a séance…", '👻')
+        : wait(mg.result ? `${lostName} made it home!` : `${lostName} is a ghost now`, '', mg.result ? '🏠' : '👻');
+      case 'seanceIntro': return wait('🕯️ Séance', me.ghost ? 'Get ready: fastest right answer comes back to life!' : 'The dead are stirring…', '🕯️');
+      case 'seanceQ': {
+        const q = mg.questions[0];
+        if (!me.ghost) return wait('The dead are stirring…', 'Only ghosts answer this one.', '🕯️');
+        return { ...base, screen: 'choices', title: 'Séance', q: q.q, sub: 'Fastest right answer comes back to life', choices: q.c.map(text => ({ text })), locked: mg.answers[pid] ? mg.answers[pid].i : null };
+      }
+      case 'seanceA': {
+        const back = mg.revived && this.player(mg.revived);
+        if (mg.revived === pid) return wait("You're back!", 'Back from the dead, and back in the night shift draw.', '🕯️');
+        return wait(back ? `${back.name} is back from the dead!` : 'The spirits stay restless', `Answer: ${mg.questions[0].c[mg.questions[0].a]}`, '🕯️');
+      }
       case 'scores': {
         const rank = this.ranked().findIndex(p => p.id === pid) + 1;
         return wait(`You're #${rank}`, `${me.score} 🎟️`, '📊');

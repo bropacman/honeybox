@@ -36,11 +36,13 @@ await tv.click('#open');
 await tv.click('[data-act="mute"]');
 await tv.waitForFunction(() => /^[A-Z]{4}$/.test(document.querySelector('.code')?.textContent || ''));
 const code = await tv.textContent('.code');
-for (let i = 0; i < 4; i++) {
+// a full cabin (8 players) is the most crowded every screen gets
+const PLAYERS = Number(process.env.PLAYERS || 8);
+for (let i = 0; i < PLAYERS; i++) {
   const p = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
   await p.goto(`${base}?room=${code}&${peer}&bot=1`);
 }
-await tv.waitForFunction(() => document.querySelectorAll('.camper').length === 4, null, { timeout: 30000 });
+await tv.waitForFunction(n => document.querySelectorAll('.camper').length === n, PLAYERS, { timeout: 30000 });
 
 // runs in the page: leaf elements (tight text boxes) that leave the viewport or sit under the fixed HUD
 const audit = () => {

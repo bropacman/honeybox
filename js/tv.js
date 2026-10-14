@@ -17,7 +17,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 // background music mood for each phase (anything missing is silence)
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
-  dragged: 'dread', mgIntro: 'dread', mgResult: 'dread',
+  dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
   triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', zoomQ: 'quiz', zoomA: 'quiz', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
@@ -361,7 +361,7 @@ export function startTV(root, { resume = null } = {}) {
 
   function avatar(p, extra = '') {
     if (!p) return '';
-    return `<span class="who ${p.connected ? '' : 'off'}">${p.avatar} ${esc(p.name)}${extra}</span>`;
+    return `<span class="who ${p.connected ? '' : 'off'} ${p.ghost ? 'ghost' : ''}">${p.avatar}${p.ghost ? '👻' : ''} ${esc(p.name)}${extra}</span>`;
   }
 
   function gainTag(pid) {
@@ -377,9 +377,9 @@ export function startTV(root, { resume = null } = {}) {
       return d ? `<span class="gain ${d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</span>` : '';
     };
     return `<div class="scoreboard ${big ? 'big' : ''}">${ranked.map((p, i) => `
-      <div class="score-row ${p.connected ? '' : 'off'}" style="animation-delay:${big ? (ranked.length - 1 - i) * 0.7 : 0}s">
+      <div class="score-row ${p.connected ? '' : 'off'} ${p.ghost ? 'ghost' : ''}" style="animation-delay:${big ? (ranked.length - 1 - i) * 0.7 : 0}s">
         <span class="rank">${i + 1}</span><span class="av">${p.avatar}</span>
-        <span class="nm">${esc(p.name)}</span><span class="pts">${p.score} 🎟️${big ? delta(p) : gainTag(p.id)}</span>
+        <span class="nm">${esc(p.name)}${p.ghost ? ' 👻' : ''}</span><span class="pts">${p.score} 🎟️${big ? delta(p) : gainTag(p.id)}</span>
       </div>`).join('')}</div>`;
   }
 
@@ -402,7 +402,7 @@ export function startTV(root, { resume = null } = {}) {
   function waitingStrip() {
     const ids = game.waitingOn();
     const S = game.S;
-    const relevant = S.players.filter(p => p.connected);
+    const relevant = S.players.filter(p => p.connected && (S.phase !== 'seanceQ' || p.ghost));
     if (!relevant.length) return '';
     return `<div class="locks">${relevant.map(p => {
       const done = !ids.includes(p.id);
@@ -643,7 +643,7 @@ export function startTV(root, { resume = null } = {}) {
             <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
             <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have. <b>👑 The leader</b> needs 2 right before they can hide.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
-            <li data-step="5"><span>💀</span><div><b>Miss and an animatronic catches you</b> and you drop the pot. Everyone plays a mini-game; win it to escape its grasp.</div></li>
+            <li data-step="5"><span>💀</span><div><b>Miss and the killer catches you</b> and you drop the pot. Everyone plays a mini-game; win it to escape, or become a <b>👻 ghost</b>: no more night shifts, unless a séance brings you back.</div></li>
             <li data-step="6"><span>🏆</span><div><b>Sunrise finale:</b> last place picks the final game. Most tickets wins the grand prize!</div></li>
           </ol>
         </div>`;
@@ -721,7 +721,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="emoji-xl">${m.emoji}</div>
           <h1>${m.name}</h1>
           <p class="big">${esc(named(S, m.rules))}</p>
-          ${mg.finale ? '<p class="big win">🌅 FINALE · DOUBLE HONEY</p>' : `<p>Captured: ${avatar(lost)} ${S.danger ? S.danger.emoji : ''} · ${S.lost.stake} 🎟️ at stake</p>`}
+          ${mg.finale ? '<p class="big win">🌅 FINALE · DOUBLE HONEY</p>' : `<p>Captured: ${avatar(lost)} ${S.danger ? S.danger.emoji : ''} · ${S.lost.stake} 🎟️ at stake · fail and they're a 👻${S.lost.lair ? ' · caught in its lair: one extra win to escape' : ''}</p>`}
         </div>`;
       }
       case 'triviaQ': case 'finaleQ': case 'pollQ': {
@@ -754,7 +754,7 @@ export function startTV(root, { resume = null } = {}) {
         const total = Math.max(1, q.counts.reduce((a, b) => a + b, 0));
         return `<div class="quiz">
           <h1 class="q">${esc(q.q)}</h1>
-          <div class="bars reveal-poll" style="--last:${choices.length}">${choices.map((c, i) => {
+          <div class="bars reveal-poll ${choices.length > 5 ? 'many' : ''}" style="--last:${choices.length}">${choices.map((c, i) => {
             const who = Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean);
             const top = q.top > 0 && q.counts[i] === q.top;
             const rank = choices.map((_, j) => j).sort((a, b) => q.counts[a] - q.counts[b]).indexOf(i);
@@ -842,7 +842,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="quiz guess-game">
           <h1 class="q">${esc(q.q)}</h1>
           ${reveal
-            ? `<div class="guess-rows">${rows}</div><div class="guess-answer late-n" style="--at:${mg.revealMs}ms">${fmt(q.a)} ${esc(q.unit)}</div>`
+            ? `<div class="guess-rows ${mg.order.length > 5 ? 'many' : ''}">${rows}</div><div class="guess-answer late-n" style="--at:${mg.revealMs}ms">${fmt(q.a)} ${esc(q.unit)}</div>`
             : `<p class="big">Type your best guess${q.unit ? ` (in ${esc(q.unit)})` : ''} on your phone. Closest wins!</p>`}
         </div>`;
       }
@@ -860,10 +860,10 @@ export function startTV(root, { resume = null } = {}) {
         if (S.phase === 'drawFib') {
           side = `<h2>What is this masterpiece? 🤔</h2><p class="big">Write a <b>fake title</b> on your phone.</p><p class="muted">Fool the others: points for every vote your lie gets.</p>`;
         } else if (S.phase === 'drawVote') {
-          side = `<h2>Which is the real title?</h2><div class="opts">${mg.options.map(o => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>`;
+          side = `<h2>Which is the real title?</h2><div class="opts ${mg.options.length > 5 ? 'many' : ''}">${mg.options.map(o => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>`;
         } else {
           const order = (mg.revealSeq || mg.options.map((_, i) => i)).map(i => [mg.options[i], i]);
-          side = `<h2>The reveal</h2><div class="opts">${order.map(([o, i], k) => {
+          side = `<h2>The reveal</h2><div class="opts ${order.length > 5 ? 'many' : ''}">${order.map(([o, i], k) => {
             const voters = Object.entries(mg.votes).filter(([, v]) => v === i).map(([id]) => game.player(id)).filter(Boolean);
             const owners = o.owners.map(id => game.player(id)).filter(Boolean);
             const by = o.real ? `the truth, drawn by ${artist?.avatar} ${esc(artist?.name)}` : o.house ? 'a house lie' : `lie by ${owners.map(p => `${p.avatar} ${esc(p.name)}`).join(', ')}`;
@@ -881,11 +881,31 @@ export function startTV(root, { resume = null } = {}) {
             const p = game.player(id);
             return `<div class="frame"><canvas data-artist="${esc(id)}" width="320" height="320"></canvas><b>${esc(mg.prompts[id])}</b><small>${p ? `${p.avatar} ${esc(p.name)}` : ''}</small></div>`;
           }).join('')}</div></div>`;
+      case 'seanceIntro': case 'seanceQ': case 'seanceA': {
+        // the ghosts get one hard question; the fastest right answer comes back to life
+        const q = mg.questions[0];
+        const ghosts = S.players.filter(p => p.ghost || p.id === mg.revived);
+        if (S.phase === 'seanceIntro') {
+          return `<div class="center seance"><div class="emoji-xl flicker">🕯️</div><h1>Séance</h1>
+            <p class="big">The dead are stirring… the fastest right answer comes back to life.</p>
+            <div class="seance-ghosts">${ghosts.map(p => avatar(p)).join(' ')}</div></div>`;
+        }
+        if (S.phase === 'seanceQ') {
+          return `<div class="quiz seance"><h1 class="q">🕯️ ${esc(q.q)}</h1>
+            <div class="answers">${q.c.map((c, i) => `<div class="ans"><span class="letter">${'ABCD'[i]}</span>${esc(c)}</div>`).join('')}</div>
+            <p class="muted">Only ghosts answer. Fastest right answer lives again.</p></div>`;
+        }
+        const back = mg.revived && game.player(mg.revived);
+        return `<div class="center seance"><div class="emoji-xl ${back ? 'bounce' : ''}">${back ? '🕯️✨' : '🕯️'}</div>
+          <h1>${back ? `${avatar(back)} is back from the dead!` : 'The spirits stay restless…'}</h1>
+          <p class="big">Answer: ${esc(q.c[q.a])}</p>${back ? '<p class="muted">Back in the night shift draw.</p>' : ''}</div>`;
+      }
       case 'mgResult':
         return `<div class="center ${mg.result ? '' : 'dark'}">
-          <div class="emoji-xl ${mg.result ? 'bounce' : 'shake'}">${mg.result ? '🏠🔥' : '💀🌲'}</div>
-          <h1>${avatar(lost)} ${mg.result ? `broke free from ${S.danger.emoji}!` : `is still in ${S.danger.emoji}'s grasp…`}</h1>
-          <p class="big">${mg.result ? '+300 🎟️' : `−${S.lost.stake} 🎟️ lost to ${esc(killerName(S))}`}</p>
+          <div class="emoji-xl ${mg.result ? 'bounce' : 'shake'}">${mg.result ? '🏠🔥' : '👻'}</div>
+          <h1>${avatar(lost)} ${mg.result ? `broke free from ${S.danger.emoji}!` : `didn't make it…`}</h1>
+          <p class="big">${mg.result ? '+300 🎟️' : `A ghost now: no more night shifts · −${S.lost.stake} 🎟️`}</p>
+          ${mg.result ? '' : '<p class="muted">Ghosts still play everything else, and a séance might bring them back.</p>'}
         </div>`;
       case 'scores':
         return `<div class="center"><div class="emoji-xl">🎟️</div><h1>Ticket Count</h1>${scoreboard(true)}<p class="muted">Night ${S.turnIdx + 1} of ${S.turnOrder.length} survived</p></div>`;
@@ -1028,14 +1048,17 @@ export function startTV(root, { resume = null } = {}) {
       const have = Math.min(1, mg.firsts?.[id] || 0);
       return { have, need: 1, text: have ? 'Escaped: fastest right answer!' : 'Escape: be the fastest right answer once' };
     }
-    if (mg.type === 'trivia' || mg.type === 'poll' || mg.type === 'guess') {
-      const have = Math.min(1, mg.firsts?.[id] || 0);
-      const how = { trivia: 'be the fastest right answer', poll: 'be the fastest to match the crowd', guess: 'win a round (ties go to the faster guess)' }[mg.type];
-      return { have, need: 1, text: have ? 'Escaped: won a round!' : `Escape: ${how} once` };
+    const lair = S.lost.lair ? 'Caught in its lair · ' : '';
+    if (['trivia', 'poll', 'guess', 'zoom'].includes(mg.type)) {
+      const need = game.escapeNeed(1);
+      const have = Math.min(need, mg.firsts?.[id] || 0);
+      const how = { trivia: 'be the fastest right answer', poll: 'be the fastest to match the crowd', guess: 'win a round (ties go to the faster guess)', zoom: 'be the fastest right answer' }[mg.type];
+      return { have, need, text: have >= need ? 'Escaped: won a round!' : `${lair}Escape: ${how} ${need === 1 ? 'once' : `twice (${have} of ${need})`}` };
     }
     const tally = { hide: mg.safe, door: mg.dodged }[mg.type];
-    const have = Math.min(2, tally?.[id] || 0);
-    return { have, need: 2, text: !tally ? '' : have >= 2 ? 'Escaped!' : `Escape: ${have} of 2` };
+    const need = game.escapeNeed(2);
+    const have = Math.min(need, tally?.[id] || 0);
+    return { have, need, text: !tally ? '' : have >= need ? 'Escaped!' : `${lair}Escape: ${have} of ${need}` };
   }
   function captive(S) {
     if (!S.lost || !S.danger || !S.mg || S.mg.finale || !CAPTIVE_PHASES.includes(S.phase)) return '';
