@@ -235,6 +235,9 @@ export function startPhone(root) {
           ? `<div class="center"><div class="suspense-ph" ${v.revealMs ? `style="animation-duration:${v.revealMs}ms"` : ''}>🥁</div><div class="late" ${v.revealMs ? `style="animation-delay:${v.revealMs}ms"` : ''}><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
           : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;
+      case 'stop':
+        body = `<div class="center"><h2>${esc(v.title)}</h2><p>${esc(v.sub)}</p><button class="big-btn stop-btn" data-stop>STOP</button></div>`;
+        break;
       case 'pick':
         body = `<h2>Pick a glowing spot</h2>
           <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🎟️</b> · next right answer <b class="win">+${v.win}</b></p>
@@ -355,6 +358,7 @@ export function startPhone(root) {
       send({ t: 'finale', choice: b.dataset.finale });
     }));
     once('[data-stake]', b => send({ t: 'stake', i: Number(b.dataset.stake) }));
+    once('[data-stop]', () => send({ t: 'stop' }));
     root.querySelectorAll('[data-answer]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-answer]').forEach(x => { x.disabled = true; });
       b.classList.add('sel');
@@ -416,7 +420,7 @@ export function startPhone(root) {
       if (num) { num.value = String(Math.floor(Math.random() * 3000)); root.querySelector('#num-send').click(); return; }
       const lie = root.querySelector('#lie');
       if (lie) { lie.value = choose(['A moose doing karate', 'Grandpa at the beach', 'A haunted toaster', 'Dog vs vacuum']) + ' ' + Math.floor(Math.random() * 99); root.querySelector('#send').click(); return; }
-      const btns = enabled('[data-pick], [data-tot], [data-decide], [data-answer], [data-stake], [data-finale]');
+      const btns = enabled('[data-pick], [data-tot], [data-decide], [data-answer], [data-stake], [data-finale], [data-stop]');
       if (btns.length) choose(btns).click();
     }, delay);
   }

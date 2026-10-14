@@ -14,7 +14,7 @@ export const TIMES = {
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
   stakesIntro: 14, stakesBet: 20, stakesReveal: 7,
   hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4, zoomQ: 21, zoomA: 6,
-  seanceIntro: 7, seanceQ: 12, seanceA: 7
+  seanceIntro: 7, seanceQ: 12, seanceA: 7, candleSpin: 6, candleWon: 3
 };
 
 export const MINIGAMES = {
@@ -463,6 +463,8 @@ export class Game {
       case 'seanceIntro': return this.askSeance();
       case 'seanceQ': return this.revealSeance();
       case 'seanceA': return this.nextTurn();
+      case 'candleSpin': return this.stopCandle(null);
+      case 'candleWon': return this.askTot();
       case 'drawDraw': return this.startFibs();
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
@@ -575,14 +577,57 @@ export class Game {
     if (kind === 'flashlight') w.free = true;
     if (kind === 'salt') w.frozen = true;
     if (kind === 'candle') {
-      const g = pick(S.players.filter(p => p.ghost));
-      g.ghost = false;
-      Object.assign(f, { pid: g.id, name: g.name });
+      const ghosts = S.players.filter(p => p.ghost);
+      if (ghosts.length === 1) {
+        ghosts[0].ghost = false;
+        Object.assign(f, { pid: ghosts[0].id, name: ghosts[0].name });
+      } else {
+        f.spin = { bulbs: this.candleBulbs(ghosts), stepMs: 45, startedAt: 0, stoppedAt: null };
+      }
     }
     if (kind === 'swap') { f.to = m.spot; m.spot = i; }
     if (kind === 'ambush') m.spot = pick(S.spots.map((_, j) => j).filter(j => j !== i && this.dist(j, i) === 1)) ?? m.spot;
     if (kind === 'raccoon') { f.amount = Math.min(w.pot, Math.max(50, Math.round(w.pot / 3 / 50) * 50)); w.pot -= f.amount; }
     return f;
+  }
+
+  // The candle's ring: 16 bulbs shared out by how long each ghost has been dead (plus one if they're behind),
+  // at least one each, in one run per ghost so everyone can see whose stretch is whose
+  candleBulbs(ghosts) {
+    const S = this.S;
+    const ranked = this.ranked();
+    const weight = (p) => 1 + Math.max(0, S.turnIdx - (p.ghostSince ?? S.turnIdx)) + (ranked.findIndex(r => r.id === p.id) >= ranked.length / 2 ? 1 : 0);
+    const ws = ghosts.map(weight);
+    const total = ws.reduce((a, b) => a + b, 0);
+    const K = 16;
+    const counts = ws.map(w => Math.max(1, Math.floor((w / total) * K)));
+    // hand out what's left to the biggest remainders
+    const order = ws.map((w, i) => [(w / total) * K - Math.floor((w / total) * K), i]).sort((a, b) => b[0] - a[0]);
+    for (let n = counts.reduce((a, b) => a + b, 0), j = 0; n < K; n++, j++) counts[order[j % order.length][1]]++;
+    return ghosts.flatMap((g, i) => Array(counts[i]).fill(g.id));
+  }
+  candleLit() {
+    const spin = this.S.watch?.find?.spin;
+    if (!spin) return 0;
+    if (spin.stoppedAt != null) return spin.stoppedAt;
+    return Math.floor((Date.now() - spin.startedAt) / spin.stepMs) % spin.bulbs.length;
+  }
+  // the instant the night shift's tap arrives (or time runs out), the light stops and that ghost comes back
+  stopCandle(pid) {
+    const S = this.S;
+    const w = S.watch;
+    if (S.phase !== 'candleSpin' || (pid && pid !== w.watcherId)) return;
+    const spin = w.find.spin;
+    spin.stoppedAt = this.candleLit();
+    const g = this.player(spin.bulbs[spin.stoppedAt]);
+    if (g) {
+      g.ghost = false;
+      Object.assign(w.find, { pid: g.id, name: g.name });
+      this.emit('mood', { pid: g.id, mood: 'happy', tv: true, delay: 300 });
+    }
+    this.emit('sfx', 'great');
+    this.emit('say', `${g?.name || 'Someone'} is back from the dead!`);
+    this.go('candleWon', TIMES.candleWon);
   }
 
   // ---------- the roaming killer ----------
@@ -683,9 +728,25 @@ export class Game {
     w.forced = null;
     this.emit('sfx', 'lock');
     const who = this.player(w.watcherId)?.name || 'Someone';
-    this.emit('say', `${w.find ? surpriseLine(S, w.find, who) + ' ' : ''}${w.st.haunted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(w.q)}`);
     const secs = S.event === 'witching' ? 10 / (TIMERS[S.timers] || 1) : TIMES.tot;
-    this.go('tot', w.find?.kind === 'batteries' ? secs / 2 : secs);
+    w.totSecs = w.find?.kind === 'batteries' ? secs / 2 : secs;
+    if (w.find?.spin) {
+      w.find.spin.startedAt = Date.now();
+      this.emit('say', `${who} found a spirit candle! Stop the light to bring a ghost back.`);
+      return this.go('candleSpin', TIMES.candleSpin);
+    }
+    this.emit('say', `${w.find ? surpriseLine(S, w.find, who) + ' ' : ''}${this.totIntro()}`);
+    this.go('tot', w.totSecs);
+  }
+
+  // the question, after any candle spin
+  totIntro() {
+    const S = this.S;
+    return `${S.watch.st.haunted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(S.watch.q)}`;
+  }
+  askTot() {
+    this.emit('say', this.totIntro());
+    this.go('tot', this.S.watch.totSecs);
   }
 
   answer(pid, i) {
@@ -1483,7 +1544,7 @@ export class Game {
     if (ok) this.addScore(lost.pid, 300);
     else this.addScore(lost.pid, -lost.stake);
     const p = this.player(lost.pid);
-    if (!ok && p) p.ghost = true;
+    if (!ok && p) { p.ghost = true; p.ghostSince = S.turnIdx; }
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
     this.emit('say', ok ? `${name} escaped ${killerName(this.S)}!` : `${name} didn't make it. ${name} is a ghost now, and won't be picked for the night shift.`);
@@ -1670,7 +1731,7 @@ export class Game {
     const ids = this.connected().map(p => p.id);
     const mg = S.mg;
     switch (S.phase) {
-      case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
+      case 'pick': case 'candleSpin': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
       case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
       case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': case 'doorQ': case 'zoomQ': return ids.filter(id => !mg.answers[id]);
@@ -1851,6 +1912,14 @@ export class Game {
       case 'drawGallery': return wait('The gallery', 'Bonus masterpieces on the TV', '🖼️');
       case 'mgResult': return isLost && !mg.result ? wait("You're a ghost now", "You won't get the night shift, but you still play everything else. Watch for a séance…", '👻')
         : wait(mg.result ? `${lostName} made it home!` : `${lostName} is a ghost now`, '', mg.result ? '🏠' : '👻');
+      case 'candleSpin':
+        return w.watcherId === pid
+          ? { ...base, screen: 'stop', title: '🕯️ Spirit candle!', sub: 'Stop the light on a ghost to bring them back' }
+          : wait('🕯️ Spirit candle!', `${watcher?.name} is about to stop the light…`, '🕯️');
+      case 'candleWon': {
+        const back = this.player(w.find?.pid);
+        return back?.id === pid ? wait("You're back!", 'Back from the dead, and back in the night shift draw.', '🕯️') : wait(`${back?.name || 'Someone'} is back from the dead!`, '', '🕯️');
+      }
       case 'seanceIntro': return wait('🕯️ Séance', me.ghost ? 'Get ready: fastest right answer comes back to life!' : 'The dead are stirring…', '🕯️');
       case 'seanceQ': {
         const q = mg.questions[0];

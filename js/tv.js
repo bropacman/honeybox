@@ -17,7 +17,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 // background music mood for each phase (anything missing is silence)
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
-  dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
+  candleSpin: 'tense', candleWon: 'tense', dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
   triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', zoomQ: 'quiz', zoomA: 'quiz', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
@@ -120,6 +120,7 @@ export function startTV(root, { resume = null } = {}) {
     if (!pid) return;
     switch (msg.t) {
       case 'pick': game.chooseSpot(pid, Number(msg.i)); break;
+      case 'stop': game.stopCandle(pid); break;
       case 'decide': game.decide(pid, String(msg.choice || '')); break;
       case 'answer':
         if (game.S.phase === 'drawVote') game.vote(pid, Number(msg.i));
@@ -585,61 +586,102 @@ export function startTV(root, { resume = null } = {}) {
     return '';
   }
 
-  // Picking the night shift, Cyclone style: one light races around a ring of bulbs, slows down bulb by bulb,
-  // and stops on a player. Players sit at evenly spaced bulbs with blanks between. The lit bulb is worked out
-  // from the time since the spin started, so re-renders mid-spin pick up where it is.
+  // Picking the night shift: an upright prize wheel. One slice per player still waiting this round, pegs on the
+  // rim, and a flapper at the top that clicks against them as the wheel slows and lands on the next player.
+  // The spin is timed from when it started, so a re-render mid-spin carries on instead of restarting.
+  const WHEEL_COLORS = ['#c8322a', '#e09a1c', '#2e7d5b', '#3a6ea5', '#8a4fbf', '#c8602a', '#2b8f8f', '#b8456e'];
   let spunFor = null;
   let spinStart = 0;
-  let chaseTimer = null;
-  const cycloneSlots = (n) => n * Math.max(2, Math.ceil(12 / n)); // bulbs on the ring, a multiple of the players
-  function wheel(wh, winnerId) {
+  let tickTimer = null;
+  // the wheel's slow-down curve, cubic-bezier(.12, .7, .18, 1): progress through the spin -> fraction of the turn
+  const ease = (t) => {
+    let u = t;
+    for (let i = 0; i < 6; i++) {
+      const x = 3 * 0.12 * u * (1 - u) ** 2 + 3 * 0.18 * u * u * (1 - u) + u ** 3;
+      const dx = 3 * 0.12 * (1 - u) ** 2 + 6 * (0.18 - 0.12) * u * (1 - u) + 3 * (1 - 0.18) * u * u;
+      u = Math.min(1, Math.max(0, u - (x - t) / (dx || 1)));
+    }
+    return 3 * 0.7 * u * (1 - u) ** 2 + 3 * u * u * (1 - u) + u ** 3;
+  };
+  function prizeWheel(wh, winnerId) {
     const ids = (wh?.ids?.length ? wh.ids : [winnerId]).filter(id => game.player(id));
     const n = ids.length;
-    const k = cycloneSlots(n);
-    const gap = k / n;
+    const seg = 360 / n;
+    const win = Math.max(0, ids.indexOf(winnerId));
+    // turn until the winner's slice is under the flapper at the top, a little off-centre so it isn't too neat
+    const end = 360 * 5 - (win * seg + seg / 2) + ((wh?.spin ?? 0.5) - 0.5) * seg * 0.6;
     const key = `${game.S.turnIdx}`;
-    if (spunFor !== key) { spunFor = key; spinStart = performance.now(); startChase(); }
-    const now = chaseAt(performance.now() - spinStart); // drawn in place so a re-render keeps the light where it is
-    const bulbs = Array.from({ length: k }, (_, i) => `<i class="cy-bulb ${i % gap === 0 ? 'pl' : ''} ${i === now.lit ? 'lit' : ''}" data-i="${i}" style="--a:${(i * 360) / k}deg"></i>`).join('');
-    const seats = ids.map((id, i) => {
+    if (spunFor !== key) { spunFor = key; spinStart = performance.now(); startTicks(end, seg / 2); }
+    const elapsed = Math.min(SPIN_MS, performance.now() - spinStart);
+    const slices = ids.map((_, i) => `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${i * seg}deg ${(i + 1) * seg}deg`).join(', ');
+    const labels = ids.map((id, i) => {
       const p = game.player(id);
-      const a = (i * gap * 360) / k;
-      return `<div class="cy-seat ${i * gap === now.lit ? 'lit' : ''}" data-i="${i * gap}" style="--a:${a}deg"><span style="--na:${-a}deg">${p.avatar}<small>${esc(p.name)}</small></span></div>`;
+      const a = i * seg + seg / 2;
+      return `<div class="pw-label" style="--a:${a}deg"><span>${p.avatar}<small>${esc(p.name)}</small></span></div>`;
     }).join('');
-    const on = now.lit % gap === 0 ? game.player(ids[now.lit / gap]) : null;
-    return `<div class="cyclone ${now.done ? 'won' : ''}"><div class="cy-dome"></div>${bulbs}${seats}<div class="cy-sign"><small>JACKPOT</small><b id="cy-name">${on ? esc(on.name) : '…'}</b></div></div>`;
+    const pegs = Array.from({ length: n * 2 }, (_, i) => `<i class="pw-peg" style="--a:${(i * seg) / 2}deg"></i>`).join('');
+    return `<div class="prize-wheel ${elapsed >= SPIN_MS ? 'won' : ''}">
+      <div class="pw-flapper"></div>
+      <div class="pw-disc" style="--end:${end}deg;animation-delay:-${Math.round(elapsed)}ms;background:conic-gradient(${slices})">${labels}${pegs}<div class="pw-hub">🎟️</div></div>
+    </div>`;
   }
-  // where the light is: laps of the ring plus the winner's bulb, eased out so it slows to a stop
-  function chaseAt(t) {
-    const wh = game.S.wheel;
-    const ids = (wh?.ids?.length ? wh.ids : [game.S.watch?.watcherId]).filter(id => game.player(id));
-    const k = cycloneSlots(ids.length);
-    const target = Math.max(0, ids.indexOf(game.S.watch?.watcherId)) * (k / ids.length);
-    const total = 3 * k + target;
-    const f = Math.min(1, t / SPIN_MS);
-    return { lit: Math.floor(total * (1 - Math.pow(1 - f, 3))) % k, done: f >= 1, ids, k };
-  }
-  function startChase() {
-    clearInterval(chaseTimer);
-    let last = -1;
-    const step = () => {
-      const ring = root.querySelector('.cyclone');
-      if (!ring) { clearInterval(chaseTimer); return; }
-      const { lit, done, ids, k } = chaseAt(performance.now() - spinStart);
-      ring.querySelectorAll('.cy-bulb').forEach(b => b.classList.toggle('lit', Number(b.dataset.i) === lit));
-      ring.querySelectorAll('.cy-seat').forEach(s => s.classList.toggle('lit', Number(s.dataset.i) === lit));
-      const on = lit % (k / ids.length) === 0 ? game.player(ids[lit / (k / ids.length)]) : null;
-      const name = ring.querySelector('#cy-name');
-      if (name) name.textContent = on ? on.name : '…';
-      if (lit !== last) { last = lit; if (!done) sfx.blip(); }
-      if (done) {
-        clearInterval(chaseTimer);
-        ring.classList.add('won');
+  // a click each time a peg passes the flapper, following the slow-down; a fanfare when it lands
+  function startTicks(end, pegEvery) {
+    clearInterval(tickTimer);
+    let passed = 0;
+    tickTimer = setInterval(() => {
+      const f = Math.min(1, (performance.now() - spinStart) / SPIN_MS);
+      const n = Math.floor((end * ease(f)) / pegEvery);
+      if (n > passed) {
+        passed = n;
+        sfx.blip();
+        const flap = root.querySelector('.pw-flapper');
+        if (flap) { flap.classList.remove('kick'); void flap.offsetWidth; flap.classList.add('kick'); }
+      }
+      if (f >= 1) {
+        clearInterval(tickTimer);
+        root.querySelector('.prize-wheel')?.classList.add('won');
         sfx.great();
       }
-    };
-    chaseTimer = setInterval(step, 30);
-    requestAnimationFrame(step);
+    }, 16);
+  }
+
+  // The spirit candle, Cyclone style: one light races around a ring of bulbs that all belong to ghosts (ghosts
+  // dead longer own more of them) and the candle-finder hits STOP on their phone. The game decides the bulb the
+  // instant the tap arrives; the TV just shows the light where the game says it is.
+  let candleTimer = null;
+  function candleRing(spin, phase) {
+    const S = game.S;
+    const k = spin.bulbs.length;
+    const lit = phase === 'candleWon' ? spin.stoppedAt : game.candleLit();
+    // each ghost sits outside the middle of their run of bulbs
+    const runs = {};
+    spin.bulbs.forEach((id, i) => { (runs[id] ||= []).push(i); });
+    const seats = Object.entries(runs).map(([id, run]) => {
+      const p = game.player(id);
+      const a = (run[Math.floor(run.length / 2)] * 360) / k;
+      return `<div class="cy-seat ${spin.bulbs[lit] === id ? 'lit' : ''}" data-id="${esc(id)}" style="--a:${a}deg"><span style="--na:${-a}deg">${p?.avatar || ''}<small>${esc(p?.name || '')}</small></span></div>`;
+    }).join('');
+    const bulbs = spin.bulbs.map((id, i) => `<i class="cy-bulb own ${i === lit ? 'lit' : ''}" data-i="${i}" data-id="${esc(id)}" style="--a:${(i * 360) / k}deg;--c:${WHEEL_COLORS[Object.keys(runs).indexOf(id) % WHEEL_COLORS.length]}"></i>`).join('');
+    const on = game.player(spin.bulbs[lit]);
+    if (phase === 'candleSpin') startCandleLight();
+    return `<div class="cyclone candle ${phase === 'candleWon' ? 'won' : ''}"><div class="cy-dome"></div>${bulbs}${seats}<div class="cy-sign"><small>🕯️ SPIRIT CANDLE</small><b id="cy-name">${on ? esc(on.name) : '…'}</b></div></div>`;
+  }
+  function startCandleLight() {
+    if (candleTimer) return;
+    let last = -1;
+    candleTimer = setInterval(() => {
+      const ring = root.querySelector('.cyclone.candle');
+      if (!ring || game.S.phase !== 'candleSpin') { clearInterval(candleTimer); candleTimer = null; return; }
+      const lit = game.candleLit();
+      if (lit === last) return;
+      last = lit;
+      ring.querySelectorAll('.cy-bulb').forEach(b => b.classList.toggle('lit', Number(b.dataset.i) === lit));
+      const id = game.S.watch.find.spin.bulbs[lit];
+      ring.querySelectorAll('.cy-seat').forEach(s => s.classList.toggle('lit', s.dataset.id === id));
+      const name = ring.querySelector('#cy-name');
+      if (name) name.textContent = game.player(id)?.name || '…';
+    }, 16);
   }
 
   function eventCard(big) {
@@ -698,12 +740,19 @@ export function startTV(root, { resume = null } = {}) {
       case 'turnStart':
         return `<div class="center turn-start">
           <p class="muted big">NIGHT ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
-          ${wheel(S.wheel, w.watcherId)}
+          ${prizeWheel(S.wheel, w.watcherId)}
           <div class="late-n" style="--at:${SPIN_MS}ms">
             <h1>${avatar(watcher)} is on the night shift!</h1>
             ${eventCard(true)}
           </div>
         </div>`;
+      case 'candleSpin': case 'candleWon': {
+        const back = game.player(w.find?.pid);
+        return `<div class="center candle-stage">
+          ${candleRing(w.find.spin, S.phase)}
+          <h2>${S.phase === 'candleWon' && back ? `${avatar(back)} is back from the dead!` : `${avatar(watcher)} found a spirit candle! Stop the light on a ghost…`}</h2>
+        </div>`;
+      }
       case 'pick':
         return `<div class="watch pick-layout">
           <div class="pick-main">${board(null)}${nightTrack(w)}</div>

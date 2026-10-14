@@ -911,3 +911,24 @@ img.px { width: 1.15em; height: 1.15em; }
 .pick.here { outline: 3px dashed var(--honey); }
 .here-ph { position: absolute; top: -10px; left: -6px; font-size: 1.4em; }
 
+/* the night-shift prize wheel (prizeWheel() in tv.js): slices, pegs on the rim, a flapper at the top */
+.prize-wheel { --s: min(58vh, 54cqh); position: relative; flex: none; width: var(--s); height: var(--s); margin: 2vh 0 0.5vh; }
+.pw-disc { position: absolute; inset: 0; border-radius: 50%; border: calc(var(--s) * 0.025) solid #f6e2b0; box-shadow: 0 0 0 calc(var(--s) * 0.012) #6b4a24, 0 0 60px rgba(242, 177, 52, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.45); transform: rotate(var(--end)); animation: wheelSpin 3.8s cubic-bezier(.12, .7, .18, 1) both; }
+@keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(var(--end)); } }
+.pw-label { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: rotate(var(--a)) translateY(calc(var(--s) * -0.32)); }
+.pw-label span { position: absolute; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; font-size: calc(var(--s) * 0.11); white-space: nowrap; }
+.pw-label small { font-size: 0.32em; font-weight: 900; color: #fff; text-shadow: 0 1px 3px #000; }
+.pw-label img.px { width: 1em; height: 1em; }
+.pw-peg { position: absolute; left: 50%; top: 50%; width: calc(var(--s) * 0.03); height: calc(var(--s) * 0.03); margin: calc(var(--s) * -0.015) 0 0 calc(var(--s) * -0.015); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #c9a85a); box-shadow: 0 1px 2px #000; transform: rotate(var(--a)) translateY(calc(var(--s) * -0.455)); }
+.pw-hub { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 16%; height: 16%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: calc(var(--s) * 0.07); background: #1b0f05; border: calc(var(--s) * 0.012) solid #f6e2b0; }
+.pw-hub img.px { width: 1em; height: 1em; }
+.pw-flapper { position: absolute; left: 50%; top: calc(var(--s) * -0.035); z-index: 2; width: calc(var(--s) * 0.07); height: calc(var(--s) * 0.11); margin-left: calc(var(--s) * -0.035); background: linear-gradient(#ff5d4f, #a32d3d); clip-path: polygon(0 0, 100% 0, 50% 100%); transform-origin: 50% 10%; filter: drop-shadow(0 3px 4px #000); }
+.pw-flapper.kick { animation: flap 0.12s ease-out; }
+@keyframes flap { 40% { transform: rotate(-22deg); } }
+.prize-wheel.won .pw-disc { box-shadow: 0 0 0 calc(var(--s) * 0.012) #6b4a24, 0 0 90px rgba(255, 211, 77, 0.7), inset 0 0 40px rgba(0, 0, 0, 0.45); }
+/* the spirit candle: every bulb belongs to a ghost, tinted with their colour */
+.cyclone.candle .cy-bulb.own { background: color-mix(in srgb, var(--c) 45%, #241a0a); border-color: color-mix(in srgb, var(--c) 70%, #000); }
+.cyclone.candle .cy-bulb.own.lit { background: #fff3b0; border-color: #ffd34d; }
+.candle-stage h2 { margin-top: 0.4em; }
+.stop-btn { font-size: 2.4em; padding: 0.6em 1.4em; margin-top: 0.6em; background: var(--bad); color: #fff; box-shadow: 0 8px 0 #7a1d16; }
+
