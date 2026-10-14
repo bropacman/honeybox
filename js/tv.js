@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
+import { SURPRISES, surpriseLine, BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -439,28 +439,63 @@ export function startTV(root, { resume = null } = {}) {
     const travel = prowl.from != null && left > 0;
     // pacing starts when the walk ends, and stays on that clock across re-renders
     const pace = travel ? left : -((Date.now() - prowl.at - TRAVEL_MS) % PACE_MS);
-    // the map clips above its top row, so killers up there patrol below their spot instead
+    // the map clips above its top row, so killers up there show their hearts beside them instead of above
     return `<div class="prowler ${travel ? 'travel' : ''} ${y1 < 25 ? 'low' : ''}" title="${esc(m.name)}"
         style="--x0:${x0}%;--y0:${y0}%;--x1:${x1}%;--y1:${y1}%;--dir:${x1 < x0 ? 1 : -1};--travel:-${TRAVEL_MS - left}ms;--pace:${pace}ms">
       <div class="prowl-pace">${hearts(m)}<div class="prowl-face"><span class="prowl-bob">${m.emoji}</span></div></div>
     </div>`;
   }
 
+  // where the killer steps after this answer (toward where the night shift is standing)
+  function huntArrow() {
+    const to = game.hunterStep();
+    if (to == null) return '';
+    const [x0, y0] = spotXY(game.S.monster.spot);
+    const [x1, y1] = spotXY(to);
+    return `<svg class="hunt" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="${x0}" y1="${y0}" x2="${x0 + (x1 - x0) * 0.8}" y2="${y0 + (y1 - y0) * 0.8}" vector-effect="non-scaling-stroke"/></svg>
+      <div class="hunt-to" style="left:${x1}%;top:${y1}%">${game.S.monster.emoji}</div>`;
+  }
+
+  // During a pick the map zooms to frame the night shift, where they can go, the killer and its next step,
+  // so the decision fills the TV. Never tighter than about 3x2 spots; the full map otherwise.
+  let lastZoom = 'none';
+  function mapZoom(w, reach) {
+    const S = game.S;
+    const pts = [w.at, ...reach, S.monster?.spot, game.hunterStep()].filter(i => i != null).map(spotXY);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    // pad for the spot's icon and labels around its centre
+    let x0 = Math.min(...xs) - 11, x1 = Math.max(...xs) + 11, y0 = Math.min(...ys) - 15, y1 = Math.max(...ys) + 16;
+    const grow = (a, b, min) => { const d = Math.max(0, min - (b - a)) / 2; return [a - d, b + d]; };
+    [x0, x1] = grow(x0, x1, 58);
+    [y0, y1] = grow(y0, y1, 62);
+    const k = Math.min(100 / (x1 - x0), 100 / (y1 - y0), 1.8);
+    if (k <= 1.15) return 'none'; // barely closer: not worth moving the camera
+    const clamp = (v, lo) => Math.min(0, Math.max(lo, v));
+    const tx = clamp(50 - ((x0 + x1) / 2) * k, 100 - 100 * k);
+    const ty = clamp(50 - ((y0 + y1) / 2) * k, 100 - 100 * k);
+    return `translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%) scale(${k.toFixed(3)})`;
+  }
+
   function board(highlight = null) {
     const S = game.S;
+    const w = S.watch;
+    const moving = S.phase === 'pick' && w && w.at != null;
+    const reach = moving ? game.reachable() : [];
     const piles = S.spots.map((sp, i) => {
       const hidden = S.event === 'outage' && i !== highlight;
       const c = CATEGORIES[sp.cat];
       const st = game.stakesNow(i);
       const [x, y] = spotXY(i);
-      return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
+      const where = !moving ? '' : reach.includes(i) ? 'reach' : (w.used || []).includes(i) ? 'used' : 'far';
+      return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''} ${where}" style="left:${x}%;top:${y}%">
         ${st.golden ? '<div class="golden-tag">⭐ +' + st.golden + '</div>' : ''}
         <div class="cat-badge">${hidden ? '❓' : c.emoji}</div>
         <div class="cat-name">${hidden ? 'Mystery' : esc(c.name)}</div>
         <div class="pile-name">${PILE_ICONS[sp.name] || ''} ${esc(sp.name)}</div>
       </div>`;
     }).join('');
-    return `<div class="map ${S.event === 'outage' ? 'outage' : ''}">
+    const zoom = moving ? mapZoom(w, reach) : 'none';
+    return `<div class="map ${S.event === 'outage' ? 'outage' : ''}"><div class="map-world" style="transform:${lastZoom}" data-zoom="${zoom}">
       <svg class="map-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <defs><radialGradient id="lake" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2c6a8f"/><stop offset="100%" stop-color="#173f57"/></radialGradient></defs>
         <path d="M30 34 L40 12 L46 22 L54 4 L62 18 L68 8 L78 30 Z" fill="#1d3328"/>
@@ -479,8 +514,10 @@ export function startTV(root, { resume = null } = {}) {
       <div class="map-label" style="left:44%;top:30%">White Mountains</div>
       <div class="map-label" style="left:1.5%;top:31%">Lincoln</div>
       ${piles}
+      ${moving ? huntArrow() : ''}
+      ${moving ? `<div class="walker" style="left:${spotXY(w.at)[0]}%;top:${spotXY(w.at)[1]}%">${game.player(w.watcherId)?.avatar || ''}</div>` : ''}
       ${prowler()}
-    </div>`;
+    </div></div>`;
   }
 
   // This or That: two big options; on reveal, each player's pick pops in one by one, then the right one lights up
@@ -651,7 +688,7 @@ export function startTV(root, { resume = null } = {}) {
           <p class="muted" data-step="0">Sneak out of the cabin and win 🎟️ tickets all night. At sunrise, whoever has the most claims the 🏆 grand prize at the arcade counter… if the animatronics don't get you first.</p>
           <ol class="steps">
             <li data-step="1"><span>🔦</span><div><b>Take turns sneaking out on the night shift.</b> Each round, one player is up.</div></li>
-            <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
+            <li data-step="2"><span>🗺️</span><div><b>Sneak across the map, answer This or That.</b> The night shift moves to a spot next to them (the killer follows!) and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
             <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have. <b>👑 The leader</b> needs 2 right before they can hide.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
             <li data-step="5"><span>💀</span><div><b>Miss and the killer catches you</b> and you drop the pot. Everyone plays a mini-game; win it to escape, or become a <b>👻 ghost</b>: no more night shifts, unless a séance brings you back.</div></li>
@@ -671,7 +708,9 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="watch pick-layout">
           <div class="pick-main">${board(null)}${nightTrack(w)}</div>
           <div class="pick-info">
-            <h2>${avatar(watcher)} is picking a category…</h2>
+            <h2>${avatar(watcher)} is picking a spot…</h2>
+            <p class="move-rule">Move to a glowing spot. ${S.monster.emoji} moves one step toward you after each answer.</p>
+            ${w.free ? '<p class="move-rule">🔦 Flashlight: anywhere on the map this time!</p>' : ''}
             ${eventCard(false)}
             <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> lurks at ${esc(S.spots[S.monster.spot].name)} ${hearts(S.monster)}: miss there = double stake, right = <b class="win">⚔️ a hit and a mystery prize</b></p>
           </div>
@@ -686,7 +725,8 @@ export function startTV(root, { resume = null } = {}) {
         // the haunted spot's killer leans in while they answer, timed from the phase start so re-renders don't reset it
         const lean = !reveal && w.st.haunted
           ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
-        return `<div class="watch">${lean}
+        const found = w.find ? `<div class="find ${SURPRISES[w.find.kind].good === true ? 'good' : SURPRISES[w.find.kind].good === false ? 'bad' : ''}"><span>${SURPRISES[w.find.kind].emoji}</span>${esc(surpriseLine(S, w.find, watcher?.name || 'Someone'))}</div>` : '';
+        return `<div class="watch">${lean}${reveal ? '' : found}
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
@@ -1177,6 +1217,14 @@ export function startTV(root, { resume = null } = {}) {
         ${settingsOpen && S.phase === 'lobby' ? settingsPanel() : ''}
       </div>`;
     spritify(root);
+    const world = root.querySelector('.map-world');
+    if (world) {
+      const to = world.dataset.zoom;
+      if (to !== lastZoom) requestAnimationFrame(() => { world.style.transform = to; });
+      lastZoom = to;
+    } else {
+      lastZoom = 'none';
+    }
     if (S.phase === 'intro' || S.phase === 'end') showSteps(true);
 
     if (S.phase === 'lobby') {

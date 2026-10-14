@@ -169,7 +169,7 @@ body.is-tv { font-size: clamp(14px, 1.45vw, 30px); overflow: hidden; }
 .story b { color: var(--honey); }
 
 /* watch */
-.watch { display: flex; flex-direction: column; gap: 1.2vh; }
+.watch { position: relative; display: flex; flex-direction: column; gap: 1.2vh; }
 .watch-head { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding-right: 4em; }
 .streak { display: flex; gap: 0.3em; font-size: 1.8em; }
 .streak .dot { filter: grayscale(1) brightness(0.5); }
@@ -319,6 +319,7 @@ body.is-phone .moon { display: none; }
   border: 3px solid var(--line); box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.6);
 }
 .map-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-world { position: absolute; inset: 0; transform-origin: 0 0; transition: transform 0.7s ease-in-out; }
 .deco { position: absolute; transform: translate(-50%, -50%); font-size: 2.2em; pointer-events: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
 .map-label { position: absolute; transform: translateX(-10%); font-size: 0.75em; color: var(--muted); letter-spacing: 0.08em; white-space: nowrap; font-style: italic; }
 .map-label.sl { color: #e88; font-family: 'Creepster', cursive; font-style: normal; font-size: 1.2em; letter-spacing: 0.12em; }
@@ -450,13 +451,14 @@ body.is-phone .moon { display: none; }
 .lurk-note { font-size: 0.9em; }
 .spot.haunted .stack .card { box-shadow: 0 0 0 4px var(--bad), 0 0 30px rgba(255, 60, 60, 0.7); }
 /* the killer patrols above its spot, and walks the map when it moves (timing vars set in tv.js) */
-.prowler { position: absolute; left: var(--x1); top: var(--y1); z-index: 4; font-size: min(2.6em, 5cqh); line-height: 1; transform: translate(-50%, -185%); pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); }
-.prowler.low { transform: translate(-50%, 150%); }
+.prowler { position: absolute; left: var(--x1); top: var(--y1); z-index: 4; font-size: min(2.6em, 5cqh); line-height: 1; transform: translate(-50%, -120%); pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); }
 .prowler.travel { animation: prowlTravel 2.6s ease-in-out var(--travel) both; }
 .prowl-pace { animation: prowlPace 9s linear var(--pace) infinite; }
 .prowl-face { transform: scaleX(var(--dir)); animation: prowlFace 9s step-end var(--pace) infinite; }
 .prowler .hearts { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-size: 0.42em; white-space: nowrap; letter-spacing: -0.1em; }
-.prowler.low .hearts { bottom: auto; top: 100%; }
+.prowler.low .hearts { left: 105%; bottom: 35%; transform: none; }
+/* the killer stands on its spot in place of the category icon */
+.spot.haunted .cat-badge { visibility: hidden; }
 .hearts img.px { width: 1em; height: 1em; }
 .nt-lurk .hearts { position: absolute; left: 50%; bottom: 2.6em; transform: translateX(-50%); font-size: 0.7em; white-space: nowrap; }
 .lurk-note .hearts { font-size: 0.9em; }
@@ -468,7 +470,7 @@ body.is-phone .moon { display: none; }
 @keyframes reelSpin { from { transform: translateY(0); } to { transform: translateY(calc(var(--n) * -1.2em)); } }
 .prowl-bob { display: inline-block; animation: prowlBob 0.6s ease-in-out infinite; }
 @keyframes prowlTravel { from { left: var(--x0); top: var(--y0); } to { left: var(--x1); top: var(--y1); } }
-@keyframes prowlPace { 0% { transform: translateX(0); } 20%, 27% { transform: translateX(1.1em); } 63%, 70% { transform: translateX(-1.1em); } 100% { transform: translateX(0); } }
+@keyframes prowlPace { 0% { transform: translateX(0); } 20%, 27% { transform: translateX(0.35em); } 63%, 70% { transform: translateX(-0.35em); } 100% { transform: translateX(0); } }
 @keyframes prowlFace { 0% { transform: scaleX(-1); } 24% { transform: scaleX(1); } 67% { transform: scaleX(-1); } }
 @keyframes prowlBob { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-0.08em) rotate(5deg); } }
 /* picked the haunted spot: the killer leans in from the edge of the screen while they answer */
@@ -583,7 +585,7 @@ body.is-phone .moon { display: none; }
 .cy-seat small { font-size: 0.3em; font-weight: 900; color: var(--ink); background: rgba(0, 0, 0, 0.55); padding: 0 0.5em; border-radius: 8px; }
 .cy-seat.lit span { transform: rotate(var(--na)) scale(1.25); filter: drop-shadow(0 0 12px rgba(255, 211, 77, 0.9)); }
 .cy-sign { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; min-width: 9em; padding: 0.2em 0.9em 0.3em; border-radius: 12px; background: #1b0f05; border: 4px solid var(--honey); box-shadow: 0 0 24px rgba(242, 177, 52, 0.4); }
-.cy-sign small { font-family: 'Pixelify Sans', 'Nunito', sans-serif; font-size: 0.9em; letter-spacing: 0.25em; color: #ff5d9e; }
+.cy-sign small { font-family: 'Pixel Digits', 'Pixelify Sans', 'Nunito', sans-serif; font-size: 0.9em; letter-spacing: 0.25em; color: #ff5d9e; }
 .cy-sign b { font-family: 'Lilita One', 'Nunito', sans-serif; font-weight: 400; font-size: 2.2em; line-height: 1.1; color: var(--honey2); white-space: nowrap; }
 .cyclone.won .cy-sign { animation: cySign 0.5s steps(2) infinite; }
 @keyframes cyWin { 50% { background: #ff5d4f; border-color: #ff5d4f; box-shadow: 0 0 2.4vh 0.8vh rgba(255, 93, 79, 0.95); } }
@@ -710,9 +712,13 @@ body.is-phone .moon { display: none; }
 .zoom-worth { font-size: 1.4em; font-weight: 900; color: var(--honey2); margin: 0; }
 
 /* ---------- presentation layer (js/fx.js) ---------- */
+/* Lilita One (bundled): ticket counts, and every digit inside pixel-font text. Pixel digits are hard to read at a
+   glance, so 'Pixel Digits' covers just the numerals and number signs, and pixel text lists it first. */
+@font-face { font-family: 'Lilita One'; src: url('../fonts/lilita-one-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Pixel Digits'; src: url('../fonts/lilita-one-latin-400-normal.woff2') format('woff2'); font-display: swap; unicode-range: U+0030-0039, U+002B, U+002C, U+0025, U+002F, U+2212; }
 @font-face { font-family: 'Pixelify Sans'; src: url('../fonts/pixelify-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Pixelify Sans'; src: url('../fonts/pixelify-sans-latin-700-normal.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
-.tv h1:not(.q):not(.tot-q), .quiz-head, .battery, .final-title, .guess-answer, .splash b, .choice-card b { font-family: 'Pixelify Sans', 'Nunito', sans-serif; letter-spacing: 0.02em; }
+.tv h1:not(.q):not(.tot-q), .quiz-head, .battery, .final-title, .guess-answer, .splash b, .choice-card b { font-family: 'Pixel Digits', 'Pixelify Sans', 'Nunito', sans-serif; letter-spacing: 0.02em; }
 /* ticket counts: chunky but readable at any size */
 .pts, .pot-big, .f-pts, .nt-pot, .nt-gain b, .zoom-worth { font-family: 'Lilita One', 'Nunito', sans-serif; font-weight: 400; letter-spacing: 0.03em; }
 
@@ -880,4 +886,28 @@ img.px { width: 1.15em; height: 1.15em; }
 .seance-ghosts { display: flex; gap: 1em; justify-content: center; flex-wrap: wrap; font-size: 1.6em; margin-top: 0.4em; }
 .flicker { animation: flicker 2.4s steps(1) infinite; }
 @keyframes flicker { 0%, 100% { opacity: 1; } 42% { opacity: 0.6; } 44% { opacity: 1; } 71% { opacity: 0.8; } 72% { opacity: 1; } }
+
+/* moving across the map: where you can go glows, the rest dims; you stand on the map; the killer's next step */
+.spot.reach .cat-badge { filter: drop-shadow(0 0 14px rgba(255, 211, 77, 0.95)); animation: reachPulse 1.6s ease-in-out infinite; }
+.spot.reach .cat-name { color: var(--honey2); }
+.spot.far, .spot.used { opacity: 0.35; filter: grayscale(0.7); }
+.spot.used::after { content: '✓'; position: absolute; top: -0.4em; right: -0.2em; font-weight: 900; color: var(--good); }
+@keyframes reachPulse { 50% { transform: scale(1.12); } }
+.walker { position: absolute; z-index: 5; font-size: min(2.2em, 4.5cqh); line-height: 1; transform: translate(-50%, 20%); filter: drop-shadow(0 0 8px rgba(255, 211, 77, 0.9)); pointer-events: none; }
+.walker img.px { width: 1em; height: 1em; }
+.hunt { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+.hunt line { stroke: var(--bad); stroke-width: 4; stroke-dasharray: 8 8; stroke-linecap: round; animation: huntDash 0.8s linear infinite; }
+@keyframes huntDash { to { stroke-dashoffset: -16; } }
+.hunt-to { position: absolute; z-index: 3; transform: translate(-50%, -120%); font-size: min(1.6em, 3.5cqh); opacity: 0.4; filter: grayscale(0.3) drop-shadow(0 0 8px rgba(255, 40, 40, 0.8)); pointer-events: none; }
+.hunt-to img.px { width: 1em; height: 1em; }
+.move-rule { color: var(--muted); font-size: 0.95em; margin: 0; }
+/* a surprise found on the spot */
+.find { align-self: center; display: flex; align-items: center; gap: 0.5em; padding: 0.3em 1em; border-radius: 14px; background: var(--panel); border: 3px solid var(--honey); font-size: 1.3em; font-weight: 800; animation: pop 0.5s both; }
+.find > span { font-size: 1.6em; line-height: 1; }
+.find.good { border-color: var(--good); }
+.find.bad { border-color: var(--bad); }
+.find-ph { text-align: center; font-weight: 800; color: var(--honey2); margin: 0.4em 0; }
+.pick:disabled { opacity: 0.3; filter: grayscale(0.8); }
+.pick.here { outline: 3px dashed var(--honey); }
+.here-ph { position: absolute; top: -10px; left: -6px; font-size: 1.4em; }
 
