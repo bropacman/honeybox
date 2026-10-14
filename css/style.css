@@ -455,6 +455,16 @@ body.is-phone .moon { display: none; }
 .prowler.travel { animation: prowlTravel 2.6s ease-in-out var(--travel) both; }
 .prowl-pace { animation: prowlPace 9s linear var(--pace) infinite; }
 .prowl-face { transform: scaleX(var(--dir)); animation: prowlFace 9s step-end var(--pace) infinite; }
+.prowler .hearts { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-size: 0.32em; white-space: nowrap; letter-spacing: -0.1em; }
+.hearts img.px { width: 1em; height: 1em; }
+.nt-lurk .hearts { position: absolute; left: 50%; bottom: 2.6em; transform: translateX(-50%); font-size: 0.7em; white-space: nowrap; }
+.lurk-note .hearts { font-size: 0.9em; }
+/* the loot reel: a strip of amounts scrolls up and stops on the prize */
+.loot { display: flex; align-items: center; gap: 0.3em; font-family: 'Lilita One', 'Nunito', sans-serif; font-size: 2.2em; color: var(--honey2); }
+.loot .reel { display: inline-block; height: 1.2em; overflow: hidden; line-height: 1.2em; padding: 0 0.3em; border-radius: 10px; background: #1b0f05; border: 3px solid var(--honey); box-shadow: 0 0 24px rgba(242, 177, 52, 0.5); }
+.loot .strip { display: flex; flex-direction: column; animation: reelSpin 1.8s cubic-bezier(.15, .7, .2, 1) calc(var(--at) + 300ms) both; }
+.loot .strip i { font-style: normal; height: 1.2em; text-align: center; }
+@keyframes reelSpin { from { transform: translateY(0); } to { transform: translateY(calc(var(--n) * -1.2em)); } }
 .prowl-bob { display: inline-block; animation: prowlBob 0.6s ease-in-out infinite; }
 @keyframes prowlTravel { from { left: var(--x0); top: var(--y0); } to { left: var(--x1); top: var(--y1); } }
 @keyframes prowlPace { 0% { transform: translateX(0); } 20%, 27% { transform: translateX(1.1em); } 63%, 70% { transform: translateX(-1.1em); } 100% { transform: translateX(0); } }
