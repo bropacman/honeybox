@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
+import { connect } from 'node:net';
 import { readFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +22,8 @@ const web = createServer(async (req, res) => {
   try { const body = await readFile(join(ROOT, path)); res.writeHead(200, { 'content-type': types[extname(path)] || 'application/octet-stream' }); res.end(body); } catch { res.writeHead(404); res.end(); }
 }).listen(5179, '127.0.0.1');
 const peerSrv = spawn(process.execPath, [join(ROOT, 'node_modules/peer/dist/bin/peerjs.js'), '--port', '9001', '--host', '127.0.0.1'], { stdio: 'ignore' });
-await new Promise(r => setTimeout(r, 1500));
+// wait until the PeerJS server is actually accepting connections (a fixed sleep was flaky on busy machines)
+for (let i = 0; i < 100 && !(await new Promise(r => { const c = connect(9001, '127.0.0.1', () => { c.end(); r(true); }); c.on('error', () => r(false)); })); i++) await new Promise(r => setTimeout(r, 100));
 const browser = await chromium.launch();
 const tv = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
 tv.on('pageerror', e => console.log('tv error:', e.message));
