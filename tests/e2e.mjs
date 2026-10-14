@@ -64,11 +64,12 @@ for (let i = 0; i < PHONES; i++) {
   phones.push(p);
 }
 await tv.waitForFunction(n => document.querySelectorAll('.camper').length === n, PHONES, { timeout: 30000 });
-// switch character in the lobby
-await phones[0].waitForSelector('[data-switch="🦄"]');
+// switch character in the lobby, to any character nobody has (bots join with random ones)
+await phones[0].waitForSelector('[data-switch]:not([disabled]):not(.sel)');
 await phones[0].screenshot({ path: join(OUT, '01-phone-lobby-switch.png') });
-await phones[0].click('[data-switch="🦄"]');
-await tv.waitForFunction(() => window.__honeybox.S.players.some(p => p.avatar === '🦄'), null, { timeout: 10000 });
+const free = await phones[0].getAttribute('[data-switch]:not([disabled]):not(.sel)', 'data-switch');
+await phones[0].click(`[data-switch="${free}"]`);
+await tv.waitForFunction(a => window.__honeybox.S.players.some(p => p.avatar === a), free, { timeout: 10000 });
 summary0.avatarSwitch = true;
 await tv.screenshot({ path: join(OUT, '01-tv-lobby-full.png') });
 await phones[0].screenshot({ path: join(OUT, '01-phone-lobby.png') });
