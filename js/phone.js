@@ -208,7 +208,7 @@ export function startPhone(root) {
 
   function header() {
     const g = view.gain ? `<span class="gain ${view.gain < 0 ? 'neg' : ''} ${view.suspense ? 'late' : ''}">${view.gain > 0 ? '+' : ''}${view.gain}</span>` : '';
-    return `<header class="ph-head"><span>${view.me.avatar} ${esc(view.me.name)}</span><span id="ptimer" class="ptimer"></span><span>${g}</span></header>`;
+    return `<header class="ph-head"><span>${view.me.avatar}${view.me.ghost ? '👻' : ''} ${esc(view.me.name)}</span><span id="ptimer" class="ptimer"></span><span>${g}</span></header>`;
   }
 
   function render() {
