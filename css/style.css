@@ -931,4 +931,20 @@ img.px { width: 1.15em; height: 1.15em; }
 .cyclone.candle .cy-bulb.own.lit { background: #fff3b0; border-color: #ffd34d; }
 .candle-stage h2 { margin-top: 0.4em; }
 .stop-btn { font-size: 2.4em; padding: 0.6em 1.4em; margin-top: 0.6em; background: var(--bad); color: #fff; box-shadow: 0 8px 0 #7a1d16; }
-
+/* plinko: a surprise drops in before the question (plinko() in tv.js); ~2.4 s, then it fades away */
+.plinko { position: absolute; left: 50%; top: 8%; translate: -50% 0; z-index: 6; width: min(70cqw, 900px); height: min(70cqh, 520px); padding: 1em 1em 0; border-radius: 22px; background: rgba(11, 23, 18, 0.96); border: 4px solid var(--honey); box-shadow: 0 0 60px rgba(0, 0, 0, 0.7); animation: plinkoOut 2.4s linear var(--in) both; pointer-events: none; }
+.pl-pegs { position: absolute; inset: 1em 1.5em 4.5em; background-image: radial-gradient(circle, rgba(255, 220, 150, 0.5) 3px, transparent 4px); background-size: 9% 18%; }
+.pl-ball { position: absolute; width: 1.6em; height: 1.6em; margin-left: -0.8em; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6c8, var(--honey) 60%, #a8731a); box-shadow: 0 0 18px rgba(255, 211, 77, 0.9); animation: plinkoDrop 1.8s cubic-bezier(.5, 0, .6, 1) var(--in) both; }
+.pl-slots { position: absolute; left: 1em; right: 1em; bottom: 0.6em; display: flex; height: 3.6em; }
+.pl-slot { display: flex; align-items: center; justify-content: center; font-size: 1.6em; border-left: 2px solid rgba(255, 220, 150, 0.35); background: rgba(255, 255, 255, 0.03); }
+.pl-slot:first-child { border-left: none; }
+.pl-slot.good { background: rgba(95, 209, 138, 0.12); }
+.pl-slot.bad { background: rgba(255, 93, 79, 0.12); }
+.pl-slot.win { animation: plinkoWin 0.6s ease-out calc(var(--in) + 1.8s) both; }
+.pl-slot img.px { width: 1em; height: 1em; }
+@keyframes plinkoDrop {
+  0% { left: var(--x0); top: 0%; } 18% { left: var(--x1); top: 16%; } 36% { left: var(--x2); top: 32%; }
+  54% { left: var(--x3); top: 48%; } 72% { left: var(--x4); top: 62%; } 100% { left: var(--x5); top: calc(100% - 3.4em); }
+}
+@keyframes plinkoWin { to { background: rgba(255, 211, 77, 0.45); box-shadow: inset 0 0 0 3px var(--honey2); transform: scale(1.15); } }
+@keyframes plinkoOut { 0%, 88% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }

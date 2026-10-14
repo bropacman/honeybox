@@ -547,6 +547,35 @@ export function startTV(root, { resume = null } = {}) {
     return `<div class="loot late-n" style="--at:${at}ms"><span class="loot-label">🎰</span><span class="reel"><span class="strip" style="--n:${spins.length};--at:${at}ms">${strip}</span></span><span>🎟️</span></div>`;
   }
 
+  // Plinko: one slot per surprise, as wide as its odds; the ball bounces down into the one that was rolled.
+  const PLINKO_MS = 2400;
+  let plinkoFor = null;
+  function plinko(find, since) {
+    const kinds = Object.keys(SURPRISES);
+    const total = kinds.reduce((t, k) => t + SURPRISES[k].weight, 0);
+    let x = 0;
+    const slots = kinds.map(k => {
+      const wd = (SURPRISES[k].weight / total) * 100;
+      const slot = { k, left: x, width: wd };
+      x += wd;
+      return slot;
+    });
+    const hit = slots.find(s => s.k === find.kind);
+    const end = hit.left + hit.width / 2;
+    // a fixed zig-zag (from the slot) so the ball takes the same path on every re-render
+    const path = [50, 50 + (end - 50) * 0.2 + 9, 50 + (end - 50) * 0.45 - 8, 50 + (end - 50) * 0.7 + 6, end + (end > 50 ? -3 : 3), end];
+    const key = `${game.S.turnIdx}:${game.S.watch?.spot}`;
+    if (plinkoFor !== key && since < 300) {
+      plinkoFor = key;
+      [300, 650, 950, 1200, 1420, 1600].forEach(t => setTimeout(() => sfx.blip(), t));
+    }
+    return `<div class="plinko" style="--in:-${Math.round(since)}ms;${path.map((v, i) => `--x${i}:${v.toFixed(1)}%`).join(';')}">
+      <div class="pl-pegs"></div>
+      <div class="pl-ball"></div>
+      <div class="pl-slots">${slots.map(sl => `<div class="pl-slot ${sl.k === find.kind ? 'win' : ''} ${SURPRISES[sl.k].good === true ? 'good' : SURPRISES[sl.k].good === false ? 'bad' : ''}" style="width:${sl.width}%">${SURPRISES[sl.k].emoji}</div>`).join('')}</div>
+    </div>`;
+  }
+
   // The night track: the night shift sneaking from 12 AM to 6 AM with the pot in hand, something waiting in the
   // dark on the way to the next hour, and what the next right answer adds. On a reveal (`at` = when the verdict
   // lands) they walk on to the next hour, or the killer lunges, or a banished killer flees.
@@ -775,7 +804,10 @@ export function startTV(root, { resume = null } = {}) {
         const lean = !reveal && w.st.haunted
           ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
         const found = w.find ? `<div class="find ${SURPRISES[w.find.kind].good === true ? 'good' : SURPRISES[w.find.kind].good === false ? 'bad' : ''}"><span>${SURPRISES[w.find.kind].emoji}</span>${esc(surpriseLine(S, w.find, watcher?.name || 'Someone'))}</div>` : '';
-        return `<div class="watch">${lean}${reveal ? '' : found}
+        // a surprise drops through a plinko board first (~2 s), timed from the phase start so re-renders don't restart it
+        const since = S.phaseMs - (game.timeLeft() ?? S.phaseMs);
+        const drop = w.find && !reveal && since < PLINKO_MS ? plinko(w.find, since) : '';
+        return `<div class="watch">${lean}${drop}${reveal ? '' : found}
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
