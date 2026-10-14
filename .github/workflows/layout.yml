@@ -1,0 +1,29 @@
+name: Layout
+
+# Checks every TV screen for overlaps (npm run layout). Not run on PRs: start it from the Actions tab
+# ("Layout" → "Run workflow"), or run it locally when changing screens.
+on:
+  workflow_dispatch:
+
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # every TV screen at 1920x1080 and 1280x720: nothing off-screen, under the status bars, or text on text
+      - name: Check TV layouts
+        run: npm run layout
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: layout-screens
+          path: test-artifacts/layout/
