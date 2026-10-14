@@ -235,18 +235,22 @@ export function startPhone(root) {
           ? `<div class="center"><div class="suspense-ph" ${v.revealMs ? `style="animation-duration:${v.revealMs}ms"` : ''}>🥁</div><div class="late" ${v.revealMs ? `style="animation-delay:${v.revealMs}ms"` : ''}><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div></div>`
           : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;
+      case 'stop':
+        body = `<div class="center"><h2>${esc(v.title)}</h2><p>${esc(v.sub)}</p><button class="big-btn stop-btn" data-stop>${esc(v.button || 'STOP')}</button></div>`;
+        break;
       case 'pick':
-        body = `<h2>Pick a category</h2>
+        body = `<h2>Pick a glowing spot</h2>
           <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🎟️</b> · next right answer <b class="win">+${v.win}</b></p>
           ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
           <p class="small">${v.monster.emoji} lurks at <b>${esc(v.spots[v.monster.spot].name)}</b>: miss there = double stake, right = <b class="win">⚔️ a hit and a mystery prize</b></p>
-          <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small></button>`).join('')}</div>`;
+          <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''} ${p.here ? 'here' : ''}" data-pick="${i}" ${p.reach ? '' : 'disabled'}>${p.here ? `<span class="here-ph">${v.me.avatar}</span>` : ''}${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small></button>`).join('')}</div>`;
         break;
       case 'tot':
         body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>
           ${v.watcher
             ? `<div class="risk-box">${v.haunted ? `${v.monster.emoji} Haunted! ` : ''}Right = <b>+${v.win}</b> into your pot (${v.pot} 🎟️)${v.haunted ? ' + <b>⚔️ a mystery prize</b>' : ''}${v.golden ? ` + <b>${v.golden}</b> golden ticket` : ''} · Miss = lose the pot & get caught</div>`
             : `<div class="safe-box">No risk for you · right answer <b>+${v.side}</b></div>`}
+          ${v.find ? `<p class="find-ph">${esc(v.find)}</p>` : ''}
           <h2 class="q">${esc(v.q)}</h2>
           <div class="tot-btns">${v.opts.map((o, i) => `<button class="tot-btn ${v.locked === i ? 'sel' : ''}" data-tot="${i}" ${v.locked != null ? 'disabled' : ''}><span class="letter">${'AB'[i]}</span>${esc(o)}</button>`).join('<div class="or">or</div>')}</div>
           ${v.locked != null ? '<p class="center-sm muted">Locked in! Watch the TV.</p>' : ''}`;
@@ -354,6 +358,7 @@ export function startPhone(root) {
       send({ t: 'finale', choice: b.dataset.finale });
     }));
     once('[data-stake]', b => send({ t: 'stake', i: Number(b.dataset.stake) }));
+    once('[data-stop]', () => send({ t: 'stop' }));
     root.querySelectorAll('[data-answer]').forEach(b => b.addEventListener('click', () => {
       root.querySelectorAll('[data-answer]').forEach(x => { x.disabled = true; });
       b.classList.add('sel');
@@ -415,7 +420,7 @@ export function startPhone(root) {
       if (num) { num.value = String(Math.floor(Math.random() * 3000)); root.querySelector('#num-send').click(); return; }
       const lie = root.querySelector('#lie');
       if (lie) { lie.value = choose(['A moose doing karate', 'Grandpa at the beach', 'A haunted toaster', 'Dog vs vacuum']) + ' ' + Math.floor(Math.random() * 99); root.querySelector('#send').click(); return; }
-      const btns = enabled('[data-pick], [data-tot], [data-decide], [data-answer], [data-stake], [data-finale]');
+      const btns = enabled('[data-pick], [data-tot], [data-decide], [data-answer], [data-stake], [data-finale], [data-stop]');
       if (btns.length) choose(btns).click();
     }, delay);
   }

@@ -14,7 +14,7 @@ export const TIMES = {
   finaleIntro: 9, finalePick: 20, finaleQ: 18, finaleA: 8,
   stakesIntro: 14, stakesBet: 20, stakesReveal: 7,
   hideQ: 15, hideA: 4, guessQ: 25, guessA: 6, doorQ: 15, doorA: 4, zoomQ: 21, zoomA: 6,
-  seanceIntro: 7, seanceQ: 12, seanceA: 7
+  seanceIntro: 7, seanceQ: 12, seanceA: 7, clawPlay: 8, clawGrab: 4.5
 };
 
 export const MINIGAMES = {
@@ -105,6 +105,36 @@ export const SIDE = { right: 100 };
 export const LOOT = [[100, 30], [200, 25], [300, 20], [500, 13], [800, 8], [1500, 4]];
 export const LOOT_FINAL = [[500, 30], [800, 28], [1200, 22], [2000, 14], [3000, 6]];
 export const BOSS_HP = 3;
+// Landing on a spot sometimes turns up a surprise. Weights are relative; a few only show up when they make sense.
+export const SURPRISE_CHANCE = 0.25;
+export const CLAW_SETTLE_MS = 2000;   // capsules show, close and shuffle before the claw starts moving
+export const CLAW_PERIOD_MS = 2600;   // one trip across and back
+export const SURPRISES = {
+  stash: { emoji: '🎟️', name: 'Ticket stash', good: true, weight: 30 },
+  flashlight: { emoji: '🔦', name: 'Flashlight', good: true, weight: 18 },
+  salt: { emoji: '🧂', name: 'Salt line', good: true, weight: 14 },
+  claw: { emoji: '🕹️', name: 'Claw machine', good: true, weight: 6 },
+  swap: { emoji: '🔄', name: 'Swap!', good: null, weight: 10 },
+  ambush: { emoji: '💀', name: 'Ambush', good: false, weight: 12 },
+  raccoon: { emoji: '🦝', name: 'Raccoon thief', good: false, weight: 12 },
+  batteries: { emoji: '🔋', name: 'Dead batteries', good: false, weight: 12 }
+};
+// one line for the TV, the phones and the narrator
+export function surpriseLine(S, f, who) {
+  const k = killerName(S, true);
+  return {
+    stash: `${who} found a stash of ${f.amount} tickets!`,
+    flashlight: 'A flashlight! The next move can go anywhere on the map.',
+    salt: `A salt line! ${k} can't move after this one.`,
+    claw: !f.prize ? `A claw machine! ${who} gets one grab: a ghost could come back…`
+      : f.prize.type === 'ghost' ? `The claw grabbed ${f.prize.name}! Back from the dead!`
+      : f.prize.type === 'tickets' ? `The claw grabbed ${f.prize.amount} tickets for ${who}!` : 'The claw grabbed… nothing. Just air!',
+    swap: `${who} and ${killerName(S)} swapped places!`,
+    ambush: `Ambush! ${k} jumps out right next to ${who}!`,
+    raccoon: `A raccoon swiped ${f.amount} tickets from the pot!`,
+    batteries: 'The batteries are dying: half the time on this one!'
+  }[f.kind];
+}
 export const SURVIVOR = 200;                 // each living player at sunrise
 
 // Night events: one is drawn at the start of each night shift and lasts for that shift
@@ -387,7 +417,7 @@ export class Game {
     this.emit('say', [
       'Welcome to the cabin. Tonight, you sneak out to win arcade tickets. At sunrise, whoever has the most claims the grand prize… if the animatronics don\'t get you first.',
       'Take turns sneaking out on the night shift. Each round, one player is up.',
-      'Pick a category on the map, and answer This or That. Everyone else answers too, risk free.',
+      'Sneak to a spot next to you on the map, and answer This or That. The killer follows one step at a time. Everyone else answers too, risk free.',
       'Right answers fill your pot. After each one, keep going for more, or hide till morning and keep what you have. Whoever is in the lead has to get two right before they can hide.',
       'Three in a row gets you to 6 A M, and a bonus.',
       'Miss, and the killer catches you and you drop the pot. Win the mini game to escape, or become a ghost: no more night shifts, unless a seance brings you back.',
@@ -414,7 +444,7 @@ export class Game {
     switch (S.phase) {
       case 'intro': return this.nextTurn();
       case 'turnStart': return this.go('pick', TIMES.pick);
-      case 'pick': return this.chooseSpot(S.watch.watcherId, Math.floor(Math.random() * S.spots.length));
+      case 'pick': return this.chooseSpot(S.watch.watcherId, pick(this.reachable()));
       case 'tot': return this.revealTot();
       case 'totReveal': return this.afterTot();
       case 'decide': return this.resolveDecide();
@@ -437,6 +467,8 @@ export class Game {
       case 'seanceIntro': return this.askSeance();
       case 'seanceQ': return this.revealSeance();
       case 'seanceA': return this.nextTurn();
+      case 'clawPlay': return this.dropClaw(null);
+      case 'clawGrab': return this.askTot();
       case 'drawDraw': return this.startFibs();
       case 'drawFib': return this.startVote();
       case 'drawVote': return this.revealVote();
@@ -466,7 +498,10 @@ export class Game {
     while (S.turnIdx < S.turnOrder.length && !alive(S.turnOrder[S.turnIdx])) S.turnIdx++;
     if (S.turnIdx >= S.turnOrder.length) return this.startFinale();
     const w = this.player(S.turnOrder[S.turnIdx]);
-    S.watch = { watcherId: w.id, streak: 0, pot: 0, spot: null, q: null, answers: {}, results: null, decision: null, dogsUsed: false };
+    if (S.monster && S.turnIdx > 0) this.moveMonster();
+    const edge = S.spots.map((_, i) => i).filter(i => { const [c, r] = this.cell(i); return (c === 0 || c === 4 || r === 0 || r === 2) && i !== S.monster?.spot; });
+    const start = pick(edge.length ? edge : S.spots.map((_, i) => i));
+    S.watch = { watcherId: w.id, streak: 0, pot: 0, spot: null, q: null, answers: {}, results: null, decision: null, dogsUsed: false, at: start, used: [start], free: false };
     const keys = Object.keys(EVENTS).filter(k => k !== S.lastEvent);
     S.event = pick(keys);
     S.lastEvent = S.event;
@@ -491,10 +526,135 @@ export class Game {
     this.go('turnStart', TIMES.turnStart);
   }
 
+  // ---------- moving across the map ----------
+  // Spots sit on a 5x3 grid (PILE_NAMES order). The night shift moves to a neighbouring spot each pick, never
+  // back to one they've used this shift; a flashlight lets them go anywhere.
+  cell(i) {
+    const k = PILE_NAMES.indexOf(this.S.spots[i]?.name);
+    return k < 0 ? [i % 5, Math.floor(i / 5)] : [k % 5, Math.floor(k / 5)];
+  }
+  dist(a, b) {
+    const [ax, ay] = this.cell(a), [bx, by] = this.cell(b);
+    return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+  }
+  reachable() {
+    const S = this.S;
+    const w = S.watch;
+    const all = S.spots.map((_, i) => i);
+    if (!w) return all;
+    const open = all.filter(i => !(w.used || []).includes(i));
+    if (!open.length) return all;
+    if (w.at == null || w.free) return open;
+    // categories turned off leave holes in the grid: reach a little further rather than strand them
+    for (const r of [1, 2]) {
+      const near = open.filter(i => this.dist(i, w.at) <= r);
+      if (near.length) return near;
+    }
+    return open;
+  }
+  // The killer's next step: one spot toward where the night shift is standing. Deterministic (ties go to the
+  // lowest spot), so the arrow the TV shows during the pick is exactly what happens. Already next to them: it waits.
+  hunterStep() {
+    const S = this.S;
+    const w = S.watch;
+    const m = S.monster;
+    if (!w || w.at == null || !m) return null;
+    const here = this.dist(m.spot, w.at);
+    if (here <= 1) return null;
+    const opts = S.spots.map((_, i) => i).filter(i => this.dist(i, m.spot) === 1);
+    const best = Math.min(...opts.map(i => this.dist(i, w.at)));
+    return best < here ? opts.find(i => this.dist(i, w.at) === best) : null;
+  }
+
+  // Landing on a spot: sometimes a surprise. May move the player (swap) or the killer, touch the pot or the timer.
+  rollSurprise(i) {
+    const S = this.S;
+    const w = S.watch;
+    const m = S.monster;
+    if (Math.random() >= SURPRISE_CHANCE) return null;
+    const allowed = { claw: S.players.some(p => p.ghost), swap: m && m.spot !== i, ambush: m && m.spot !== i, raccoon: w.pot > 0 };
+    const kinds = Object.keys(SURPRISES).filter(k => allowed[k] !== false);
+    let r = Math.random() * kinds.reduce((t, k) => t + SURPRISES[k].weight, 0);
+    const kind = kinds.find(k => (r -= SURPRISES[k].weight) < 0) || kinds[0];
+    const f = { kind };
+    if (kind === 'stash') { f.amount = pick([100, 150, 200, 300]); this.addScore(w.watcherId, f.amount); }
+    if (kind === 'flashlight') w.free = true;
+    if (kind === 'salt') w.frozen = true;
+    if (kind === 'claw') f.claw = this.loadClaw();
+    if (kind === 'swap') { f.to = m.spot; m.spot = i; }
+    if (kind === 'ambush') m.spot = pick(S.spots.map((_, j) => j).filter(j => j !== i && this.dist(j, i) === 1)) ?? m.spot;
+    if (kind === 'raccoon') { f.amount = Math.min(w.pot, Math.max(50, Math.round(w.pot / 3 / 50) * 50)); w.pot -= f.amount; }
+    return f;
+  }
+
+  // ---------- the claw machine ----------
+  // Capsules go in with their contents showing, then close and get shuffled: one per ghost (two for a ghost
+  // dead a while), a couple of ticket prizes and one empty. The claw swings along the top; the night shift taps
+  // DROP and it grabs one of the capsules near where it was, at random. Decided the instant the tap arrives.
+  loadClaw() {
+    const S = this.S;
+    const caps = [];
+    for (const g of S.players.filter(p => p.ghost)) {
+      caps.push({ type: 'ghost', pid: g.id });
+      if (S.turnIdx - (g.ghostSince ?? S.turnIdx) >= 2) caps.push({ type: 'ghost', pid: g.id });
+    }
+    caps.push({ type: 'tickets', amount: pick([100, 150]) }, { type: 'tickets', amount: pick([200, 300]) }, { type: 'empty' });
+    const n = caps.length;
+    const spots = (shift) => shuffle(caps.map((_, i) => i)).map((slot, k) => ({ x: 12 + (76 * (slot + 0.5)) / n + (Math.random() - 0.5) * 4, y: k % 2 ? 72 : 82 + shift }));
+    const from = spots(0), to = spots(0);
+    return {
+      caps: caps.map((c, i) => ({ ...c, sx: from[i].x, sy: from[i].y, x: to[i].x, y: to[i].y, hue: Math.floor(Math.random() * 360) })),
+      startedAt: 0, x: null, grabbed: null
+    };
+  }
+  // where the claw is along the top (percent across the cabinet): still while the capsules shuffle, then back and forth
+  clawX(at = Date.now()) {
+    const c = this.S.watch?.find?.claw;
+    if (!c) return 50;
+    if (c.x != null) return c.x;
+    const t = Math.max(0, at - c.startedAt - CLAW_SETTLE_MS);
+    const ph = (t % CLAW_PERIOD_MS) / CLAW_PERIOD_MS;
+    return 12 + 76 * (ph < 0.5 ? ph * 2 : 2 - ph * 2);
+  }
+  dropClaw(pid) {
+    const S = this.S;
+    const w = S.watch;
+    if (S.phase !== 'clawPlay' || (pid && pid !== w.watcherId)) return;
+    const c = w.find.claw;
+    c.x = this.clawX();
+    // a weak claw: anything within reach could be the one it closes on, nearer is likelier
+    const near = c.caps.map((cap, i) => [i, Math.abs(cap.x - c.x)]).filter(([, d]) => d < 13);
+    const pool = near.length ? near : [[c.caps.map((cap, i) => [i, Math.abs(cap.x - c.x)]).sort((a, b) => a[1] - b[1])[0][0], 0]];
+    let r = Math.random() * pool.reduce((t, [, d]) => t + 1 / (d + 4), 0);
+    c.grabbed = (pool.find(([, d]) => (r -= 1 / (d + 4)) < 0) || pool[0])[0];
+    const cap = c.caps[c.grabbed];
+    const who = this.player(w.watcherId);
+    if (cap.type === 'ghost') {
+      const g = this.player(cap.pid);
+      if (g) g.ghost = false;
+      w.find.prize = { type: 'ghost', pid: cap.pid, name: g?.name || 'Someone' };
+      this.emit('mood', { pid: cap.pid, mood: 'happy', tv: true, delay: 2800 });
+    } else if (cap.type === 'tickets') {
+      this.addScore(w.watcherId, cap.amount);
+      w.find.prize = { type: 'tickets', amount: cap.amount };
+    } else {
+      w.find.prize = { type: 'empty' };
+    }
+    this.emit('sfx', 'drumroll');
+    const k = Math.min(1, this.speed * 4);
+    setTimeout(() => {
+      this.emit('sfx', cap.type === 'empty' ? 'bad' : 'great');
+      this.emit('say', surpriseLine(S, w.find, who?.name || 'Someone'));
+    }, 2600 * k);
+    this.go('clawGrab', TIMES.clawGrab);
+  }
+
   // ---------- the roaming killer ----------
   spawnMonster(avoid = -1) {
     const S = this.S;
-    const spots = S.spots.map((_, i) => i).filter(i => i !== avoid);
+    let spots = S.spots.map((_, i) => i).filter(i => i !== avoid);
+    const at = S.watch?.at;
+    if (at != null && spots.some(i => this.dist(i, at) >= 2)) spots = spots.filter(i => this.dist(i, at) >= 2);
     const kind = pick(DANGERS.filter(d => d.name !== S.monster?.name));
     S.monster = { spot: pick(spots), name: kind.name, short: kind.short, emoji: kind.emoji, hp: BOSS_HP, maxHp: BOSS_HP };
   }
@@ -563,7 +723,17 @@ export class Game {
   chooseSpot(pid, i) {
     const S = this.S;
     const w = S.watch;
-    if (S.phase !== 'pick' || pid !== w.watcherId || !S.spots[i]) return;
+    if (S.phase !== 'pick' || pid !== w.watcherId || !S.spots[i] || !this.reachable().includes(i)) return;
+    w.hunt = this.hunterStep();
+    w.free = false;
+    w.frozen = false;
+    w.used = w.used || [];
+    w.find = this.rollSurprise(i);
+    if (w.find?.kind === 'swap') i = w.find.to;
+    // the killer already moved (or can't): no step this turn
+    if (['swap', 'ambush', 'salt'].includes(w.find?.kind)) w.hunt = null;
+    w.at = i;
+    w.used.push(i);
     w.spot = i;
     w.st = this.stakesNow(i);
     // the killer's own spot always asks the hardest kind of question
@@ -576,8 +746,26 @@ export class Game {
     w.golden = false;
     w.forced = null;
     this.emit('sfx', 'lock');
-    this.emit('say', `${w.st.haunted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(w.q)}`);
-    this.go('tot', S.event === 'witching' ? 10 / (TIMERS[S.timers] || 1) : TIMES.tot);
+    const who = this.player(w.watcherId)?.name || 'Someone';
+    const secs = S.event === 'witching' ? 10 / (TIMERS[S.timers] || 1) : TIMES.tot;
+    w.totSecs = w.find?.kind === 'batteries' ? secs / 2 : secs;
+    if (w.find?.claw) {
+      w.find.claw.startedAt = Date.now();
+      this.emit('say', surpriseLine(S, w.find, who));
+      return this.go('clawPlay', TIMES.clawPlay);
+    }
+    this.emit('say', `${w.find ? surpriseLine(S, w.find, who) + ' ' : ''}${this.totIntro()}`);
+    this.go('tot', w.totSecs);
+  }
+
+  // the question, after any claw machine
+  totIntro() {
+    const S = this.S;
+    return `${S.watch.st.haunted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(S.watch.q)}`;
+  }
+  askTot() {
+    this.emit('say', this.totIntro());
+    this.go('tot', this.S.watch.totSecs);
   }
 
   answer(pid, i) {
@@ -669,8 +857,14 @@ export class Game {
       this.emit('say', `${name} defeated ${killerName(S)}! And ${w.hit.loot} tickets! But something else is waking up…`);
       this.spawnMonster(w.spot);
     } else {
-      if (w.hit) this.emit('say', `${name} hit ${killerName(S)} for ${w.hit.loot} tickets! It runs off to lick its wounds.`);
-      this.moveMonster();
+      if (w.hit) {
+        this.emit('say', `${name} hit ${killerName(S)} for ${w.hit.loot} tickets! It backs off to lick its wounds.`);
+        // a hit knocks it back: you're standing on its spot, so it lands two spots away from you
+        const away = S.spots.map((_, i) => i).filter(i => this.dist(i, w.at) === 2);
+        if (away.length && !w.frozen) S.monster.spot = pick(away);
+      } else if (w.hunt != null) {
+        S.monster.spot = w.hunt;
+      }
     }
     S.gains = {};
     if (w.saved) {
@@ -1369,7 +1563,7 @@ export class Game {
     if (ok) this.addScore(lost.pid, 300);
     else this.addScore(lost.pid, -lost.stake);
     const p = this.player(lost.pid);
-    if (!ok && p) p.ghost = true;
+    if (!ok && p) { p.ghost = true; p.ghostSince = S.turnIdx; }
     S.mg.result = ok;
     this.emit('sfx', ok ? 'great' : 'howl');
     this.emit('say', ok ? `${name} escaped ${killerName(this.S)}!` : `${name} didn't make it. ${name} is a ghost now, and won't be picked for the night shift.`);
@@ -1556,7 +1750,7 @@ export class Game {
     const ids = this.connected().map(p => p.id);
     const mg = S.mg;
     switch (S.phase) {
-      case 'pick': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
+      case 'pick': case 'clawPlay': return [S.watch.watcherId].filter(id => this.player(id)?.connected);
       case 'tot': return ids.filter(id => S.watch.answers[id] == null);
       case 'decide': return ids.filter(id => id === S.watch.watcherId && !S.watch.decision);
       case 'triviaQ': case 'finaleQ': case 'pollQ': case 'hideQ': case 'guessQ': case 'doorQ': case 'zoomQ': return ids.filter(id => !mg.answers[id]);
@@ -1609,7 +1803,7 @@ export class Game {
             spots: S.spots.map((sp, i) => {
               const hidden = S.event === 'outage';
               const c = CATEGORIES[sp.cat];
-              return { name: sp.name, cat: hidden ? 'Mystery' : c.name, emoji: hidden ? '❓' : c.emoji, ...this.stakesNow(i) };
+              return { name: sp.name, cat: hidden ? 'Mystery' : c.name, emoji: hidden ? '❓' : c.emoji, ...this.stakesNow(i), reach: this.reachable().includes(i), here: w.at === i };
             })
           };
         }
@@ -1618,6 +1812,7 @@ export class Game {
         const c = CATEGORIES[w.q.cat];
         return {
           ...base, screen: 'tot', watcher: w.watcherId === pid, watcherName: watcher?.name,
+          find: w.find ? `${SURPRISES[w.find.kind].emoji} ${surpriseLine(S, w.find, w.watcherId === pid ? 'You' : watcher?.name || 'Someone')}` : null,
           catName: c.name, catEmoji: c.emoji, q: w.q.q, opts: w.q.opts, locked: w.answers[pid] ?? null,
           streak: w.streak, pot: w.pot, ...w.st, side: this.sideRight(), event: EVENTS[S.event], monster: S.monster
         };
@@ -1736,6 +1931,15 @@ export class Game {
       case 'drawGallery': return wait('The gallery', 'Bonus masterpieces on the TV', '🖼️');
       case 'mgResult': return isLost && !mg.result ? wait("You're a ghost now", "You won't get the night shift, but you still play everything else. Watch for a séance…", '👻')
         : wait(mg.result ? `${lostName} made it home!` : `${lostName} is a ghost now`, '', mg.result ? '🏠' : '👻');
+      case 'clawPlay':
+        return w.watcherId === pid
+          ? { ...base, screen: 'stop', title: '🕹️ Claw machine!', sub: 'Watch the claw on the TV and drop it on a capsule. A ghost could come back!', button: 'DROP' }
+          : wait('🕹️ Claw machine!', me.ghost ? `${watcher?.name} is going for the capsules… one might be you!` : `${watcher?.name} is lining up the claw…`, '🕹️');
+      case 'clawGrab': {
+        const prize = w.find?.prize;
+        if (prize?.type === 'ghost' && prize.pid === pid) return { ...wait("You're back!", 'Back from the dead, and back in the night shift draw.', '🕹️'), suspense: true, revealMs: 2600 };
+        return { ...wait('The claw is coming up…', '', '🕹️'), suspense: true, revealMs: 2600 };
+      }
       case 'seanceIntro': return wait('🕯️ Séance', me.ghost ? 'Get ready: fastest right answer comes back to life!' : 'The dead are stirring…', '🕯️');
       case 'seanceQ': {
         const q = mg.questions[0];

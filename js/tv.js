@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
+import { CLAW_SETTLE_MS, CLAW_PERIOD_MS, SURPRISES, surpriseLine, BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -17,7 +17,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 // background music mood for each phase (anything missing is silence)
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
-  dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
+  clawPlay: 'tense', clawGrab: 'tense', dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
   triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', zoomQ: 'quiz', zoomA: 'quiz', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
@@ -120,6 +120,7 @@ export function startTV(root, { resume = null } = {}) {
     if (!pid) return;
     switch (msg.t) {
       case 'pick': game.chooseSpot(pid, Number(msg.i)); break;
+      case 'stop': game.dropClaw(pid); break;
       case 'decide': game.decide(pid, String(msg.choice || '')); break;
       case 'answer':
         if (game.S.phase === 'drawVote') game.vote(pid, Number(msg.i));
@@ -439,28 +440,63 @@ export function startTV(root, { resume = null } = {}) {
     const travel = prowl.from != null && left > 0;
     // pacing starts when the walk ends, and stays on that clock across re-renders
     const pace = travel ? left : -((Date.now() - prowl.at - TRAVEL_MS) % PACE_MS);
-    // the map clips above its top row, so killers up there patrol below their spot instead
+    // the map clips above its top row, so killers up there show their hearts beside them instead of above
     return `<div class="prowler ${travel ? 'travel' : ''} ${y1 < 25 ? 'low' : ''}" title="${esc(m.name)}"
         style="--x0:${x0}%;--y0:${y0}%;--x1:${x1}%;--y1:${y1}%;--dir:${x1 < x0 ? 1 : -1};--travel:-${TRAVEL_MS - left}ms;--pace:${pace}ms">
       <div class="prowl-pace">${hearts(m)}<div class="prowl-face"><span class="prowl-bob">${m.emoji}</span></div></div>
     </div>`;
   }
 
+  // where the killer steps after this answer (toward where the night shift is standing)
+  function huntArrow() {
+    const to = game.hunterStep();
+    if (to == null) return '';
+    const [x0, y0] = spotXY(game.S.monster.spot);
+    const [x1, y1] = spotXY(to);
+    return `<svg class="hunt" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="${x0}" y1="${y0}" x2="${x0 + (x1 - x0) * 0.8}" y2="${y0 + (y1 - y0) * 0.8}" vector-effect="non-scaling-stroke"/></svg>
+      <div class="hunt-to" style="left:${x1}%;top:${y1}%">${game.S.monster.emoji}</div>`;
+  }
+
+  // During a pick the map zooms to frame the night shift, where they can go, the killer and its next step,
+  // so the decision fills the TV. Never tighter than about 3x2 spots; the full map otherwise.
+  let lastZoom = 'none';
+  function mapZoom(w, reach) {
+    const S = game.S;
+    const pts = [w.at, ...reach, S.monster?.spot, game.hunterStep()].filter(i => i != null).map(spotXY);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    // pad for the spot's icon and labels around its centre
+    let x0 = Math.min(...xs) - 11, x1 = Math.max(...xs) + 11, y0 = Math.min(...ys) - 15, y1 = Math.max(...ys) + 16;
+    const grow = (a, b, min) => { const d = Math.max(0, min - (b - a)) / 2; return [a - d, b + d]; };
+    [x0, x1] = grow(x0, x1, 58);
+    [y0, y1] = grow(y0, y1, 62);
+    const k = Math.min(100 / (x1 - x0), 100 / (y1 - y0), 1.8);
+    if (k <= 1.15) return 'none'; // barely closer: not worth moving the camera
+    const clamp = (v, lo) => Math.min(0, Math.max(lo, v));
+    const tx = clamp(50 - ((x0 + x1) / 2) * k, 100 - 100 * k);
+    const ty = clamp(50 - ((y0 + y1) / 2) * k, 100 - 100 * k);
+    return `translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%) scale(${k.toFixed(3)})`;
+  }
+
   function board(highlight = null) {
     const S = game.S;
+    const w = S.watch;
+    const moving = S.phase === 'pick' && w && w.at != null;
+    const reach = moving ? game.reachable() : [];
     const piles = S.spots.map((sp, i) => {
       const hidden = S.event === 'outage' && i !== highlight;
       const c = CATEGORIES[sp.cat];
       const st = game.stakesNow(i);
       const [x, y] = spotXY(i);
-      return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''}" style="left:${x}%;top:${y}%">
+      const where = !moving ? '' : reach.includes(i) ? 'reach' : (w.used || []).includes(i) ? 'used' : 'far';
+      return `<div class="spot cat-spot ${i === highlight ? 'hl' : ''} ${st.haunted ? 'haunted' : ''} ${where}" style="left:${x}%;top:${y}%">
         ${st.golden ? '<div class="golden-tag">⭐ +' + st.golden + '</div>' : ''}
         <div class="cat-badge">${hidden ? '❓' : c.emoji}</div>
         <div class="cat-name">${hidden ? 'Mystery' : esc(c.name)}</div>
         <div class="pile-name">${PILE_ICONS[sp.name] || ''} ${esc(sp.name)}</div>
       </div>`;
     }).join('');
-    return `<div class="map ${S.event === 'outage' ? 'outage' : ''}">
+    const zoom = moving ? mapZoom(w, reach) : 'none';
+    return `<div class="map ${S.event === 'outage' ? 'outage' : ''}"><div class="map-world" style="transform:${lastZoom}" data-zoom="${zoom}">
       <svg class="map-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <defs><radialGradient id="lake" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2c6a8f"/><stop offset="100%" stop-color="#173f57"/></radialGradient></defs>
         <path d="M30 34 L40 12 L46 22 L54 4 L62 18 L68 8 L78 30 Z" fill="#1d3328"/>
@@ -479,8 +515,10 @@ export function startTV(root, { resume = null } = {}) {
       <div class="map-label" style="left:44%;top:30%">White Mountains</div>
       <div class="map-label" style="left:1.5%;top:31%">Lincoln</div>
       ${piles}
+      ${moving ? huntArrow() : ''}
+      ${moving ? `<div class="walker" style="left:${spotXY(w.at)[0]}%;top:${spotXY(w.at)[1]}%">${game.player(w.watcherId)?.avatar || ''}</div>` : ''}
       ${prowler()}
-    </div>`;
+    </div></div>`;
   }
 
   // This or That: two big options; on reveal, each player's pick pops in one by one, then the right one lights up
@@ -548,61 +586,91 @@ export function startTV(root, { resume = null } = {}) {
     return '';
   }
 
-  // Picking the night shift, Cyclone style: one light races around a ring of bulbs, slows down bulb by bulb,
-  // and stops on a player. Players sit at evenly spaced bulbs with blanks between. The lit bulb is worked out
-  // from the time since the spin started, so re-renders mid-spin pick up where it is.
+  // Picking the night shift: an upright prize wheel. One slice per player still waiting this round, pegs on the
+  // rim, and a flapper at the top that clicks against them as the wheel slows and lands on the next player.
+  // The spin is timed from when it started, so a re-render mid-spin carries on instead of restarting.
+  const WHEEL_COLORS = ['#c8322a', '#e09a1c', '#2e7d5b', '#3a6ea5', '#8a4fbf', '#c8602a', '#2b8f8f', '#b8456e'];
   let spunFor = null;
   let spinStart = 0;
-  let chaseTimer = null;
-  const cycloneSlots = (n) => n * Math.max(2, Math.ceil(12 / n)); // bulbs on the ring, a multiple of the players
-  function wheel(wh, winnerId) {
+  let tickTimer = null;
+  // the wheel's slow-down curve, cubic-bezier(.12, .7, .18, 1): progress through the spin -> fraction of the turn
+  const ease = (t) => {
+    let u = t;
+    for (let i = 0; i < 6; i++) {
+      const x = 3 * 0.12 * u * (1 - u) ** 2 + 3 * 0.18 * u * u * (1 - u) + u ** 3;
+      const dx = 3 * 0.12 * (1 - u) ** 2 + 6 * (0.18 - 0.12) * u * (1 - u) + 3 * (1 - 0.18) * u * u;
+      u = Math.min(1, Math.max(0, u - (x - t) / (dx || 1)));
+    }
+    return 3 * 0.7 * u * (1 - u) ** 2 + 3 * u * u * (1 - u) + u ** 3;
+  };
+  function prizeWheel(wh, winnerId) {
     const ids = (wh?.ids?.length ? wh.ids : [winnerId]).filter(id => game.player(id));
     const n = ids.length;
-    const k = cycloneSlots(n);
-    const gap = k / n;
+    const seg = 360 / n;
+    const win = Math.max(0, ids.indexOf(winnerId));
+    // turn until the winner's slice is under the flapper at the top, a little off-centre so it isn't too neat
+    const end = 360 * 5 - (win * seg + seg / 2) + ((wh?.spin ?? 0.5) - 0.5) * seg * 0.6;
     const key = `${game.S.turnIdx}`;
-    if (spunFor !== key) { spunFor = key; spinStart = performance.now(); startChase(); }
-    const now = chaseAt(performance.now() - spinStart); // drawn in place so a re-render keeps the light where it is
-    const bulbs = Array.from({ length: k }, (_, i) => `<i class="cy-bulb ${i % gap === 0 ? 'pl' : ''} ${i === now.lit ? 'lit' : ''}" data-i="${i}" style="--a:${(i * 360) / k}deg"></i>`).join('');
-    const seats = ids.map((id, i) => {
+    if (spunFor !== key) { spunFor = key; spinStart = performance.now(); startTicks(end, seg / 2); }
+    const elapsed = Math.min(SPIN_MS, performance.now() - spinStart);
+    const slices = ids.map((_, i) => `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${i * seg}deg ${(i + 1) * seg}deg`).join(', ');
+    const labels = ids.map((id, i) => {
       const p = game.player(id);
-      const a = (i * gap * 360) / k;
-      return `<div class="cy-seat ${i * gap === now.lit ? 'lit' : ''}" data-i="${i * gap}" style="--a:${a}deg"><span style="--na:${-a}deg">${p.avatar}<small>${esc(p.name)}</small></span></div>`;
+      const a = i * seg + seg / 2;
+      return `<div class="pw-label" style="--a:${a}deg"><span>${p.avatar}<small>${esc(p.name)}</small></span></div>`;
     }).join('');
-    const on = now.lit % gap === 0 ? game.player(ids[now.lit / gap]) : null;
-    return `<div class="cyclone ${now.done ? 'won' : ''}"><div class="cy-dome"></div>${bulbs}${seats}<div class="cy-sign"><small>JACKPOT</small><b id="cy-name">${on ? esc(on.name) : '…'}</b></div></div>`;
+    const pegs = Array.from({ length: n * 2 }, (_, i) => `<i class="pw-peg" style="--a:${(i * seg) / 2}deg"></i>`).join('');
+    return `<div class="prize-wheel ${elapsed >= SPIN_MS ? 'won' : ''}">
+      <div class="pw-flapper"></div>
+      <div class="pw-disc" style="--end:${end}deg;animation-delay:-${Math.round(elapsed)}ms;background:conic-gradient(${slices})">${labels}${pegs}<div class="pw-hub">🎟️</div></div>
+    </div>`;
   }
-  // where the light is: laps of the ring plus the winner's bulb, eased out so it slows to a stop
-  function chaseAt(t) {
-    const wh = game.S.wheel;
-    const ids = (wh?.ids?.length ? wh.ids : [game.S.watch?.watcherId]).filter(id => game.player(id));
-    const k = cycloneSlots(ids.length);
-    const target = Math.max(0, ids.indexOf(game.S.watch?.watcherId)) * (k / ids.length);
-    const total = 3 * k + target;
-    const f = Math.min(1, t / SPIN_MS);
-    return { lit: Math.floor(total * (1 - Math.pow(1 - f, 3))) % k, done: f >= 1, ids, k };
-  }
-  function startChase() {
-    clearInterval(chaseTimer);
-    let last = -1;
-    const step = () => {
-      const ring = root.querySelector('.cyclone');
-      if (!ring) { clearInterval(chaseTimer); return; }
-      const { lit, done, ids, k } = chaseAt(performance.now() - spinStart);
-      ring.querySelectorAll('.cy-bulb').forEach(b => b.classList.toggle('lit', Number(b.dataset.i) === lit));
-      ring.querySelectorAll('.cy-seat').forEach(s => s.classList.toggle('lit', Number(s.dataset.i) === lit));
-      const on = lit % (k / ids.length) === 0 ? game.player(ids[lit / (k / ids.length)]) : null;
-      const name = ring.querySelector('#cy-name');
-      if (name) name.textContent = on ? on.name : '…';
-      if (lit !== last) { last = lit; if (!done) sfx.blip(); }
-      if (done) {
-        clearInterval(chaseTimer);
-        ring.classList.add('won');
+  // a click each time a peg passes the flapper, following the slow-down; a fanfare when it lands
+  function startTicks(end, pegEvery) {
+    clearInterval(tickTimer);
+    let passed = 0;
+    tickTimer = setInterval(() => {
+      const f = Math.min(1, (performance.now() - spinStart) / SPIN_MS);
+      const n = Math.floor((end * ease(f)) / pegEvery);
+      if (n > passed) {
+        passed = n;
+        sfx.blip();
+        const flap = root.querySelector('.pw-flapper');
+        if (flap) { flap.classList.remove('kick'); void flap.offsetWidth; flap.classList.add('kick'); }
+      }
+      if (f >= 1) {
+        clearInterval(tickTimer);
+        root.querySelector('.prize-wheel')?.classList.add('won');
         sfx.great();
       }
-    };
-    chaseTimer = setInterval(step, 30);
-    requestAnimationFrame(step);
+    }, 16);
+  }
+
+  // The claw machine: capsules drop in showing what's inside, close, and shuffle; the claw swings along the top
+  // (on the game's own clock, so where you see it is where it drops); after the tap it goes down, grabs, carries
+  // the capsule to the chute, and it pops open. Everything is timed from the phase start, so re-renders don't reset it.
+  function clawCabinet(phase) {
+    const S = game.S;
+    const c = S.watch.find.claw;
+    const since = Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs));
+    const grab = phase === 'clawGrab';
+    const inside = (cap) => cap.type === 'ghost' ? (game.player(cap.pid)?.avatar || '👻') : cap.type === 'tickets' ? `🎟️<small>${cap.amount}</small>` : '💨';
+    const caps = c.caps.map((cap, i) => `<div class="cap ${grab && i === c.grabbed ? 'grabbed' : ''}" style="--sx:${cap.sx}%;--sy:${cap.sy}%;--cx:${cap.x}%;--cy:${cap.y}%;--h:${cap.hue}"><span class="cap-in">${inside(cap)}</span></div>`).join('');
+    const prize = grab && c.caps[c.grabbed];
+    const startX = grab ? c.x : null;
+    // while playing, the claw's swing is a CSS loop that starts when the game's clock does (after the shuffle),
+    // so its position always matches clawX(), which decides the grab
+    const swingDelay = c.startedAt + CLAW_SETTLE_MS - Date.now();
+    return `<div class="claw-cab ${grab ? 'grab' : 'play'}" style="--in:-${Math.round(since)}ms;--period:${CLAW_PERIOD_MS}ms;--settle:${Math.max(0, CLAW_SETTLE_MS - (Date.now() - c.startedAt))}ms;--swing:${swingDelay}ms;${startX != null ? `--x:${startX}%;` : ''}${prize ? `--gx:${prize.x}%;--gy:${prize.y}%;` : ''}">
+      <div class="cab-sign">🕹️ CLAW MACHINE</div>
+      <div class="cab-glass">
+        <div class="cab-rail"></div>
+        <div class="claw"><div class="claw-cable"><div class="claw-head"></div></div></div>
+        ${caps}
+        <div class="cab-chute"></div>
+      </div>
+      ${prize ? `<div class="cap-reveal ${prize.type}">${prize.type === 'ghost' ? `${game.player(prize.pid)?.avatar || '👻'}<small>${esc(game.player(prize.pid)?.name || 'A ghost')} is back!</small>` : prize.type === 'tickets' ? `🎟️<small>+${prize.amount} tickets</small>` : '💨<small>Just air!</small>'}</div>` : ''}
+    </div>`;
   }
 
   function eventCard(big) {
@@ -651,7 +719,7 @@ export function startTV(root, { resume = null } = {}) {
           <p class="muted" data-step="0">Sneak out of the cabin and win 🎟️ tickets all night. At sunrise, whoever has the most claims the 🏆 grand prize at the arcade counter… if the animatronics don't get you first.</p>
           <ol class="steps">
             <li data-step="1"><span>🔦</span><div><b>Take turns sneaking out on the night shift.</b> Each round, one player is up.</div></li>
-            <li data-step="2"><span>🗺️</span><div><b>Pick a category, answer This or That.</b> The night shift picks a spot on the map and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
+            <li data-step="2"><span>🗺️</span><div><b>Sneak across the map, answer This or That.</b> The night shift moves to a spot next to them (the killer follows!) and answers on their phone. <b>Everyone else answers too</b>: +${game.sideRight()} if right, no risk.</div></li>
             <li data-step="3"><span>🎟️</span><div><b>Right answers fill your pot</b> (+${POT.join(', +')}). After each one: <b>🔦 keep going</b> for more, or <b>🛏️ hide till morning</b> and keep what you have. <b>👑 The leader</b> needs 2 right before they can hide.</div></li>
             <li data-step="4"><span>🌅</span><div><b>3 in a row = 6 AM</b>: you keep the pot plus a +${SIX_AM} bonus.</div></li>
             <li data-step="5"><span>💀</span><div><b>Miss and the killer catches you</b> and you drop the pot. Everyone plays a mini-game; win it to escape, or become a <b>👻 ghost</b>: no more night shifts, unless a séance brings you back.</div></li>
@@ -661,17 +729,24 @@ export function startTV(root, { resume = null } = {}) {
       case 'turnStart':
         return `<div class="center turn-start">
           <p class="muted big">NIGHT ${S.turnIdx + 1} of ${S.turnOrder.length}</p>
-          ${wheel(S.wheel, w.watcherId)}
+          ${prizeWheel(S.wheel, w.watcherId)}
           <div class="late-n" style="--at:${SPIN_MS}ms">
             <h1>${avatar(watcher)} is on the night shift!</h1>
             ${eventCard(true)}
           </div>
         </div>`;
+      case 'clawPlay': case 'clawGrab':
+        return `<div class="center claw-stage">
+          <h2>${avatar(watcher)} found a claw machine! One grab: a ghost could come back…</h2>
+          ${clawCabinet(S.phase)}
+        </div>`;
       case 'pick':
         return `<div class="watch pick-layout">
           <div class="pick-main">${board(null)}${nightTrack(w)}</div>
           <div class="pick-info">
-            <h2>${avatar(watcher)} is picking a category…</h2>
+            <h2>${avatar(watcher)} is picking a spot…</h2>
+            <p class="move-rule">Move to a glowing spot. ${S.monster.emoji} moves one step toward you after each answer.</p>
+            ${w.free ? '<p class="move-rule">🔦 Flashlight: anywhere on the map this time!</p>' : ''}
             ${eventCard(false)}
             <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> lurks at ${esc(S.spots[S.monster.spot].name)} ${hearts(S.monster)}: miss there = double stake, right = <b class="win">⚔️ a hit and a mystery prize</b></p>
           </div>
@@ -686,7 +761,8 @@ export function startTV(root, { resume = null } = {}) {
         // the haunted spot's killer leans in while they answer, timed from the phase start so re-renders don't reset it
         const lean = !reveal && w.st.haunted
           ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
-        return `<div class="watch">${lean}
+        const found = w.find ? `<div class="find ${SURPRISES[w.find.kind].good === true ? 'good' : SURPRISES[w.find.kind].good === false ? 'bad' : ''}"><span>${SURPRISES[w.find.kind].emoji}</span>${esc(surpriseLine(S, w.find, watcher?.name || 'Someone'))}</div>` : '';
+        return `<div class="watch">${lean}${reveal ? '' : found}
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
@@ -1177,6 +1253,14 @@ export function startTV(root, { resume = null } = {}) {
         ${settingsOpen && S.phase === 'lobby' ? settingsPanel() : ''}
       </div>`;
     spritify(root);
+    const world = root.querySelector('.map-world');
+    if (world) {
+      const to = world.dataset.zoom;
+      if (to !== lastZoom) requestAnimationFrame(() => { world.style.transform = to; });
+      lastZoom = to;
+    } else {
+      lastZoom = 'none';
+    }
     if (S.phase === 'intro' || S.phase === 'end') showSteps(true);
 
     if (S.phase === 'lobby') {
