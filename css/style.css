@@ -283,6 +283,10 @@ body.is-phone .moon { display: none; }
 .q { line-height: 1.25; }
 .prompt { color: var(--honey2); }
 .pick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* only the spots you can reach this turn: fewer, bigger buttons */
+.pick-grid.few { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.pick-grid.few .pick { padding: 16px 6px; font-size: 1.1em; }
+.pick-grid.few .cat-em { font-size: 1.6em; }
 .pick { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; }
 .pick b { font-size: 0.8em; }
 .pick small { color: var(--muted); font-size: 0.75em; }
