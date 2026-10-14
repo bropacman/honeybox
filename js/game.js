@@ -100,7 +100,12 @@ export const POT = [200, 300, 500];
 export const SIX_AM = 500;
 export const STAKE = 300;                    // lost if you stay captured; doubled on the killer's spot
 export const SIDE = { right: 100 };
-export const BANISH = 300;                   // bonus for a right answer on the killer's spot
+// Hitting the killer pays hidden loot, rolled from these [tickets, weight] tables. The final blow rolls
+// the bigger one. Players in the bottom half roll twice and keep the better result.
+export const LOOT = [[100, 30], [200, 25], [300, 20], [500, 13], [800, 8], [1500, 4]];
+export const LOOT_FINAL = [[500, 30], [800, 28], [1200, 22], [2000, 14], [3000, 6]];
+export const BOSS_HP = 3;
+export const SURVIVOR = 200;                 // each living player at sunrise
 
 // Night events: one is drawn at the start of each night shift and lasts for that shift
 export const EVENTS = {
@@ -111,7 +116,7 @@ export const EVENTS = {
   fever: { name: 'Funspot Fever', emoji: '🎪', text: 'Everyone else\'s right answers pay double tonight.' },
   wind: { name: 'Mount Washington Wind', emoji: '🌪️', text: 'The categories blew around the map!' },
   witching: { name: 'Witching Hour', emoji: '🕛', text: 'Only 10 seconds to answer tonight.' },
-  moon: { name: 'Full Moon', emoji: '🌕', text: 'Banishing {killer} pays triple tonight.' },
+  moon: { name: 'Full Moon', emoji: '🌕', text: 'Hits on {killer} do double damage tonight.' },
   golden: { name: 'Golden Ticket', emoji: '⭐', text: 'A golden ticket is hidden at one spot: answer right there for +300.' },
   nohide: { name: 'Lockdown', emoji: '🔒', text: 'The cabin door is locked. No hiding tonight until 6 AM!' },
   freeze: { name: 'Brain Freeze', emoji: '🧊', text: 'Only the hardest questions tonight, but the pot pays 50% more.' }
@@ -491,7 +496,7 @@ export class Game {
     const S = this.S;
     const spots = S.spots.map((_, i) => i).filter(i => i !== avoid);
     const kind = pick(DANGERS.filter(d => d.name !== S.monster?.name));
-    S.monster = { spot: pick(spots), name: kind.name, short: kind.short, emoji: kind.emoji };
+    S.monster = { spot: pick(spots), name: kind.name, short: kind.short, emoji: kind.emoji, hp: BOSS_HP, maxHp: BOSS_HP };
   }
 
   moveMonster() {
@@ -501,7 +506,18 @@ export class Game {
 
   // ---------- money ----------
   potValue(streak) { return POT[Math.min(streak, POT.length - 1)] * ({ jackpot: 2, freeze: 1.5 }[this.S.event] || 1); }
-  banishValue() { return BANISH * (this.S.event === 'moon' ? 3 : 1); }
+  // roll hidden loot for hitting the killer; trailing players get two rolls and keep the better
+  rollLoot(pid, final) {
+    const table = final ? LOOT_FINAL : LOOT;
+    const roll = () => {
+      let r = Math.random() * table.reduce((t, [, w]) => t + w, 0);
+      for (const [v, w] of table) { if ((r -= w) < 0) return v; }
+      return table[0][0];
+    };
+    const ranked = this.ranked();
+    const behind = ranked.findIndex(p => p.id === pid) >= ranked.length / 2;
+    return behind ? Math.max(roll(), roll()) : roll();
+  }
   sideRight() { return SIDE.right * (this.S.event === 'fever' ? 2 : 1); }
 
   // what's on the line for the watcher at a given spot right now
@@ -514,7 +530,7 @@ export class Game {
       pot: w ? w.pot : 0,
       risk: STAKE * (haunted ? 2 : 1),
       haunted,
-      banish: haunted ? this.banishValue() : 0,
+      banish: haunted, // a right answer here hits the killer (for hidden loot)
       golden: S.event === 'golden' && S.golden === spot ? GOLDEN : 0
     };
   }
@@ -556,6 +572,7 @@ export class Game {
     w.results = null;
     w.saved = false;
     w.banished = false;
+    w.hit = null;
     w.golden = false;
     w.forced = null;
     this.emit('sfx', 'lock');
@@ -617,7 +634,16 @@ export class Game {
     if (ok) {
       w.pot += w.st.win;
       w.streak++;
-      if (w.st.haunted) { w.banished = true; w.pot += w.st.banish; }
+      if (w.st.haunted) {
+        // a hit: knock off a heart (two under a full moon) and roll hidden loot, paid straight to their tickets
+        const m = S.monster;
+        const dmg = S.event === 'moon' ? 2 : 1;
+        m.hp = Math.max(0, (m.hp ?? BOSS_HP) - dmg);
+        const final = m.hp === 0;
+        w.hit = { dmg, final, loot: this.rollLoot(w.watcherId, final) };
+        this.addScore(w.watcherId, w.hit.loot);
+        w.banished = final;
+      }
       if (w.st.golden) { w.golden = true; w.pot += w.st.golden; S.golden = null; }
     } else if (S.event === 'dogs' && !w.dogsUsed) {
       w.saved = true;
@@ -627,7 +653,7 @@ export class Game {
     const at = revealAt(w.order.length);
     this.emit('sfx', 'drumroll');
     setTimeout(() => {
-      this.emit('sfx', ok ? (w.banished ? 'great' : 'good') : w.saved ? 'good' : 'bad');
+      this.emit('sfx', ok ? (w.hit ? 'great' : 'good') : w.saved ? 'good' : 'bad');
       this.emit('say', `It's ${q.opts[q.ans]}!${w.golden ? ' And that\'s the golden ticket!' : ''}`);
     }, at * k);
     for (const [pid, r] of Object.entries(results)) this.emit('mood', { pid, mood: r ? 'happy' : 'sad', tv: pid === w.watcherId, delay: at + 300 });
@@ -640,9 +666,10 @@ export class Game {
     const name = this.player(w.watcherId)?.name || 'Someone';
     const lurker = { ...S.monster };
     if (w.banished) {
-      this.emit('say', `${name} banished ${S.monster.name}!`);
+      this.emit('say', `${name} defeated ${killerName(S)}! And ${w.hit.loot} tickets! But something else is waking up…`);
       this.spawnMonster(w.spot);
     } else {
+      if (w.hit) this.emit('say', `${name} hit ${killerName(S)} for ${w.hit.loot} tickets! It runs off to lick its wounds.`);
       this.moveMonster();
     }
     S.gains = {};
@@ -1403,11 +1430,13 @@ export class Game {
     S.watch = null;
     S.lost = null;
     S.gains = {};
+    S.survivors = S.players.filter(p => !p.ghost).map(p => p.id);
+    for (const id of S.survivors) this.addScore(id, SURVIVOR);
     const pool = this.connected().length ? this.connected() : S.players;
     const low = Math.min(...pool.map(p => p.score));
     const picker = pick(pool.filter(p => p.score === low));
     S.mg = { type: 'finalePick', picker: picker?.id, options: this.finaleOptions() };
-    this.emit('say', `Five A M. The sun is almost up. ${picker?.name || 'Someone'}, you're in last place, so you choose how the night ends.`);
+    this.emit('say', `Five A M. The sun is almost up.${S.survivors.length ? ` Everyone who survived the night gets ${SURVIVOR} tickets.` : ''} ${picker?.name || 'Someone'}, you're in last place, so you choose how the night ends.`);
     this.go('finalePick', TIMES.finalePick);
   }
 
@@ -1598,7 +1627,7 @@ export class Game {
         const right = w.q.opts[w.q.ans];
         if (mine == null) return { ...wait(`It's ${right}`, 'You didn\'t answer this one.', '🤷'), suspense: true };
         if (pid === w.watcherId && w.saved) return { ...wait('Saved by the dogs!', `It was ${right}. Archie & Honey chased it off.`, '🐕'), suspense: true };
-        if (pid === w.watcherId && w.banished) return { ...wait('You banished it!', `+${w.st.banish} bonus · pot ${w.pot} 🎟️`, '⚡'), suspense: true };
+        if (pid === w.watcherId && w.hit) return { ...wait(w.hit.final ? 'You defeated it!' : 'You hit it!', `🎰 +${w.hit.loot} mystery prize · pot ${w.pot} 🎟️`, '⚔️'), suspense: true };
         if (pid === w.watcherId && w.results[pid]) return { ...wait('Correct!', `Pot: ${w.pot} 🎟️`, '✅'), suspense: true };
         return { ...wait(w.results[pid] ? 'Correct!' : 'Wrong!', `It's ${right}.`, w.results[pid] ? '✅' : '❌'), suspense: true };
       }

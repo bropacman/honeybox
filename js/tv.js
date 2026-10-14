@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
+import { BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -417,6 +417,9 @@ export function startTV(root, { resume = null } = {}) {
     'Funspot': [11, 77], 'Weirs Drive-In': [30, 75], 'Lake Dock': [50, 77], 'Meadowbrook': [70, 75], 'Loudon Speedway': [89, 77]
   };
 
+  // the killer's hearts: a right answer on its spot knocks one off
+  const hearts = (m) => `<span class="hearts">${'❤️'.repeat(m.hp ?? BOSS_HP)}${'🖤'.repeat(Math.max(0, (m.maxHp ?? BOSS_HP) - (m.hp ?? BOSS_HP)))}</span>`;
+
   const spotXY = (i) => SPOTS[game.S.spots[i].name] || [12 + (i % 3) * 38, 18 + Math.floor(i / 3) * 32];
 
   // The killer on the map: the first time the map shows after it moves, it walks over from its old spot;
@@ -439,7 +442,7 @@ export function startTV(root, { resume = null } = {}) {
     // the map clips above its top row, so killers up there patrol below their spot instead
     return `<div class="prowler ${travel ? 'travel' : ''} ${y1 < 25 ? 'low' : ''}" title="${esc(m.name)}"
         style="--x0:${x0}%;--y0:${y0}%;--x1:${x1}%;--y1:${y1}%;--dir:${x1 < x0 ? 1 : -1};--travel:-${TRAVEL_MS - left}ms;--pace:${pace}ms">
-      <div class="prowl-pace"><div class="prowl-face"><span class="prowl-bob">${m.emoji}</span></div></div>
+      <div class="prowl-pace">${hearts(m)}<div class="prowl-face"><span class="prowl-bob">${m.emoji}</span></div></div>
     </div>`;
   }
 
@@ -498,6 +501,14 @@ export function startTV(root, { resume = null } = {}) {
       </div>`;
   }
 
+  // Hidden loot for hitting the killer: a slot reel spins through amounts and lands on the prize
+  function lootReel(hit, at) {
+    const table = (hit.final ? LOOT_FINAL : LOOT).map(([v]) => v);
+    const spins = Array.from({ length: 11 }, (_, i) => table[(i * 3 + table.length - 1) % table.length]);
+    const strip = [...spins, hit.loot].map(v => `<i>+${v}</i>`).join('');
+    return `<div class="loot late-n" style="--at:${at}ms"><span class="loot-label">🎰</span><span class="reel"><span class="strip" style="--n:${spins.length};--at:${at}ms">${strip}</span></span><span>🎟️</span></div>`;
+  }
+
   // The night track: the night shift sneaking from 12 AM to 6 AM with the pot in hand, something waiting in the
   // dark on the way to the next hour, and what the next right answer adds. On a reveal (`at` = when the verdict
   // lands) they walk on to the next hour, or the killer lunges, or a banished killer flees.
@@ -513,10 +524,10 @@ export function startTV(root, { resume = null } = {}) {
         <i></i><span>${t}</span>${i === 3 ? `<small>+${SIX_AM} bonus</small>` : ''}</div>`).join('');
     const fate = !reveal ? '' : reveal.ok ? (haunted ? 'flee' : 'stay') : reveal.saved ? 'stay' : 'lunge';
     const lurk = was < 3 ? `<div class="nt-lurk ${haunted ? 'haunted' : ''} ${fate}" style="left:${mid};--to:${pos(was)};--at:${reveal?.at ?? 0}ms">
-        <span class="nt-killer">${haunted ? S.monster.emoji : '👀'}</span>
+        <span class="nt-killer">${haunted ? S.monster.emoji : '👀'}</span>${haunted && !reveal ? hearts(S.monster) : ''}
         ${reveal ? '' : `<small>${haunted ? `miss: caught, −${st.risk}` : `miss: drop ${w.pot} 🎟️`}</small>`}</div>` : '';
     const win = st?.win ?? game.potValue(w.streak);
-    const gain = !reveal && was < 3 ? `<div class="nt-gain" style="left:${mid}"><b>+${win}</b>${st?.golden ? `<em>⭐ +${st.golden}</em>` : ''}${haunted ? `<em class="banish">⚡ +${st.banish} banish</em>` : ''}</div>` : '';
+    const gain = !reveal && was < 3 ? `<div class="nt-gain" style="left:${mid}"><b>+${win}</b>${st?.golden ? `<em>⭐ +${st.golden}</em>` : ''}${haunted ? '<em class="banish">⚔️ + a mystery prize</em>' : ''}</div>` : '';
     const walk = reveal?.ok ? `--x0:${pos(was)};--at:${reveal.at}ms` : '';
     return `<div class="night-track">
       <div class="nt-road"></div>${stops}${gain}${lurk}
@@ -662,7 +673,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="pick-info">
             <h2>${avatar(watcher)} is picking a category…</h2>
             ${eventCard(false)}
-            <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> lurks at ${esc(S.spots[S.monster.spot].name)}: miss there = double stake, right = <b class="win">+${game.stakesNow(S.monster.spot).banish} banish!</b></p>
+            <p class="lurk-note">${S.monster.emoji} <b>${esc(S.monster.name)}</b> lurks at ${esc(S.spots[S.monster.spot].name)} ${hearts(S.monster)}: miss there = double stake, right = <b class="win">⚔️ a hit and a mystery prize</b></p>
           </div>
         </div>`;
       case 'tot': case 'totReveal': {
@@ -671,7 +682,7 @@ export function startTV(root, { resume = null } = {}) {
         const c = CATEGORIES[q.cat];
         const mine = w.answers[w.watcherId];
         const ok = reveal && w.results[w.watcherId];
-        const verdict = !reveal ? '' : w.saved ? '🐕 SAVED BY THE DOGS!' : w.banished ? `⚡ BANISHED ${S.monster.emoji}!` : ok ? (w.streak >= 3 ? '🌅 6 AM!' : '✅ RIGHT!') : '💀 WRONG!';
+        const verdict = !reveal ? '' : w.saved ? '🐕 SAVED BY THE DOGS!' : w.hit ? `⚔️ ${w.hit.final ? 'DEFEATED' : 'HIT'} ${S.monster.emoji}!` : ok ? (w.streak >= 3 ? '🌅 6 AM!' : '✅ RIGHT!') : '💀 WRONG!';
         // the haunted spot's killer leans in while they answer, timed from the phase start so re-renders don't reset it
         const lean = !reveal && w.st.haunted
           ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
@@ -679,7 +690,7 @@ export function startTV(root, { resume = null } = {}) {
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
-            ? `${nightTrack(w, { st: w.st, reveal: { ok, saved: w.saved, at: revealAt(w.order.length) } })}<div class="reveal-row"><div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}</div>`
+            ? `${nightTrack(w, { st: w.st, reveal: { ok, saved: w.saved, at: revealAt(w.order.length) } })}<div class="reveal-row"><div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${w.hit ? lootReel(w.hit, revealAt(w.order.length) + 500) : q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}</div>`
             : `${nightTrack(w, { st: w.st })}
               <div class="side-note">Everyone else: right answer <b class="win">+${game.sideRight()}</b> ${eventCard(false)}</div>
               `}
@@ -920,6 +931,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="center">
           <div class="emoji-xl">🌅</div>
           <h1>5 AM · Last Light</h1>
+          ${(S.survivors || []).length ? `<p>🌅 Survived the night: ${S.survivors.map(id => avatar(game.player(id))).join(' ')} <b class="win">+${SURVIVOR}</b></p>` : ''}
           <p class="big">${avatar(picker)} is in last place… so they choose how the night ends.</p>
           <div class="finale-opts">${mg.options.map(k => `<div class="finale-opt"><span class="emoji-xl">${FINALES[k].emoji}</span><b>${FINALES[k].name}</b><small>${esc(FINALES[k].blurb)}</small></div>`).join('')}</div>
         </div>`;
