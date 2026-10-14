@@ -31,7 +31,7 @@ const web = createServer(async (req, res) => {
   } catch { res.writeHead(404); res.end(); }
 }).listen(5178, '127.0.0.1');
 
-const peerSrv = spawn(join(ROOT, 'node_modules/.bin/peerjs'), ['--port', '9000', '--host', '127.0.0.1'], { stdio: 'ignore' });
+const peerSrv = spawn(process.execPath, [join(ROOT, 'node_modules/peer/dist/bin/peerjs.js'), '--port', '9000', '--host', '127.0.0.1'], { stdio: 'ignore' });
 await new Promise(r => setTimeout(r, 1500));
 
 const errors = [];
@@ -48,6 +48,8 @@ const peer = 'peer=127.0.0.1:9000';
 const TURBO = Boolean(process.env.TURBO);
 await tv.goto(`${base}?host=1&${peer}&speed=${TURBO ? 0.03 : 0.1}`);
 await tv.click('#open');
+// mute: narration runs at real speed and would lag far behind the fast test timers (the TV falls back to timed reveals)
+await tv.click('[data-act="mute"]');
 await tv.waitForFunction(() => /^[A-Z]{4}$/.test(document.querySelector('.code')?.textContent || ''), null, { timeout: 20000 });
 const code = await tv.textContent('.code');
 console.log('room', code);
@@ -136,7 +138,7 @@ for (let g = 0; g < GAMES; g++) {
   const endedOk = last.startsWith('end') && revealed;
   summary.games.push({ phases: seen, final, endedOk });
   console.log(`game ${g + 1}: ${seen.length} phases, ended=${endedOk}, standingsRevealed=${revealed}`, final);
-  if (!endedOk) break;
+  if (!endedOk) { console.log('last phases:', seen.slice(-20).join(' ')); break; }
   if (minigames.size === 3 && g >= 0) break;
   await tv.click('[data-act="again"]');
   await tv.waitForFunction(() => window.__honeybox.S.phase === 'lobby');

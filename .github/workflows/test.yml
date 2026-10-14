@@ -1,0 +1,34 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # index.html must carry fresh file hashes, or players get a mix of old and new code
+      - name: Check npm run stamp was run
+        run: |
+          npm run stamp
+          git diff --exit-code index.html || { echo "::error::index.html is out of date. Run npm run stamp and commit."; exit 1; }
+
+      - name: Play a full game with bot phones
+        run: npm run e2e:fast
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-artifacts
+          path: test-artifacts/

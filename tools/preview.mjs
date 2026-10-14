@@ -20,7 +20,7 @@ const web = createServer(async (req, res) => {
   if (path === '/') path = '/index.html';
   try { const body = await readFile(join(ROOT, path)); res.writeHead(200, { 'content-type': types[extname(path)] || 'application/octet-stream' }); res.end(body); } catch { res.writeHead(404); res.end(); }
 }).listen(5179, '127.0.0.1');
-const peerSrv = spawn(join(ROOT, 'node_modules/.bin/peerjs'), ['--port', '9001', '--host', '127.0.0.1'], { stdio: 'ignore' });
+const peerSrv = spawn(process.execPath, [join(ROOT, 'node_modules/peer/dist/bin/peerjs.js'), '--port', '9001', '--host', '127.0.0.1'], { stdio: 'ignore' });
 await new Promise(r => setTimeout(r, 1500));
 const browser = await chromium.launch();
 const tv = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
