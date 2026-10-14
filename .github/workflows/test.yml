@@ -18,12 +18,6 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
 
-      # index.html must carry fresh file hashes, or players get a mix of old and new code
-      - name: Check npm run stamp was run
-        run: |
-          npm run stamp
-          git diff --exit-code index.html || { echo "::error::index.html is out of date. Run npm run stamp and commit."; exit 1; }
-
       - name: Play a full game with bot phones
         run: npm run e2e:fast
 

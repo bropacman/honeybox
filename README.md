@@ -49,8 +49,9 @@ direct connections only.
 
 ## Publishing changes
 
-Run `npm run stamp` before committing. It fingerprints every JS/CSS file in `index.html`, so browsers pick up
-new code right away instead of mixing cached old files with new ones.
+Merging to `main` publishes the site: `.github/workflows/deploy.yml` stamps `index.html` (a content hash on every
+JS/CSS file, so browsers pick up new code right away instead of mixing cached old files with new ones) and deploys
+to GitHub Pages. No need to stamp by hand; `npm run stamp` is still there if you want to stamp locally.
 
 ## Testing
 
