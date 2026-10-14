@@ -236,7 +236,7 @@ export function startPhone(root) {
           : `<div class="center"><div class="emoji-xl">${v.emoji}</div><h2>${esc(v.title)}</h2>${v.sub ? `<p>${esc(v.sub)}</p>` : ''}</div>`;
         break;
       case 'stop':
-        body = `<div class="center"><h2>${esc(v.title)}</h2><p>${esc(v.sub)}</p><button class="big-btn stop-btn" data-stop>STOP</button></div>`;
+        body = `<div class="center"><h2>${esc(v.title)}</h2><p>${esc(v.sub)}</p><button class="big-btn stop-btn" data-stop>${esc(v.button || 'STOP')}</button></div>`;
         break;
       case 'pick':
         body = `<h2>Pick a glowing spot</h2>

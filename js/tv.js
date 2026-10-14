@@ -1,6 +1,6 @@
 // The TV (host) screen: owns the Game, talks to phones, renders the big picture.
 
-import { SURPRISES, surpriseLine, BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
+import { CLAW_SETTLE_MS, CLAW_PERIOD_MS, SURPRISES, surpriseLine, BOSS_HP, SURVIVOR, LOOT, LOOT_FINAL, Game, MINIGAMES, LENGTHS, TIMERS, CLOCK, STAKES, NARRATED, ANSWER_PHASES, FINALES, EVENTS, CATEGORIES, POT, SIX_AM, STAKE, CHIP_MS, REVEAL_STEP, SPIN_MS, SEARCH_MS, GUESS_STEP, DOOR_STEP, ZOOM_POINTS, revealAt, killerName, named } from './game.js';
 import { startHost, newRoomCode } from './net.js';
 import { sfx, say, unlockAudio, setMuted, isMuted, characterSound, setMusic, isSpeaking, stopSpeaking, voiceOptions, voiceSettings, setVoice, setStyle, STYLES } from './audio.js';
 import { drawStrokes } from './draw.js';
@@ -17,7 +17,7 @@ const MIN_PLAYERS = params.has('dev') ? 1 : 2;
 // background music mood for each phase (anything missing is silence)
 const MUSIC = {
   intro: 'dread', turnStart: 'tense', pick: 'tense', tot: 'tense', totReveal: 'tense', decide: 'tense', decideReveal: 'tense',
-  candleSpin: 'tense', candleWon: 'tense', dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
+  clawPlay: 'tense', clawGrab: 'tense', dragged: 'dread', mgIntro: 'dread', mgResult: 'dread', seanceIntro: 'dread', seanceQ: 'dread', seanceA: 'dread',
   triviaQ: 'quiz', triviaA: 'quiz', pollQ: 'quiz', pollA: 'quiz', hideQ: 'tense', hideA: 'dread', doorQ: 'tense', doorA: 'tense', zoomQ: 'quiz', zoomA: 'quiz', guessQ: 'quiz', guessA: 'quiz', drawDraw: 'quiz', drawFib: 'quiz', drawVote: 'quiz', drawReveal: 'quiz', drawGallery: 'quiz',
   finalePick: 'tense', end: 'standings', finaleIntro: 'sunrise', finaleQ: 'sunrise', finaleA: 'sunrise', stakesIntro: 'sunrise', stakesBet: 'sunrise', stakesReveal: 'sunrise'
 };
@@ -120,7 +120,7 @@ export function startTV(root, { resume = null } = {}) {
     if (!pid) return;
     switch (msg.t) {
       case 'pick': game.chooseSpot(pid, Number(msg.i)); break;
-      case 'stop': game.stopCandle(pid); break;
+      case 'stop': game.dropClaw(pid); break;
       case 'decide': game.decide(pid, String(msg.choice || '')); break;
       case 'answer':
         if (game.S.phase === 'drawVote') game.vote(pid, Number(msg.i));
@@ -646,42 +646,31 @@ export function startTV(root, { resume = null } = {}) {
     }, 16);
   }
 
-  // The spirit candle, Cyclone style: one light races around a ring of bulbs that all belong to ghosts (ghosts
-  // dead longer own more of them) and the candle-finder hits STOP on their phone. The game decides the bulb the
-  // instant the tap arrives; the TV just shows the light where the game says it is.
-  let candleTimer = null;
-  function candleRing(spin, phase) {
+  // The claw machine: capsules drop in showing what's inside, close, and shuffle; the claw swings along the top
+  // (on the game's own clock, so where you see it is where it drops); after the tap it goes down, grabs, carries
+  // the capsule to the chute, and it pops open. Everything is timed from the phase start, so re-renders don't reset it.
+  function clawCabinet(phase) {
     const S = game.S;
-    const k = spin.bulbs.length;
-    const lit = phase === 'candleWon' ? spin.stoppedAt : game.candleLit();
-    // each ghost sits outside the middle of their run of bulbs
-    const runs = {};
-    spin.bulbs.forEach((id, i) => { (runs[id] ||= []).push(i); });
-    const seats = Object.entries(runs).map(([id, run]) => {
-      const p = game.player(id);
-      const a = (run[Math.floor(run.length / 2)] * 360) / k;
-      return `<div class="cy-seat ${spin.bulbs[lit] === id ? 'lit' : ''}" data-id="${esc(id)}" style="--a:${a}deg"><span style="--na:${-a}deg">${p?.avatar || ''}<small>${esc(p?.name || '')}</small></span></div>`;
-    }).join('');
-    const bulbs = spin.bulbs.map((id, i) => `<i class="cy-bulb own ${i === lit ? 'lit' : ''}" data-i="${i}" data-id="${esc(id)}" style="--a:${(i * 360) / k}deg;--c:${WHEEL_COLORS[Object.keys(runs).indexOf(id) % WHEEL_COLORS.length]}"></i>`).join('');
-    const on = game.player(spin.bulbs[lit]);
-    if (phase === 'candleSpin') startCandleLight();
-    return `<div class="cyclone candle ${phase === 'candleWon' ? 'won' : ''}"><div class="cy-dome"></div>${bulbs}${seats}<div class="cy-sign"><small>🕯️ SPIRIT CANDLE</small><b id="cy-name">${on ? esc(on.name) : '…'}</b></div></div>`;
-  }
-  function startCandleLight() {
-    if (candleTimer) return;
-    let last = -1;
-    candleTimer = setInterval(() => {
-      const ring = root.querySelector('.cyclone.candle');
-      if (!ring || game.S.phase !== 'candleSpin') { clearInterval(candleTimer); candleTimer = null; return; }
-      const lit = game.candleLit();
-      if (lit === last) return;
-      last = lit;
-      ring.querySelectorAll('.cy-bulb').forEach(b => b.classList.toggle('lit', Number(b.dataset.i) === lit));
-      const id = game.S.watch.find.spin.bulbs[lit];
-      ring.querySelectorAll('.cy-seat').forEach(s => s.classList.toggle('lit', s.dataset.id === id));
-      const name = ring.querySelector('#cy-name');
-      if (name) name.textContent = game.player(id)?.name || '…';
-    }, 16);
+    const c = S.watch.find.claw;
+    const since = Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs));
+    const grab = phase === 'clawGrab';
+    const inside = (cap) => cap.type === 'ghost' ? (game.player(cap.pid)?.avatar || '👻') : cap.type === 'tickets' ? `🎟️<small>${cap.amount}</small>` : '💨';
+    const caps = c.caps.map((cap, i) => `<div class="cap ${grab && i === c.grabbed ? 'grabbed' : ''}" style="--sx:${cap.sx}%;--sy:${cap.sy}%;--cx:${cap.x}%;--cy:${cap.y}%;--h:${cap.hue}"><span class="cap-in">${inside(cap)}</span></div>`).join('');
+    const prize = grab && c.caps[c.grabbed];
+    const startX = grab ? c.x : null;
+    // while playing, the claw's swing is a CSS loop that starts when the game's clock does (after the shuffle),
+    // so its position always matches clawX(), which decides the grab
+    const swingDelay = c.startedAt + CLAW_SETTLE_MS - Date.now();
+    return `<div class="claw-cab ${grab ? 'grab' : 'play'}" style="--in:-${Math.round(since)}ms;--period:${CLAW_PERIOD_MS}ms;--settle:${Math.max(0, CLAW_SETTLE_MS - (Date.now() - c.startedAt))}ms;--swing:${swingDelay}ms;${startX != null ? `--x:${startX}%;` : ''}${prize ? `--gx:${prize.x}%;--gy:${prize.y}%;` : ''}">
+      <div class="cab-sign">🕹️ CLAW MACHINE</div>
+      <div class="cab-glass">
+        <div class="cab-rail"></div>
+        <div class="claw"><div class="claw-cable"><div class="claw-head"></div></div></div>
+        ${caps}
+        <div class="cab-chute"></div>
+      </div>
+      ${prize ? `<div class="cap-reveal ${prize.type}">${prize.type === 'ghost' ? `${game.player(prize.pid)?.avatar || '👻'}<small>${esc(game.player(prize.pid)?.name || 'A ghost')} is back!</small>` : prize.type === 'tickets' ? `🎟️<small>+${prize.amount} tickets</small>` : '💨<small>Just air!</small>'}</div>` : ''}
+    </div>`;
   }
 
   function eventCard(big) {
@@ -746,13 +735,11 @@ export function startTV(root, { resume = null } = {}) {
             ${eventCard(true)}
           </div>
         </div>`;
-      case 'candleSpin': case 'candleWon': {
-        const back = game.player(w.find?.pid);
-        return `<div class="center candle-stage">
-          ${candleRing(w.find.spin, S.phase)}
-          <h2>${S.phase === 'candleWon' && back ? `${avatar(back)} is back from the dead!` : `${avatar(watcher)} found a spirit candle! Stop the light on a ghost…`}</h2>
+      case 'clawPlay': case 'clawGrab':
+        return `<div class="center claw-stage">
+          <h2>${avatar(watcher)} found a claw machine! One grab: a ghost could come back…</h2>
+          ${clawCabinet(S.phase)}
         </div>`;
-      }
       case 'pick':
         return `<div class="watch pick-layout">
           <div class="pick-main">${board(null)}${nightTrack(w)}</div>

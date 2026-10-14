@@ -912,7 +912,7 @@ img.px { width: 1.15em; height: 1.15em; }
 .here-ph { position: absolute; top: -10px; left: -6px; font-size: 1.4em; }
 
 /* the night-shift prize wheel (prizeWheel() in tv.js): slices, pegs on the rim, a flapper at the top */
-.prize-wheel { --s: min(58vh, 54cqh); position: relative; flex: none; width: var(--s); height: var(--s); margin: 2vh 0 0.5vh; }
+.prize-wheel { --s: min(58vh, 47cqh); position: relative; flex: none; width: var(--s); height: var(--s); margin: 2vh 0 0.5vh; }
 .pw-disc { position: absolute; inset: 0; border-radius: 50%; border: calc(var(--s) * 0.025) solid #f6e2b0; box-shadow: 0 0 0 calc(var(--s) * 0.012) #6b4a24, 0 0 60px rgba(242, 177, 52, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.45); transform: rotate(var(--end)); animation: wheelSpin 3.8s cubic-bezier(.12, .7, .18, 1) both; }
 @keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(var(--end)); } }
 .pw-label { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: rotate(var(--a)) translateY(calc(var(--s) * -0.32)); }
@@ -926,9 +926,50 @@ img.px { width: 1.15em; height: 1.15em; }
 .pw-flapper.kick { animation: flap 0.12s ease-out; }
 @keyframes flap { 40% { transform: rotate(-22deg); } }
 .prize-wheel.won .pw-disc { box-shadow: 0 0 0 calc(var(--s) * 0.012) #6b4a24, 0 0 90px rgba(255, 211, 77, 0.7), inset 0 0 40px rgba(0, 0, 0, 0.45); }
-/* the spirit candle: every bulb belongs to a ghost, tinted with their colour */
-.cyclone.candle .cy-bulb.own { background: color-mix(in srgb, var(--c) 45%, #241a0a); border-color: color-mix(in srgb, var(--c) 70%, #000); }
-.cyclone.candle .cy-bulb.own.lit { background: #fff3b0; border-color: #ffd34d; }
-.candle-stage h2 { margin-top: 0.4em; }
 .stop-btn { font-size: 2.4em; padding: 0.6em 1.4em; margin-top: 0.6em; background: var(--bad); color: #fff; box-shadow: 0 8px 0 #7a1d16; }
+
+/* the claw machine (clawCabinet() in tv.js) */
+.claw-cab { --cab: min(78vh, 66cqh); position: relative; width: calc(var(--cab) * 1.3); height: var(--cab); margin-top: 0.4em; }
+.cab-sign { position: absolute; left: 50%; top: 0; translate: -50% 0; z-index: 2; padding: 0.1em 0.9em; border-radius: 10px; background: #1b0f05; border: 3px solid #ff5d9e; color: #ff5d9e; font-family: 'Pixel Digits', 'Pixelify Sans', 'Nunito', sans-serif; letter-spacing: 0.15em; box-shadow: 0 0 18px rgba(255, 93, 158, 0.5); }
+.cab-glass { position: absolute; inset: 1.4em 0 0; border-radius: 16px; border: 6px solid #3a6ea5; background: linear-gradient(160deg, rgba(140, 220, 255, 0.10), rgba(20, 40, 60, 0.55)); box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(58, 110, 165, 0.35); overflow: hidden; }
+.cab-rail { position: absolute; left: 4%; right: 4%; top: 5%; height: 6px; border-radius: 3px; background: #9aa3ad; }
+.cab-chute { position: absolute; right: 2%; bottom: 0; width: 13%; height: 30%; border: 4px solid #9aa3ad; border-bottom: none; border-radius: 10px 10px 0 0; background: rgba(0, 0, 0, 0.35); }
+/* the claw spans the cabinet's height, so the cable can be a share of it; the head hangs off the cable's end */
+.claw { position: absolute; top: 5%; bottom: 0; z-index: 3; width: 0; left: var(--x, 50%); }
+.claw-cable { position: absolute; left: -2px; top: 0; width: 4px; height: 6%; background: #c7cdd4; }
+.claw-head { position: absolute; left: 50%; top: 100%; translate: -50% 0; width: calc(var(--cab) * 0.11); height: calc(var(--cab) * 0.09); }
+.claw-head::before, .claw-head::after { content: ''; position: absolute; top: 0; width: 45%; height: 100%; border: 5px solid #c7cdd4; border-top: none; }
+.claw-head::before { left: 0; border-right: none; border-radius: 0 0 0 70%; transform-origin: top right; transform: rotate(18deg); }
+.claw-head::after { right: 0; border-left: none; border-radius: 0 0 70% 0; transform-origin: top left; transform: rotate(-18deg); }
+.claw-cab.play .claw { animation: clawSwing var(--period) linear var(--swing) infinite; }
+@keyframes clawSwing { 0%, 100% { left: 12%; } 50% { left: 88%; } }
+.cap { position: absolute; z-index: 2; left: var(--cx); top: var(--cy); width: calc(var(--cab) * 0.13); height: calc(var(--cab) * 0.13); translate: -50% -50%; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(to bottom, hsl(var(--h) 75% 60%) 0 50%, rgba(240, 240, 255, 0.85) 50% 100%); border: 3px solid rgba(0, 0, 0, 0.35); box-shadow: inset -6px -6px 12px rgba(0, 0, 0, 0.25); }
+.cap-in { font-size: calc(var(--cab) * 0.065); line-height: 1; display: flex; flex-direction: column; align-items: center; }
+.cap-in small { font-size: 0.45em; font-weight: 900; }
+.cap-in img.px { width: 1em; height: 1em; }
+/* loading: capsules show what's inside at their first spot, then close and slide to where they end up */
+.claw-cab.play .cap { animation: capShuffle var(--settle) ease-in-out both; animation-delay: calc(var(--settle) - 2000ms); }
+.claw-cab.play .cap-in { animation: capClose 2000ms steps(1) calc(var(--settle) - 2000ms) both; }
+@keyframes capShuffle { 0%, 45% { left: var(--sx); top: var(--sy); } 100% { left: var(--cx); top: var(--cy); } }
+@keyframes capClose { 0% { visibility: visible; } 40% { visibility: hidden; } 100% { visibility: hidden; } }
+.claw-cab.play .cap .cap-in { visibility: hidden; }
+.claw-cab.grab .cap .cap-in { visibility: hidden; }
+/* the grab: down to the capsule, close, up, over to the chute */
+.claw-cab.grab .claw { animation: clawGrab 2.6s ease-in-out var(--in) both; }
+.claw-cab.grab .claw-cable { animation: cableGrab 2.6s ease-in-out var(--in) both; }
+.claw-cab.grab .claw-head::before { animation: pinchL 2.6s ease-in-out var(--in) both; }
+.claw-cab.grab .claw-head::after { animation: pinchR 2.6s ease-in-out var(--in) both; }
+.claw-cab.grab .cap.grabbed { animation: capGrab 2.6s ease-in-out var(--in) both; z-index: 4; }
+@keyframes clawGrab { 0%, 62% { left: var(--x); } 84%, 100% { left: 91%; } }
+@keyframes cableGrab { 0% { height: 6%; } 30%, 40% { height: calc((var(--gy) - 16%) / 0.95); } 62%, 100% { height: 6%; } }
+@keyframes pinchL { 0%, 32% { transform: rotate(18deg); } 40%, 92% { transform: rotate(-4deg); } 100% { transform: rotate(18deg); } }
+@keyframes pinchR { 0%, 32% { transform: rotate(-18deg); } 40%, 92% { transform: rotate(4deg); } 100% { transform: rotate(-18deg); } }
+@keyframes capGrab { 0%, 40% { left: var(--cx); top: var(--cy); } 62% { left: var(--x); top: 22%; } 84% { left: 91%; top: 22%; } 100% { left: 91%; top: 88%; opacity: 0; } }
+.cap-reveal { position: absolute; left: 50%; top: 50%; z-index: 5; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; padding: 0.3em 0.7em; border-radius: 22px; background: var(--bg2); border: 4px solid var(--honey); font-size: calc(var(--cab) * 0.16); line-height: 1; box-shadow: 0 0 50px rgba(255, 211, 77, 0.6); animation: verdict 0.6s cubic-bezier(.2, 1.6, .4, 1) calc(var(--in) + 2600ms) both; }
+.cap-reveal.ghost { border-color: var(--good); box-shadow: 0 0 60px rgba(95, 209, 138, 0.7); }
+.cap-reveal.empty { border-color: var(--muted); box-shadow: none; }
+.cap-reveal small { font-size: 0.4em; font-weight: 900; }
+.cap-reveal img.px { width: 1em; height: 1em; }
+.claw-stage h2 { margin: 0; }
 
