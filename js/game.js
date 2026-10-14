@@ -169,6 +169,7 @@ export class Game {
       length: 'normal',
       timers: 'medium',
       offCats: [],
+      offGames: [],
       turnOrder: [],
       turnIdx: -1,
       piles: [],
@@ -337,6 +338,17 @@ export class Game {
   }
 
   activeCats() { return Object.keys(TOT).filter(c => !(this.S.offCats || []).includes(c)); }
+
+  // lobby setting: which mini-games can come up (handy for testing one); at least one stays on
+  toggleMinigame(type) {
+    const S = this.S;
+    if (S.phase !== 'lobby' || !MINIGAMES[type]) return;
+    const off = new Set(S.offGames || []);
+    if (off.has(type)) off.delete(type);
+    else if (Object.keys(MINIGAMES).filter(t => !off.has(t)).length > 1) off.add(type);
+    S.offGames = [...off];
+    this.changed();
+  }
 
   setTimers(t) {
     if (TIMERS[t] && this.S.phase === 'lobby') { this.S.timers = t; this.changed(); }
@@ -697,7 +709,10 @@ export class Game {
   startMinigame() {
     const S = this.S;
     // Cabin Census needs a crowd: skip it with fewer than 3 players
-    const allowed = Object.keys(MINIGAMES).filter(t => (t !== 'poll' || this.connected().length >= 3) && (t !== 'zoom' || (this.S.zoomOk || []).length >= 8));
+    const playable = Object.keys(MINIGAMES).filter(t => (t !== 'poll' || this.connected().length >= 3) && (t !== 'zoom' || (this.S.zoomOk || []).length >= 8));
+    // the lobby's picks, unless none of them can run right now (e.g. only Cabin Census with 2 players)
+    const picked = playable.filter(t => !(S.offGames || []).includes(t));
+    const allowed = picked.length ? picked : playable;
     S.bag = S.bag.filter(t => allowed.includes(t));
     if (!S.bag.length) S.bag = shuffle(allowed);
     const type = S.bag.pop();
