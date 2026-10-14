@@ -761,8 +761,9 @@ export function startTV(root, { resume = null } = {}) {
         // the haunted spot's killer leans in while they answer, timed from the phase start so re-renders don't reset it
         const lean = !reveal && w.st.haunted
           ? `<div class="peeker" style="--dur:${S.phaseMs}ms;--in:-${Math.max(0, S.phaseMs - (game.timeLeft() ?? S.phaseMs))}ms"><span>${S.monster.emoji}</span></div>` : '';
+        const cut = w.intercepted ? `<div class="find bad"><span>${S.monster.emoji}</span>${esc(`${watcher?.name || 'They'} stepped into its path! ${killerName(S, true)} is here.`)}</div>` : '';
         const found = w.find ? `<div class="find ${SURPRISES[w.find.kind].good === true ? 'good' : SURPRISES[w.find.kind].good === false ? 'bad' : ''}"><span>${SURPRISES[w.find.kind].emoji}</span>${esc(surpriseLine(S, w.find, watcher?.name || 'Someone'))}</div>` : '';
-        return `<div class="watch">${lean}${reveal ? '' : found}
+        return `<div class="watch">${lean}${reveal ? '' : cut + found}
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal

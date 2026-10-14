@@ -244,7 +244,7 @@ export function startPhone(root) {
           ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
           <p class="small">${v.monster.emoji} lurks at <b>${esc(v.spots[v.monster.spot].name)}</b>: miss there = double stake, right = <b class="win">⚔️ a hit and a mystery prize</b></p>
           ${v.spots.some(p => p.here) ? `<p class="muted small">📍 You're at ${esc(v.spots.find(p => p.here).name)}</p>` : ''}
-          <div class="pick-grid few">${v.spots.map((p, i) => [p, i]).filter(([p]) => p.reach).map(([p, i]) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small></button>`).join('')}</div>`;
+          <div class="pick-grid few">${v.spots.map((p, i) => [p, i]).filter(([p]) => p.reach).map(([p, i]) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small>${p.next ? `<small class="next-ph">⚠️ ${v.monster.emoji} heading here</small>` : ''}</button>`).join('')}</div>`;
         break;
       case 'tot':
         body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>

@@ -976,4 +976,4 @@ img.px { width: 1.15em; height: 1.15em; }
 .cap-reveal small { font-size: 0.4em; font-weight: 900; }
 .cap-reveal img.px { width: 1em; height: 1em; }
 .claw-stage h2 { margin: 0; }
-
+.pick .next-ph { color: var(--bad); font-weight: 800; }
