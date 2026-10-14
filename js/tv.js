@@ -302,6 +302,27 @@ export function startTV(root, { resume = null } = {}) {
     if (e.key === 'n' || e.key === 'N') game.skip();
   });
 
+  // the lobby's invite link (it carries the room code, so friends skip typing it)
+  function copyLink(b) {
+    const label = (text) => { b.textContent = text; spritify(b); };
+    const done = (ok) => {
+      label(ok ? '✅ Copied!' : `🔗 ${b.dataset.url}`);
+      if (ok) setTimeout(() => label('🔗 Copy invite link'), 2000);
+    };
+    const fallback = () => {
+      const t = document.createElement('textarea');
+      t.value = b.dataset.url;
+      document.body.append(t);
+      t.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { /* show the link instead */ }
+      t.remove();
+      done(ok);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(b.dataset.url).then(() => done(true), fallback);
+    else fallback();
+  }
+
   root.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
@@ -315,6 +336,7 @@ export function startTV(root, { resume = null } = {}) {
     if (act === 'kick') game.kick(b.dataset.id);
     if (act === 'players') { playersOpen = !playersOpen; render(); }
     if (act === 'settings') { settingsOpen = !settingsOpen; render(); }
+    if (act === 'copylink') copyLink(b);
     if (act === 'retro') { fx.toggleRetro(); render(); }
     if (act === 'fxlevel') { fx.setLevel(FX_LEVELS[(FX_LEVELS.indexOf(fx.level) + 1) % FX_LEVELS.length]); render(); }
     if (act === 'fxset') { fx.setLevel(b.dataset.l); render(); }
@@ -581,7 +603,7 @@ export function startTV(root, { resume = null } = {}) {
             <div class="qr" id="qr"></div>
             <p class="join-at">On your phone, go to<br><b>${esc(joinUrl.replace(/^https?:\/\//, ''))}</b></p>
             <div class="code">${ready ? code : '····'}</div>
-            ${ready ? '' : '<p class="muted">Opening the cabin…</p>'}
+            ${ready ? `<button class="copy-link" data-act="copylink" data-url="${esc(url)}">🔗 Copy invite link</button>` : '<p class="muted">Opening the cabin…</p>'}
           </div>
           <div class="lobby-side">
             <h2>Around the campfire (${S.players.length}/8)</h2>
