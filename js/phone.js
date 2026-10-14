@@ -239,11 +239,12 @@ export function startPhone(root) {
         body = `<div class="center"><h2>${esc(v.title)}</h2><p>${esc(v.sub)}</p><button class="big-btn stop-btn" data-stop>${esc(v.button || 'STOP')}</button></div>`;
         break;
       case 'pick':
-        body = `<h2>Pick a glowing spot</h2>
+        body = `<h2>Pick your next spot</h2>
           <p class="muted">${v.streak}/3 · pot <b>${v.pot} 🎟️</b> · next right answer <b class="win">+${v.win}</b></p>
           ${v.event ? `<p class="event-chip">${v.event.emoji} ${esc(v.event.name)}</p>` : ''}
           <p class="small">${v.monster.emoji} lurks at <b>${esc(v.spots[v.monster.spot].name)}</b>: miss there = double stake, right = <b class="win">⚔️ a hit and a mystery prize</b></p>
-          <div class="pick-grid">${v.spots.map((p, i) => `<button class="pick ${p.haunted ? 'haunted' : ''} ${p.here ? 'here' : ''}" data-pick="${i}" ${p.reach ? '' : 'disabled'}>${p.here ? `<span class="here-ph">${v.me.avatar}</span>` : ''}${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small></button>`).join('')}</div>`;
+          ${v.spots.some(p => p.here) ? `<p class="muted small">📍 You're at ${esc(v.spots.find(p => p.here).name)}</p>` : ''}
+          <div class="pick-grid few">${v.spots.map((p, i) => [p, i]).filter(([p]) => p.reach).map(([p, i]) => `<button class="pick ${p.haunted ? 'haunted' : ''}" data-pick="${i}">${p.haunted ? `<span class="lurk-ph">${v.monster.emoji}</span>` : ''}<span class="cat-em">${p.emoji}</span><b>${esc(p.cat)}</b><small>${p.golden ? '⭐ golden ticket' : esc(p.name)}</small>${p.next ? `<small class="next-ph">⚠️ ${v.monster.emoji} heading here</small>` : ''}</button>`).join('')}</div>`;
         break;
       case 'tot':
         body = `<p class="role">${v.watcher ? `🔦 Your night shift · ${v.streak}/3` : `${esc(v.watcherName)}'s night shift`} · ${v.catEmoji} ${esc(v.catName)}</p>

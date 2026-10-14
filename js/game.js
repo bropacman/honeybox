@@ -732,6 +732,9 @@ export class Game {
     if (w.find?.kind === 'swap') i = w.find.to;
     // the killer already moved (or can't): no step this turn
     if (['swap', 'ambush', 'salt'].includes(w.find?.kind)) w.hunt = null;
+    // stepping where the arrow pointed: the killer arrives as you do, and this spot plays like its lair
+    w.intercepted = w.hunt != null && w.hunt === i;
+    if (w.intercepted) { S.monster.spot = i; w.hunt = null; }
     w.at = i;
     w.used.push(i);
     w.spot = i;
@@ -754,14 +757,14 @@ export class Game {
       this.emit('say', surpriseLine(S, w.find, who));
       return this.go('clawPlay', TIMES.clawPlay);
     }
-    this.emit('say', `${w.find ? surpriseLine(S, w.find, who) + ' ' : ''}${this.totIntro()}`);
+    this.emit('say', `${w.intercepted ? `Bad move! ${killerName(S, true)} was heading right here! ` : ''}${w.find ? surpriseLine(S, w.find, who) + ' ' : ''}${this.totIntro()}`);
     this.go('tot', w.totSecs);
   }
 
   // the question, after any claw machine
   totIntro() {
     const S = this.S;
-    return `${S.watch.st.haunted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(S.watch.q)}`;
+    return `${S.watch.st.haunted && !S.watch.intercepted ? `Careful… ${S.monster.name} is lurking here. ` : ''}${this.totLine(S.watch.q)}`;
   }
   askTot() {
     this.emit('say', this.totIntro());
@@ -1803,7 +1806,7 @@ export class Game {
             spots: S.spots.map((sp, i) => {
               const hidden = S.event === 'outage';
               const c = CATEGORIES[sp.cat];
-              return { name: sp.name, cat: hidden ? 'Mystery' : c.name, emoji: hidden ? '❓' : c.emoji, ...this.stakesNow(i), reach: this.reachable().includes(i), here: w.at === i };
+              return { name: sp.name, cat: hidden ? 'Mystery' : c.name, emoji: hidden ? '❓' : c.emoji, ...this.stakesNow(i), reach: this.reachable().includes(i), here: w.at === i, next: this.hunterStep() === i };
             })
           };
         }
