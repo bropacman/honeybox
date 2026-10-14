@@ -673,7 +673,7 @@ body.is-phone .moon { display: none; }
 .guess-row small { color: var(--muted); text-align: right; }
 .guess-row.won { animation: lateIn 0.4s ease-out var(--at) both, wonRow 0.6s ease-out var(--end) both; }
 @keyframes wonRow { to { border-color: var(--honey); box-shadow: 0 0 40px rgba(242, 177, 52, 0.6); transform: scale(1.04); } }
-.guess-answer { font-size: min(3.4em, 10cqh); font-weight: 900; color: var(--honey2); text-shadow: 0 0 30px rgba(242, 177, 52, 0.6); }
+.guess-answer { font-size: min(3.4em, 9cqh); line-height: 1.1; font-weight: 900; color: var(--honey2); text-shadow: 0 0 30px rgba(242, 177, 52, 0.6); }
 
 /* phone number entry */
 .num-row { display: flex; align-items: center; gap: 0.5em; margin: 1em 0; }
