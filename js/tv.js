@@ -361,6 +361,22 @@ export function startTV(root, { resume = null } = {}) {
       </div>`).join('')}</div>`;
   }
 
+  // Top bar, left: which mini-game, which round, and who's captured, in the same spot on every mini-game screen
+  const MG_STATUS = ['triviaQ', 'triviaA', 'finaleQ', 'finaleA', 'pollQ', 'pollA', 'hideQ', 'hideA', 'zoomQ', 'zoomA', 'doorQ', 'doorA',
+    'guessQ', 'guessA', 'drawDraw', 'drawFib', 'drawVote', 'drawReveal', 'drawGallery'];
+  function statusLine(S) {
+    const mg = S.mg;
+    if (!mg || !MG_STATUS.includes(S.phase)) return '';
+    const m = MINIGAMES[mg.type] || FINALES[mg.type];
+    const name = S.phase.startsWith('finale') ? '🐻 Trivia Blitz · double tickets' : m ? `${m.emoji} ${m.name}` : '';
+    const total = (mg.questions || mg.rounds || []).length;
+    const round = total && mg.qi >= 0 && mg.type !== 'draw' ? ` <span class="muted">${mg.qi + 1}/${total}</span>` : '';
+    const lost = !mg.finale && S.lost && game.player(S.lost.pid);
+    return `<div class="quiz-head">${name}${round}${lost ? ` · captured: ${avatar(lost)}` : ''}</div>`;
+  }
+  // Top bar, right: who has answered, on every screen where everyone answers
+  const WAIT_PHASES = ANSWER_PHASES.filter(ph => !['pick', 'decide', 'finalePick'].includes(ph));
+
   function waitingStrip() {
     const ids = game.waitingOn();
     const S = game.S;
@@ -398,7 +414,8 @@ export function startTV(root, { resume = null } = {}) {
     const travel = prowl.from != null && left > 0;
     // pacing starts when the walk ends, and stays on that clock across re-renders
     const pace = travel ? left : -((Date.now() - prowl.at - TRAVEL_MS) % PACE_MS);
-    return `<div class="prowler ${travel ? 'travel' : ''}" title="${esc(m.name)}"
+    // the map clips above its top row, so killers up there patrol below their spot instead
+    return `<div class="prowler ${travel ? 'travel' : ''} ${y1 < 25 ? 'low' : ''}" title="${esc(m.name)}"
         style="--x0:${x0}%;--y0:${y0}%;--x1:${x1}%;--y1:${y1}%;--dir:${x1 < x0 ? 1 : -1};--travel:-${TRAVEL_MS - left}ms;--pace:${pace}ms">
       <div class="prowl-pace"><div class="prowl-face"><span class="prowl-bob">${m.emoji}</span></div></div>
     </div>`;
@@ -430,12 +447,12 @@ export function startTV(root, { resume = null } = {}) {
         <path d="M88 100 C 86 80, 88 62, 86 50 S 80 30, 74 22" fill="none" stroke="#3a3a33" stroke-width="2.6"/>
         <path d="M28 100 C 26 80, 24 64, 22 50 S 14 30, 12 10" fill="none" stroke="#3a3a33" stroke-width="2.6"/>
       </svg>
-      <div class="deco" style="left:6%;top:58%">🌲</div><div class="deco" style="left:34%;top:62%">🌲</div>
+      <div class="deco" style="left:9%;top:63%">🌲</div><div class="deco" style="left:34%;top:62%">🌲</div>
       <div class="deco" style="left:70%;top:60%">🌲</div><div class="deco" style="left:94%;top:70%">🌲</div>
-      <div class="deco" style="left:88%;top:12%">🌲</div><div class="deco" style="left:4%;top:92%">🌲</div>
+      <div class="deco" style="left:96%;top:30%">🌲</div><div class="deco" style="left:4%;top:92%">🌲</div>
       <div class="map-label" style="left:40%;top:95%">Lake Winnipesaukee</div>
       <div class="map-label" style="left:44%;top:30%">White Mountains</div>
-      <div class="map-label" style="left:2%;top:54%">Lincoln</div>
+      <div class="map-label" style="left:1.5%;top:31%">Lincoln</div>
       ${piles}
       ${prowler()}
     </div>`;
@@ -640,10 +657,10 @@ export function startTV(root, { resume = null } = {}) {
           <div class="watch-head"><h2>${avatar(watcher)} at ${esc(S.spots[w.spot].name)} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2></div>
           ${totBoard(q, reveal ? w.order : null, w.answers, w.watcherId)}
           ${reveal
-            ? `${nightTrack(w, { st: w.st, reveal: { ok, saved: w.saved, at: revealAt(w.order.length) } })}<div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}`
+            ? `${nightTrack(w, { st: w.st, reveal: { ok, saved: w.saved, at: revealAt(w.order.length) } })}<div class="reveal-row"><div class="vs result late-n ${ok || w.saved ? 'ok' : 'bad'}" style="--at:${revealAt(w.order.length)}ms">${verdict}</div>${q.note ? `<p class="fact late-n" style="--at:${revealAt(w.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : ''}</div>`
             : `${nightTrack(w, { st: w.st })}
               <div class="side-note">Everyone else: right answer <b class="win">+${game.sideRight()}</b> ${eventCard(false)}</div>
-              ${waitingStrip()}`}
+              `}
         </div>`;
       }
       case 'decide': case 'decideReveal': {
@@ -689,19 +706,16 @@ export function startTV(root, { resume = null } = {}) {
         const q = mg.questions[mg.qi];
         const poll = S.phase === 'pollQ';
         const choices = poll ? game.pollChoices(q) : q.c;
-        const title = poll ? '📋 Cabin Census' : S.phase === 'finaleQ' ? '🐻 Trivia Blitz · double tickets' : '🐻 Bear Trivia';
         return `<div class="quiz">
-          <div class="quiz-head">${title} <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost && !poll && S.phase !== 'finaleQ' ? ` · captured: ${avatar(lost)}` : ''}${lost && poll ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${esc(q.q)}</h1>
           ${poll ? '<p class="muted">Pick what you think MOST people will pick.</p>' : ''}
           <div class="answers ${choices.length > 4 ? 'many' : ''}">${choices.map((c, i) => `<div class="ans"><span class="letter">${'ABCDEFGH'[i]}</span>${esc(c)}</div>`).join('')}</div>
-          ${waitingStrip()}
+          
         </div>`;
       }
       case 'triviaA': case 'finaleA': {
         const q = mg.questions[mg.qi];
         return `<div class="quiz">
-          <div class="quiz-head">${S.phase === 'finaleA' ? '🐻 Trivia Blitz' : '🐻 Bear Trivia'} <span class="muted">${mg.qi + 1}/${mg.questions.length}</span></div>
           <h1 class="q">${esc(q.q)}</h1>
           <div class="answers reveal-q2" style="--at:${revealAt((mg.order || []).length)}ms">${q.c.map((c, i) => {
             const chips = (mg.order || []).map((id, k) => {
@@ -717,7 +731,6 @@ export function startTV(root, { resume = null } = {}) {
         const choices = game.pollChoices(q);
         const total = Math.max(1, q.counts.reduce((a, b) => a + b, 0));
         return `<div class="quiz">
-          <div class="quiz-head">📋 Cabin Census <span class="muted">${mg.qi + 1}/${mg.questions.length}</span></div>
           <h1 class="q">${esc(q.q)}</h1>
           <div class="bars reveal-poll" style="--last:${choices.length}">${choices.map((c, i) => {
             const who = Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean);
@@ -745,12 +758,11 @@ export function startTV(root, { resume = null } = {}) {
         }).join('');
         const exposed = reveal ? game.connected().filter(p => !mg.answers[p.id]) : [];
         return `<div class="quiz hide-game">
-          <div class="quiz-head">🙈 Hide and Seek <span class="muted">${mg.qi + 1}/${mg.rounds.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${reveal ? 'Ready or not…' : 'Where will you hide?'}</h1>
           ${reveal ? '' : `<p class="muted">${esc(killerName(S, true))} checks the most crowded spot first, then one more. Unfound = +200</p>`}
           <div class="hide-grid">${cards}</div>
           ${exposed.length ? `<p class="muted">Caught in the open: ${exposed.map(p => p.avatar).join(' ')}</p>` : ''}
-          ${reveal ? '' : waitingStrip()}
+          
         </div>`;
       }
       case 'zoomQ': case 'zoomA': {
@@ -761,7 +773,6 @@ export function startTV(root, { resume = null } = {}) {
         const elapsed = Math.min(total, Date.now() - mg.startedAt);
         const img = `<img src="${esc(q.file)}" alt="" style="transform-origin:${q.fx * 100}% ${q.fy * 100}%;${reveal ? '' : `animation:zoomOut ${total}ms linear -${elapsed}ms both;`}${game.isPaused() ? 'animation-play-state:paused;' : ''}">`;
         return `<div class="quiz zoom-game">
-          <div class="quiz-head">🔍 Zoom In <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
           <div class="zoom-row">
             <div class="zoom-frame ${reveal ? 'revealed' : ''}">${img}</div>
             <div class="zoom-side">
@@ -770,7 +781,7 @@ export function startTV(root, { resume = null } = {}) {
                 const who = reveal ? Object.entries(mg.answers).filter(([, a]) => a.i === i).map(([id]) => game.player(id)).filter(Boolean) : [];
                 return `<div class="ans ${reveal ? (i === q.a ? 'right-n' : 'wrong-n') : ''}" style="--at:0ms"><span class="letter">${'ABCD'[i]}</span>${esc(c)}<span class="voters">${who.map(p => `${p.avatar}${gainTag(p.id)}`).join(' ')}</span></div>`;
               }).join('')}</div>
-              ${reveal ? '' : waitingStrip()}
+              
             </div>
           </div>
         </div>`;
@@ -790,12 +801,11 @@ export function startTV(root, { resume = null } = {}) {
         }).join('');
         const froze = reveal ? game.connected().filter(p => !mg.answers[p.id]) : [];
         return `<div class="quiz door-game">
-          <div class="quiz-head">🚪 Pick a Door <span class="muted">${mg.qi + 1}/${mg.rounds.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${reveal ? 'Let\'s open them up…' : 'Which door?'}</h1>
           ${reveal ? '' : `<p class="muted">🎁 +300 · 🍬 +100 · one hides ${esc(killerName(S))}</p>`}
           <div class="doors">${doors}</div>
           ${froze.length ? `<p class="muted">Froze and didn't pick: ${froze.map(p => p.avatar).join(' ')}</p>` : ''}
-          ${reveal ? '' : waitingStrip()}
+          
         </div>`;
       }
       case 'guessQ': case 'guessA': {
@@ -808,11 +818,10 @@ export function startTV(root, { resume = null } = {}) {
           return p ? `<div class="guess-row ${won ? 'won' : ''}" style="--at:${k * GUESS_STEP}ms;--end:${mg.revealMs}ms"><span>${p.avatar} ${esc(p.name)}</span><b>${fmt(mg.answers[id].n)}</b><small>${fmt(Math.abs(mg.answers[id].n - q.a))} off</small>${gainTag(id)}</div>` : '';
         }).join('') : '';
         return `<div class="quiz guess-game">
-          <div class="quiz-head">📏 Closest Guess <span class="muted">${mg.qi + 1}/${mg.questions.length}</span>${lost ? ` · captured: ${avatar(lost)}` : ''}</div>
           <h1 class="q">${esc(q.q)}</h1>
           ${reveal
             ? `<div class="guess-rows">${rows}</div><div class="guess-answer late-n" style="--at:${mg.revealMs}ms">${fmt(q.a)} ${esc(q.unit)}</div>`
-            : `<p class="big">Type your best guess${q.unit ? ` (in ${esc(q.unit)})` : ''} on your phone. Closest wins!</p>${waitingStrip()}`}
+            : `<p class="big">Type your best guess${q.unit ? ` (in ${esc(q.unit)})` : ''} on your phone. Closest wins!</p>`}
         </div>`;
       }
       case 'drawDraw':
@@ -821,15 +830,15 @@ export function startTV(root, { resume = null } = {}) {
           <h1>Sketchy Woods</h1>
           <p class="big">Everyone: draw your secret prompt on your phone!</p>
           ${mg.finale ? '<p class="big win">🌅 Finale · double tickets</p>' : `<p>Captured: ${avatar(lost)} — someone needs to guess your drawing or you lose ${S.lost.stake} 🎟️.</p>`}
-          ${waitingStrip()}
+          
         </div>`;
       case 'drawFib': case 'drawVote': case 'drawReveal': {
         const artist = game.player(game.artistId());
         let side = '';
         if (S.phase === 'drawFib') {
-          side = `<h2>What is this masterpiece? 🤔</h2><p class="big">Write a <b>fake title</b> on your phone.</p><p class="muted">Fool the others: points for every vote your lie gets.</p>${waitingStrip()}`;
+          side = `<h2>What is this masterpiece? 🤔</h2><p class="big">Write a <b>fake title</b> on your phone.</p><p class="muted">Fool the others: points for every vote your lie gets.</p>`;
         } else if (S.phase === 'drawVote') {
-          side = `<h2>Which is the real title?</h2><div class="opts">${mg.options.map(o => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>${waitingStrip()}`;
+          side = `<h2>Which is the real title?</h2><div class="opts">${mg.options.map(o => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>`;
         } else {
           const order = (mg.revealSeq || mg.options.map((_, i) => i)).map(i => [mg.options[i], i]);
           side = `<h2>The reveal</h2><div class="opts">${order.map(([o, i], k) => {
@@ -893,7 +902,7 @@ export function startTV(root, { resume = null } = {}) {
         return `<div class="watch">
           <div class="watch-head"><h2>🌅 Sunrise Stakes · question ${mg.round} of ${mg.rounds} · <span class="cat-chip">${c.emoji} ${esc(c.name)}</span></h2><div class="stake-val">±${STAKES.values[mg.round - 1]} 🎟️</div></div>
           ${totBoard(q, reveal ? mg.order : null, answers, null)}
-          ${reveal ? (q.note ? `<p class="fact late-n" style="--at:${revealAt(mg.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : '') : waitingStrip()}
+          ${reveal ? (q.note ? `<p class="fact late-n" style="--at:${revealAt(mg.order.length) + 400}ms">💡 ${esc(q.note)}</p>` : '') : ''}
         </div>`;
       }
       case 'end': {
@@ -1082,25 +1091,31 @@ export function startTV(root, { resume = null } = {}) {
     if (S.phase !== 'end') musicOverride = null;
     setMusic(hurryOn ? 'panic' : (musicOverride || MUSIC[S.phase] || 'none'));
     const showSide = !['lobby', 'end', 'scores', 'intro'].includes(S.phase);
-    const cap = captive(S);
+    // Three bands: status on top, the screen itself, and the captive strip / controls at the bottom.
+    // The bars take their own space, so a screen's content can never slide under them.
     root.innerHTML = `
-      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''} ${cap ? 'has-captive' : ''}">
+      <div class="tv phase-${S.phase} ${hurryOn ? 'hurry' : ''}">
         <div id="final-count" class="final-count"></div>
         ${splash}
+        <header class="tv-top">
+          <div class="top-left">${statusLine(S)}</div>
+          <div id="timer" class="battery idle"><div class="cells">${'<i></i>'.repeat(5)}</div><span class="secs"></span></div>
+          <div class="top-right">${WAIT_PHASES.includes(S.phase) ? waitingStrip() : ''}</div>
+          ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
+        </header>
         <div class="tv-main">${stage()}</div>
-        ${showSide ? `<div class="mini-code">${code}</div>` : ''}
-        <div id="timer" class="battery idle"><div class="cells">${'<i></i>'.repeat(5)}</div><span class="secs"></span></div>
-        <div class="host-ctl">
+        <footer class="tv-bottom">
+          <div class="bottom-left">${captive(S)}${showSide ? `<div class="mini-code">${code}</div>` : ''}</div>
+          <div class="host-ctl">
           ${S.phase === 'lobby' ? '<button data-act="settings" title="Settings">⚙️ Settings</button>' : ''}
           <button data-act="mute" title="Sound">${isMuted() ? '🔇' : '🔊'}</button>
           <button data-act="retro" title="Film grain">${fx.retro ? '📺' : '🖥️'}</button>
           <button data-act="fxlevel" title="Effects: ${fx.level}">✨ ${fx.level}</button>
           ${S.phase !== 'lobby' ? '<button data-act="players" title="Players">👥</button>' : ''}
           ${S.phase !== 'lobby' && S.phase !== 'end' ? `<button data-act="pause" title="Pause (space)">${game.isPaused() ? '▶️' : '⏸'}</button><button data-act="skip" title="Skip (N)">⏭</button>` : ''}
-        </div>
+          </div>
+        </footer>
         ${game.isPaused() ? '<div class="paused">PAUSED</div>' : ''}
-        ${cap}
-        ${S.phase !== 'lobby' && S.players.some(p => !p.connected) ? `<div class="dc-banner">📵 ${S.players.filter(p => !p.connected).map(p => `${p.avatar} ${esc(p.name)}`).join(', ')} disconnected · rejoin with code <b>${code}</b> · 👥 to fix</div>` : ''}
         ${playersOpen && S.phase !== 'lobby' ? playersPanel() : ''}
         ${settingsOpen && S.phase === 'lobby' ? settingsPanel() : ''}
       </div>`;
