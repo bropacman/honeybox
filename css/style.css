@@ -450,12 +450,13 @@ body.is-phone .moon { display: none; }
 .lurk-note { font-size: 0.9em; }
 .spot.haunted .stack .card { box-shadow: 0 0 0 4px var(--bad), 0 0 30px rgba(255, 60, 60, 0.7); }
 /* the killer patrols above its spot, and walks the map when it moves (timing vars set in tv.js) */
-.prowler { position: absolute; left: var(--x1); top: var(--y1); z-index: 4; font-size: 2.6em; line-height: 1; transform: translate(-50%, -185%); pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); }
-.prowler.low { transform: translate(-50%, 95%); }
+.prowler { position: absolute; left: var(--x1); top: var(--y1); z-index: 4; font-size: min(2.6em, 5cqh); line-height: 1; transform: translate(-50%, -185%); pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 40, 40, 0.9)); }
+.prowler.low { transform: translate(-50%, 150%); }
 .prowler.travel { animation: prowlTravel 2.6s ease-in-out var(--travel) both; }
 .prowl-pace { animation: prowlPace 9s linear var(--pace) infinite; }
 .prowl-face { transform: scaleX(var(--dir)); animation: prowlFace 9s step-end var(--pace) infinite; }
-.prowler .hearts { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-size: 0.32em; white-space: nowrap; letter-spacing: -0.1em; }
+.prowler .hearts { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-size: 0.42em; white-space: nowrap; letter-spacing: -0.1em; }
+.prowler.low .hearts { bottom: auto; top: 100%; }
 .hearts img.px { width: 1em; height: 1em; }
 .nt-lurk .hearts { position: absolute; left: 50%; bottom: 2.6em; transform: translateX(-50%); font-size: 0.7em; white-space: nowrap; }
 .lurk-note .hearts { font-size: 0.9em; }
