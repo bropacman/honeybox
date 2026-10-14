@@ -17,11 +17,11 @@ export const TIMES = {
 };
 
 export const MINIGAMES = {
-  trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Caught? Get 2 right to escape its grasp.' },
+  trivia: { name: 'Bear Trivia', emoji: '🐻', rules: 'Answer 3 questions. Caught? Be the fastest right answer once to escape its grasp.' },
   draw: { name: 'Sketchy Woods', emoji: '🖍️', rules: 'Draw your secret prompt. Then fib a title for the drawing and find the real one. The captured player needs someone to guess theirs.' },
-  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Caught? Match the crowd 2 of 3 times to escape its grasp.' },
+  poll: { name: 'Cabin Census', emoji: '📋', rules: 'Pick the answer you think MOST people will pick. Caught? Be the fastest to match the crowd once to escape its grasp.' },
   hide: { name: 'Hide and Seek', emoji: '🙈', rules: 'Pick a hiding spot. {Killer} checks the most crowded spot first, then one more. Caught? Stay hidden 2 of 3 times to escape its grasp.' },
-  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins. Caught? Beat at least one other camper 2 of 3 times to escape its grasp.' },
+  guess: { name: 'Closest Guess', emoji: '📏', rules: 'Guess the number. Closest wins, and a tie goes to the faster guess. Caught? Win a round once to escape its grasp.' },
   zoom: { name: 'Zoom In', emoji: '🔍', rules: 'A photo starts super zoomed in and slowly zooms out. The fastest right answers win 300, 200 and 100. Caught? Be the fastest right answer once to escape its grasp.' },
   door: { name: 'Pick a Door', emoji: '🚪', rules: 'Three doors: a prize, a little prize, and {killer}. Pick one. Caught? Dodge {killer} 2 of 3 times to escape its grasp.' }
 };
@@ -728,12 +728,14 @@ export class Game {
       mg.questions = this.takeTrivia(3);
       mg.qi = -1;
       mg.correct = {};
+      mg.firsts = {};
       return this.askTrivia();
     }
     if (mg.type === 'poll') {
       mg.questions = this.takePolls(3);
       mg.qi = -1;
       mg.hits = {};
+      mg.firsts = {};
       return this.askPoll();
     }
     if (mg.type === 'hide') {
@@ -757,7 +759,7 @@ export class Game {
     if (mg.type === 'guess') {
       mg.questions = this.takeGuesses(3);
       mg.qi = -1;
-      mg.beat = {};
+      mg.firsts = {};
       return this.askGuess();
     }
     return this.startDrawing();
@@ -793,6 +795,15 @@ export class Game {
     this.go(finale ? 'finaleQ' : 'triviaQ', finale ? TIMES.finaleQ : TIMES.triviaQ);
   }
 
+  // Of the players who gave the round's best answer, the fastest wins the round (that's what frees a captured
+  // player). Finales don't track it. Returns the winner's id.
+  creditRound(best) {
+    const mg = this.S.mg;
+    const top = best.slice().sort((a, b) => mg.answers[a].at - mg.answers[b].at)[0];
+    if (top && mg.firsts) mg.firsts[top] = (mg.firsts[top] || 0) + 1;
+    return top;
+  }
+
   revealTrivia() {
     const S = this.S;
     const mg = S.mg;
@@ -807,6 +818,7 @@ export class Game {
       this.addScore(pid, pts);
       if (mg.correct) mg.correct[pid] = (mg.correct[pid] || 0) + 1;
     }
+    this.creditRound(Object.keys(mg.answers).filter(id => mg.answers[id].i === q.a));
     mg.order = this.revealOrder(Object.keys(mg.answers));
     const at = revealAt(mg.order.length);
     for (const p of this.connected()) {
@@ -825,7 +837,7 @@ export class Game {
     if (mg.qi + 1 < mg.questions.length) return this.askTrivia();
     if (mg.type === 'finale' || mg.finale) return this.finish();
     const lost = this.S.lost;
-    return this.finishMinigame((mg.correct[lost.pid] || 0) >= 2);
+    return this.finishMinigame((mg.firsts[lost.pid] || 0) >= 1);
   }
 
   takePolls(n) {
@@ -878,6 +890,7 @@ export class Game {
           mg.hits[pid] = (mg.hits[pid] || 0) + 1;
         }
       }
+      this.creditRound(Object.keys(mg.answers).filter(id => counts[mg.answers[id].i] === top));
     }
     const choices = this.pollChoices(q);
     const at = 900 * choices.length + 600;
@@ -897,7 +910,7 @@ export class Game {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askPoll();
     if (mg.finale) return this.finish();
-    return this.finishMinigame((mg.hits[this.S.lost.pid] || 0) >= 2);
+    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= 1);
   }
 
   // ---------- Hide and Seek ----------
@@ -1098,7 +1111,7 @@ export class Game {
     this.checkAllDone();
   }
 
-  // Guesses pop in farthest first; the closest guess wins. "Beat" = someone else was farther off.
+  // Guesses pop in farthest first; the closest guess wins.
   revealGuess() {
     const S = this.S;
     const mg = S.mg;
@@ -1108,14 +1121,11 @@ export class Game {
     const ids = Object.keys(mg.answers);
     mg.order = ids.slice().sort((a, b) => off(b) - off(a));
     const best = ids.length ? Math.min(...ids.map(off)) : null;
-    mg.winners = ids.filter(id => off(id) === best);
+    // equally close guesses: the faster one wins
+    const top = this.creditRound(ids.filter(id => off(id) === best));
+    mg.winners = top ? [top] : [];
     S.gains = {};
     for (const id of mg.winners) this.addScore(id, 300);
-    const everyone = this.connected().map(p => p.id);
-    for (const id of everyone) {
-      const mine = mg.answers[id] ? off(id) : Infinity;
-      if (everyone.some(o => o !== id && (mg.answers[o] ? off(o) : Infinity) > mine)) mg.beat[id] = (mg.beat[id] || 0) + 1;
-    }
     const end = mg.order.length * GUESS_STEP + 800;
     mg.revealMs = end;
     const fmt = (x) => (q.unit ? Number(x).toLocaleString('en-US') : String(x));
@@ -1132,7 +1142,7 @@ export class Game {
   nextGuess() {
     const mg = this.S.mg;
     if (mg.qi + 1 < mg.questions.length) return this.askGuess();
-    return this.finishMinigame((mg.beat[this.S.lost.pid] || 0) >= 2);
+    return this.finishMinigame((mg.firsts[this.S.lost.pid] || 0) >= 1);
   }
 
   // Drawful-style

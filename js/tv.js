@@ -997,7 +997,12 @@ export function startTV(root, { resume = null } = {}) {
       const have = Math.min(1, mg.firsts?.[id] || 0);
       return { have, need: 1, text: have ? 'Escaped: fastest right answer!' : 'Escape: be the fastest right answer once' };
     }
-    const tally = { trivia: mg.correct, poll: mg.hits, hide: mg.safe, guess: mg.beat, door: mg.dodged }[mg.type];
+    if (mg.type === 'trivia' || mg.type === 'poll' || mg.type === 'guess') {
+      const have = Math.min(1, mg.firsts?.[id] || 0);
+      const how = { trivia: 'be the fastest right answer', poll: 'be the fastest to match the crowd', guess: 'win a round (ties go to the faster guess)' }[mg.type];
+      return { have, need: 1, text: have ? 'Escaped: won a round!' : `Escape: ${how} once` };
+    }
+    const tally = { hide: mg.safe, door: mg.dodged }[mg.type];
     const have = Math.min(2, tally?.[id] || 0);
     return { have, need: 2, text: !tally ? '' : have >= 2 ? 'Escaped!' : `Escape: ${have} of 2` };
   }
